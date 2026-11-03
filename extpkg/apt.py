@@ -131,6 +131,7 @@ class Repo:
         self.verify_signature = verify_signature
         self.signature = "unchecked"
         self._release = None
+        self.by_hash = False
 
     def _base(self):
         if self.flat:
@@ -165,6 +166,7 @@ class Repo:
         if not ok and self.verify_signature:
             raise AptError(f"signature check failed for {self._base()} (add the key to keys/)")
         self._release = _release_hashes(text)
+        self.by_hash = bool(re.search(r"^Acquire-By-Hash:\s*yes\s*$", text, re.M | re.I))
         return self._release
 
     def packages(self, arch):
@@ -178,9 +180,7 @@ class Repo:
                 if stem + ext not in hashes:
                     continue
                 want, size = hashes[stem + ext]
-                raw = self._get(stem + ext)
-                if hashlib.sha256(raw).hexdigest() != want or len(raw) != size:
-                    raise AptError(f"{self._base()}/{stem}{ext}: index hash does not match Release")
+                raw = self._index(stem, ext, want, size)
                 for st in _parse_stanzas(unpack(raw).decode("utf-8", "replace")):
                     st["_component"] = comp
                     out.append(st)
@@ -189,6 +189,30 @@ class Repo:
                 # The component lists nothing for this architecture.
                 continue
         return out
+
+    def _index(self, stem, ext, want, size):
+        """Fetch one index and check it against Release.
+
+        With Acquire-By-Hash, take the index by its hash, as apt does: that
+        path never changes, so it always matches the Release that named it.
+        A CDN can serve a new Release with an old Packages for some minutes
+        after the repository changes (seen on packages.microsoft.com).
+        """
+        paths = []
+        if self.by_hash:
+            paths.append(f"{os.path.dirname(stem)}/by-hash/SHA256/{want}")
+        paths.append(stem + ext)
+        last = None
+        for path in paths:
+            try:
+                raw = self._get(path)
+            except net.FetchError as e:
+                last = e
+                continue
+            if hashlib.sha256(raw).hexdigest() == want and len(raw) == size:
+                return raw
+            last = AptError(f"{self._base()}/{path}: index hash does not match Release")
+        raise last
 
     def pool_url(self, filename):
         return f"{self.url}/{filename}"
