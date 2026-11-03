@@ -130,7 +130,25 @@ jobs:
           fi
           install -d -m 700 ~/.ssh
           printf '%s\n' "$KEY" > ~/.ssh/id_upload && chmod 600 ~/.ssh/id_upload
-          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts_upload
+          # Pin the host key from the secret, in the host format that ssh
+          # expects: take the server's scanned keys whose fingerprint is in
+          # the secret. Only fingerprints are printed.
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts_secret
+          want=$(ssh-keygen -lf ~/.ssh/known_hosts_secret 2>/dev/null | awk '{print $2}' | sort -u)
+          ssh-keyscan -p "${PORT:-22}" "$HOST" 2>/dev/null > ~/.ssh/known_hosts_scan || true
+          : > ~/.ssh/known_hosts_upload
+          while read -r line; do
+            case "$line" in ""|"#"*) continue ;; esac
+            fp=$(printf '%s\n' "$line" | ssh-keygen -lf - 2>/dev/null | awk '{print $2}')
+            grep -qxF "$fp" <<< "$want" && printf '%s\n' "$line" >> ~/.ssh/known_hosts_upload
+          done < ~/.ssh/known_hosts_scan
+          if [ ! -s ~/.ssh/known_hosts_upload ]; then
+            echo "::error::No server host key matches KNOWN_HOSTS_ARMBIAN_UPLOAD"
+            echo "Secret fingerprints:"; printf '  %s\n' $want
+            echo "Server fingerprints:"; ssh-keygen -lf ~/.ssh/known_hosts_scan 2>/dev/null | awk '{print "  " $2, $4}'
+            exit 1
+          fi
+          echo "Host key pinned: $(ssh-keygen -lf ~/.ssh/known_hosts_upload | awk '{print $2, $4}' | paste -sd' ')"
           printf 'Host %s\n  IdentityFile ~/.ssh/id_upload\n  IdentitiesOnly yes\n' "$HOST" > ~/.ssh/config
           echo "dest=${USER}@${HOST}:${UPLOAD_PATH}" >> "$GITHUB_OUTPUT"
           echo "port=${PORT:-22}" >> "$GITHUB_OUTPUT"
