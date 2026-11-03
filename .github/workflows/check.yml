@@ -57,8 +57,14 @@ jobs:
               | xargs -r -n1 basename | sed 's/\.yaml$//' \
               | while read -r n; do [ -f "packages/$n.yaml" ] && echo "$n"; done | paste -sd, -)
           fi
+          count=$(printf '%s' "$names" | tr ',' '\n' | grep -c . || true)
+          echo "Changed package configs (${count}): ${names:-none}"
+          # A download of many configs belongs in the Sync workflow (dry run).
+          if [ "$count" -gt 8 ]; then
+            echo "::notice::${count} configs changed: plan only. Run 'Sync external packages' with dry_run for a download test."
+            names=""
+          fi
           echo "names=${names}" >> "$GITHUB_OUTPUT"
-          echo "Changed package configs: ${names:-none}"
 
       - name: Dry-run download of changed configs
         if: steps.changed.outputs.names != ''
