@@ -149,7 +149,12 @@ Manual for now. Inputs: `only` (config names) and `dry_run` (default true).
 
 Each shard keeps the `manifest.json` of its last successful run in the GitHub Actions cache (`state-<live|dry>-shard-<n>-<run id>`).
 A file is not downloaded again when the config, release, architecture, URL and upstream SHA256 match an entry in that manifest. The server already has it.
-`url` files have no upstream hash, so they are always downloaded.
+Without an upstream hash, the identity is:
+
+- `url`: the final URL after redirects (without the query), `ETag`, `Last-Modified` and size, from a `HEAD` request in the plan;
+- `github` assets without a digest (older releases): asset ID, update time and size.
+
+A file with the same identity is not downloaded again. It is still unverified.
 State is saved only after a successful run. Dry runs and live runs keep separate state.
 
 #### Upload

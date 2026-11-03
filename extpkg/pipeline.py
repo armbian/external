@@ -166,8 +166,8 @@ class Fetcher:
         if self.stop and self.stop():
             self.skipped.append({**base, "file": cand["filename"], "reason": "stopped: upload failed"})
             return []
-        prev = cand.get("sha256") and self.previous.get(
-            (entry["config"], entry["release"], entry["arch"], cand["url"], cand["sha256"]))
+        ident = cand.get("sha256") or cand.get("identity")
+        prev = ident and self.previous.get((entry["config"], entry["release"], entry["arch"], cand["url"], ident))
         if prev:
             # Uploaded by an earlier run, and the server keeps it.
             with self._guard:
@@ -240,6 +240,7 @@ class Fetcher:
             "signature": cand.get("signature", "none"),
             "checksum": "verified" if cand.get("sha256") else "none",
             "upstream_sha256": cand.get("sha256"),
+            "upstream_id": cand.get("identity"),
             "published": have,
             "beta": beta_rel,
             "stable": stable_rel,
@@ -275,8 +276,9 @@ def fetch(plan_doc, pkgs, out, cache, pub_url=published.DEFAULT_URL, jobs=8, pru
     f.progress = net.Progress("fetch", sum(len(e["candidates"]) for e in plan_doc["entries"]))
     if previous:
         for x in previous.get("files", []):
-            if x.get("upstream_sha256"):
-                f.previous[(x["config"], x["release"], x["arch"], x["source"], x["upstream_sha256"])] = x
+            ident = x.get("upstream_sha256") or x.get("upstream_id")
+            if ident:
+                f.previous[(x["config"], x["release"], x["arch"], x["source"], ident)] = x
     groups = {}
     for e in plan_doc["entries"]:
         if e.get("skip"):

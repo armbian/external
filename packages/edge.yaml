@@ -17,5 +17,3 @@ target: desktop
 install:
 - microsoft-edge-stable
 filter: Name (% microsoft-edge-stable)
-verify:
-  checksums: false

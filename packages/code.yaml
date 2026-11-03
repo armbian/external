@@ -20,5 +20,3 @@ target: desktop
 install:
 - code
 filter: Name (% code)
-verify:
-  checksums: false

@@ -63,5 +63,8 @@ def resolve(pkg, release_name, arch, keyring=None):
             "size": a.get("size"),
             "signature": "none",
             "tag": rel.get("tag_name"),
+            # Older assets have no digest: identify them by id, update time and size.
+            "identity": None if digest.startswith("sha256:") else
+            f"gh:{a.get('id')}|{a.get('updated_at')}|{a.get('size')}",
         })
     return out
