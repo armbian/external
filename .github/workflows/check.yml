@@ -42,9 +42,12 @@ jobs:
       - name: Install missing tools
         run: |
           need=()
-          for t in gpgv:gpgv dpkg-deb:dpkg fakeroot:fakeroot; do
+          for t in gpgv:gpgv dpkg-deb:dpkg fakeroot:fakeroot apt-get:apt; do
             command -v "${t%%:*}" >/dev/null || need+=("${t##*:}")
           done
+          # Archive keys for the dependency check.
+          [ -f /usr/share/keyrings/debian-archive-keyring.gpg ] || need+=(debian-archive-keyring)
+          [ -f /usr/share/keyrings/ubuntu-archive-keyring.gpg ] || need+=(ubuntu-keyring)
           python3 -c 'import yaml' 2>/dev/null || need+=(python3-yaml)
           if [ ${#need[@]} -gt 0 ]; then
             SUDO=$(command -v sudo || true)
@@ -80,11 +83,21 @@ jobs:
           fi
           echo "names=${names}" >> "$GITHUB_OUTPUT"
 
-      - name: Dry-run download of changed configs
+      - name: Restore apt index lists
         if: steps.changed.outputs.names != ''
+        uses: actions/cache/restore@v6
+        with:
+          path: .cache/apt-lists
+          key: depcheck-lists-${{ github.run_id }}
+          restore-keys: depcheck-lists-
+
+      - name: Dry-run download and dependency check of changed configs
+        if: steps.changed.outputs.names != ''
+        # Fails on a failed download, check or dependency: the PR must not merge.
         run: |
-          python3 -m extpkg run --dry-run --strict --jobs 12 \
-            --only "${{ steps.changed.outputs.names }}" --out output --cache "${RUNNER_TEMP}/cache"
+          python3 -m extpkg run --dry-run --strict --depcheck --jobs 12 \
+            --only "${{ steps.changed.outputs.names }}" --out output --cache "${RUNNER_TEMP}/cache" \
+            --lists-cache .cache/apt-lists
 
       - name: Keep plan and manifest
         if: always()

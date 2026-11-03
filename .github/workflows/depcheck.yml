@@ -1,0 +1,122 @@
+name: "Dependency check"
+
+# Daily: can apt install the packages that changed upstream since the last
+# check? Report only. Failures go to one open issue with the label
+# "depcheck". Configs that a person changes are checked in pull requests.
+
+on:
+  schedule:
+    - cron: "40 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: depcheck
+  cancel-in-progress: false
+
+jobs:
+  depcheck:
+    runs-on: ${{ fromJSON(vars.RUNNER_LABELS || '"ubuntu-latest"') }}
+    timeout-minutes: 120
+    env:
+      ARMBIAN_BUILD_DIR: ${{ github.workspace }}/build
+      GITHUB_TOKEN: ${{ github.token }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Runner clean (self-hosted runner)
+        if: runner.environment != 'github-hosted'
+        uses: armbian/actions/runner-clean@main
+
+      - uses: actions/checkout@v7
+
+      - name: Checkout armbian/build (supported releases only)
+        uses: actions/checkout@v7
+        with:
+          repository: armbian/build
+          path: build
+          sparse-checkout: config/distributions
+
+      - name: Install missing tools
+        run: |
+          need=()
+          for t in gpgv:gpgv dpkg-deb:dpkg fakeroot:fakeroot apt-get:apt; do
+            command -v "${t%%:*}" >/dev/null || need+=("${t##*:}")
+          done
+          python3 -c 'import yaml' 2>/dev/null || need+=(python3-yaml)
+          [ -f /usr/share/keyrings/debian-archive-keyring.gpg ] || need+=(debian-archive-keyring)
+          [ -f /usr/share/keyrings/ubuntu-archive-keyring.gpg ] || need+=(ubuntu-keyring)
+          if [ ${#need[@]} -gt 0 ]; then
+            SUDO=$(command -v sudo || true)
+            $SUDO apt-get update -qq
+            $SUDO apt-get install -y --no-install-recommends "${need[@]}"
+          fi
+
+      - name: Restore state and apt index lists
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            state
+            .cache/apt-lists
+          key: depcheck-${{ github.run_id }}
+          restore-keys: depcheck-
+
+      - name: Check
+        run: |
+          args=(--dry-run --depcheck --jobs 12 --out output --cache "${RUNNER_TEMP}/cache"
+                --lists-cache .cache/apt-lists)
+          [ -f state/manifest.json ] && args+=(--previous state/manifest.json)
+          python3 -m extpkg run "${args[@]}"
+
+      - name: Report failures in an issue
+        run: |
+          python3 - > "${RUNNER_TEMP}/issue.md" <<'EOF'
+          import json
+          m = json.load(open("output/manifest.json"))
+          bad = [x for x in m.get("depcheck", []) if x["ok"] is False]
+          if bad:
+              print("Packages that apt cannot install on an Armbian release.")
+              print("Found by the daily dependency check. Fix the package config, then close this issue.")
+              print()
+              print("| config | release | arch | packages | cause |")
+              print("|---|---|---|---|---|")
+              for x in bad:
+                  print(f"| {x['config']} | {x['release']} | {x['arch']} | {' '.join(x['packages'])} | {x['message'][:300]} |")
+              print()
+              print(f"Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}")
+          EOF
+          if [ ! -s "${RUNNER_TEMP}/issue.md" ]; then
+            echo "No dependency failures."
+            exit 0
+          fi
+          gh label create depcheck --color B60205 --description "Daily dependency check" 2>/dev/null || true
+          num=$(gh issue list --label depcheck --state open --json number --jq '.[0].number // empty')
+          if [ -n "$num" ]; then
+            gh issue comment "$num" --body-file "${RUNNER_TEMP}/issue.md"
+          else
+            gh issue create --title "Dependency check failures" --label depcheck --body-file "${RUNNER_TEMP}/issue.md"
+          fi
+
+      - name: Save state
+        if: success()
+        run: mkdir -p state && cp output/manifest.json state/manifest.json
+
+      - name: Store state and apt index lists
+        if: success()
+        uses: actions/cache/save@v6
+        with:
+          path: |
+            state
+            .cache/apt-lists
+          key: depcheck-${{ github.run_id }}
+
+      - name: Keep manifest
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: depcheck
+          path: output/manifest.json
+          if-no-files-found: ignore
+          retention-days: 14
