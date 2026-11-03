@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.RUNNER_LABELS || '"ubuntu-latest"') }}
     timeout-minutes: 60
     env:
       ARMBIAN_BUILD_DIR: ${{ github.workspace }}/build
@@ -49,8 +49,18 @@ jobs:
           path: build
           sparse-checkout: config/distributions
 
-      - name: Install tools
-        run: sudo apt-get install -y --no-install-recommends fakeroot python3-yaml
+      - name: Install missing tools
+        run: |
+          need=()
+          for t in gpgv:gpgv dpkg-deb:dpkg fakeroot:fakeroot; do
+            command -v "${t%%:*}" >/dev/null || need+=("${t##*:}")
+          done
+          python3 -c 'import yaml' 2>/dev/null || need+=(python3-yaml)
+          if [ ${#need[@]} -gt 0 ]; then
+            SUDO=$(command -v sudo || true)
+            $SUDO apt-get update -qq
+            $SUDO apt-get install -y --no-install-recommends "${need[@]}"
+          fi
 
       - name: Unit tests
         run: python3 -m unittest discover -s tests -t . -v

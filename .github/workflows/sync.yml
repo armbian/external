@@ -5,8 +5,12 @@ name: "Sync external packages"
 #   debs/extra/<release>-<target>/        only when newer than the published stable version
 #
 # Dry-run is the default. An upload needs dry_run=false and the upload secrets.
-# The destination is the repository variable UPLOAD_PATH; the default keeps
-# test runs out of the production incoming directory.
+# Every runner uploads with rsync over SSH to the repository server.
+#
+# Repository variables:
+#   RUNNER_LABELS  JSON runner labels, e.g. ["self-hosted","Linux","X64"]. Default: GitHub-hosted.
+#   CACHE_DIR      persistent download cache on self-hosted runners. Default: per job.
+#   UPLOAD_PATH    destination on the server. Default keeps test runs out of production.
 
 on:
   workflow_dispatch:
@@ -33,7 +37,7 @@ concurrency:
 jobs:
   sync:
     name: "Shard ${{ matrix.shard }}/4"
-    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ fromJSON(vars.RUNNER_LABELS || '"ubuntu-latest"') }}
     timeout-minutes: 120
     strategy:
       fail-fast: false
@@ -44,6 +48,7 @@ jobs:
       GITHUB_TOKEN: ${{ github.token }}
       DRY_RUN: ${{ github.event_name != 'workflow_dispatch' && 'false' || inputs.dry_run }}
       UPLOAD_PATH: ${{ vars.UPLOAD_PATH || 'storage/incoming/external-next' }}
+      CACHE_DIR: ${{ vars.CACHE_DIR }}
     steps:
       - name: Free disk space (GitHub-hosted runner)
         if: runner.environment == 'github-hosted'
@@ -68,8 +73,44 @@ jobs:
           path: build
           sparse-checkout: config/distributions
 
-      - name: Install tools
-        run: sudo apt-get install -y --no-install-recommends fakeroot python3-yaml rsync
+      - name: Install missing tools
+        run: |
+          need=()
+          for t in gpgv:gpgv dpkg-deb:dpkg fakeroot:fakeroot rsync:rsync ssh:openssh-client; do
+            command -v "${t%%:*}" >/dev/null || need+=("${t##*:}")
+          done
+          python3 -c 'import yaml' 2>/dev/null || need+=(python3-yaml)
+          if [ ${#need[@]} -gt 0 ]; then
+            echo "Installing: ${need[*]}"
+            SUDO=$(command -v sudo || true)
+            $SUDO apt-get update -qq
+            $SUDO apt-get install -y --no-install-recommends "${need[@]}"
+          fi
+
+      - name: Download cache
+        id: cache
+        run: |
+          # Persistent on self-hosted runners (CACHE_DIR), else per job.
+          # One directory per shard: shards prune their own cache only.
+          if [ -n "$CACHE_DIR" ]; then
+            dir="${CACHE_DIR}/shard-${{ matrix.shard }}"; prune=--prune-cache
+          else
+            dir="${RUNNER_TEMP}/cache"; prune=
+          fi
+          mkdir -p "$dir"
+          echo "dir=$dir" >> "$GITHUB_OUTPUT"
+          echo "prune=$prune" >> "$GITHUB_OUTPUT"
+          df -h "$dir" | tail -1
+
+      - name: Restore state (last successful run)
+        # manifest.json of the last successful run of this shard. Files it lists
+        # with the same upstream SHA256 are not downloaded again. Dry runs keep
+        # their own state, so a test never marks a file as uploaded.
+        uses: actions/cache/restore@v4
+        with:
+          path: state
+          key: state-${{ env.DRY_RUN == 'true' && 'dry' || 'live' }}-shard-${{ matrix.shard }}-${{ github.run_id }}
+          restore-keys: state-${{ env.DRY_RUN == 'true' && 'dry' || 'live' }}-shard-${{ matrix.shard }}-
 
       - name: Upload credentials
         id: creds
@@ -96,7 +137,9 @@ jobs:
 
       - name: Sync
         run: |
-          args=(--jobs 12 --shard "${{ matrix.shard }}/4" --out output --cache "${RUNNER_TEMP}/cache")
+          args=(--jobs 12 --shard "${{ matrix.shard }}/4" --out output --cache "${{ steps.cache.outputs.dir }}")
+          [ -n "${{ steps.cache.outputs.prune }}" ] && args+=(--prune-cache)
+          [ -f state/manifest.json ] && args+=(--previous state/manifest.json)
           [ -n "${{ inputs.only }}" ] && args+=(--only "${{ inputs.only }}")
           if [ -n "${{ steps.creds.outputs.dest }}" ]; then
             args+=(--dest "${{ steps.creds.outputs.dest }}" --port "${{ steps.creds.outputs.port }}"
@@ -105,6 +148,17 @@ jobs:
             args+=(--dry-run)
           fi
           python3 -m extpkg run "${args[@]}"
+
+      - name: Save state
+        if: success()
+        run: mkdir -p state && cp output/manifest.json state/manifest.json
+
+      - name: Store state
+        if: success()
+        uses: actions/cache/save@v4
+        with:
+          path: state
+          key: state-${{ env.DRY_RUN == 'true' && 'dry' || 'live' }}-shard-${{ matrix.shard }}-${{ github.run_id }}
 
       - name: Keep plan and manifest
         if: always()
@@ -117,6 +171,7 @@ jobs:
           if-no-files-found: ignore
           retention-days: 30
 
-      - name: Remove downloads
+      - name: Remove output
         if: always()
-        run: rm -rf output "${RUNNER_TEMP}/cache"
+        # The persistent cache stays; the job cache goes with RUNNER_TEMP.
+        run: rm -rf output

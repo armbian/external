@@ -90,6 +90,9 @@ class Fetcher:
         self._placed = {}
         self.progress = None
         self.bytes = 0
+        self.used = set()   # cache paths this run used
+        self.previous = {}  # (config, release, arch, source, sha256) -> manifest entry
+        self.unchanged = 0
 
     def _lock(self, key):
         with self._guard:
@@ -100,6 +103,8 @@ class Fetcher:
         key = hashlib.sha256(cand["url"].encode()).hexdigest()[:24]
         d = os.path.join(self.cache, key)
         path = os.path.join(d, cand["filename"])
+        with self._guard:
+            self.used.add(path)
         with self._lock(key):
             cand["_cached"] = os.path.exists(path)
             if not os.path.exists(path):
@@ -142,6 +147,15 @@ class Fetcher:
             return
         for cand in entry["candidates"]:
             where = f"{entry['config']} {entry['release']}/{entry['arch']}"
+            prev = cand.get("sha256") and self.previous.get(
+                (entry["config"], entry["release"], entry["arch"], cand["url"], cand["sha256"]))
+            if prev:
+                # Uploaded by an earlier run, and the server keeps it.
+                with self._guard:
+                    self.files.append({**prev, "unchanged": True})
+                    self.unchanged += 1
+                self.progress.step(f"{where}: unchanged {prev['filename']}")
+                continue
             try:
                 x = self._one_file(pkg, entry, cand, base)
                 check = ("sig+sha" if x["signature"] == "verified" else "sha") if x["checksum"] == "verified" \
@@ -170,6 +184,8 @@ class Fetcher:
             os.makedirs(rdir, exist_ok=True)
             with self._lock("repack:" + path):
                 path = debfile.repack(path, new_version, rdir)
+            with self._guard:
+                self.used.add(path)
             name, version = os.path.basename(path), new_version
 
         have = self.pub.version(entry["release"], entry["target"], entry["arch"], fields["Package"])
@@ -190,6 +206,7 @@ class Fetcher:
             "source": cand["url"],
             "signature": cand.get("signature", "none"),
             "checksum": "verified" if cand.get("sha256") else "none",
+            "upstream_sha256": cand.get("sha256"),
             "published": have,
             "beta": beta_rel,
             "stable": stable_rel,
@@ -199,14 +216,37 @@ class Fetcher:
         return rec
 
 
-def fetch(plan_doc, pkgs, out, cache, pub_url=published.DEFAULT_URL, jobs=8):
+def prune_cache(cache, used):
+    """Remove cached files that this run did not use. Return (files, bytes)."""
+    n = size = 0
+    for d, _, names in os.walk(cache, topdown=False):
+        for name in names:
+            path = os.path.join(d, name)
+            if path not in used:
+                size += os.path.getsize(path)
+                os.unlink(path)
+                n += 1
+        if d != cache and not os.listdir(d):
+            os.rmdir(d)
+    return n, size
+
+
+def fetch(plan_doc, pkgs, out, cache, pub_url=published.DEFAULT_URL, jobs=8, prune=False, previous=None):
     os.makedirs(out, exist_ok=True)
     os.makedirs(cache, exist_ok=True)
     f = Fetcher(pkgs, out, cache, published.Published(pub_url))
     f.progress = net.Progress("fetch", sum(len(e["candidates"]) for e in plan_doc["entries"]))
+    if previous:
+        for x in previous.get("files", []):
+            if x.get("upstream_sha256"):
+                f.previous[(x["config"], x["release"], x["arch"], x["source"], x["upstream_sha256"])] = x
     with cf.ThreadPoolExecutor(jobs) as ex:
         list(ex.map(f.one, plan_doc["entries"]))
-    f.progress.done(f"{len(f.files)} files, {net.human(f.bytes)} downloaded, {len(f.skipped)} skipped")
+    f.progress.done(f"{len(f.files)} files ({f.unchanged} unchanged), {net.human(f.bytes)} downloaded, "
+                    f"{len(f.skipped)} skipped")
+    if prune:
+        n, size = prune_cache(cache, f.used)
+        net.log(f"cache: removed {n} unused files, {net.human(size)}")
     manifest = {
         "generated": _now(),
         "tool": TOOL,

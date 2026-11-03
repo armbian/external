@@ -31,6 +31,16 @@ def _failed(manifest):
     return [s for s in manifest["skipped"] if s["reason"] != "no package matched"]
 
 
+def _previous(args):
+    """Manifest of the last successful upload, if given and readable."""
+    if not args.previous or not os.path.exists(args.previous):
+        return None
+    with open(args.previous) as f:
+        doc = json.load(f)
+    net.log(f"previous: {len(doc.get('files', []))} files from {doc.get('generated', '?')}")
+    return doc
+
+
 def _shard(text):
     if not text:
         return None
@@ -61,7 +71,7 @@ def cmd_fetch(args):
     pkgs, _ = _load(args)
     with open(args.plan) as f:
         doc = json.load(f)
-    m = pipeline.fetch(doc, pkgs, args.out, args.cache, args.published, args.jobs)
+    m = pipeline.fetch(doc, pkgs, args.out, args.cache, args.published, args.jobs, args.prune_cache, _previous(args))
     rep = pipeline.report(m)
     net.summary(rep)
     print(rep)
@@ -74,7 +84,7 @@ def cmd_run(args):
     os.makedirs(args.out, exist_ok=True)
     with open(os.path.join(args.out, "plan.json"), "w") as f:
         json.dump(doc, f, indent=1)
-    m = pipeline.fetch(doc, pkgs, args.out, args.cache, args.published, args.jobs)
+    m = pipeline.fetch(doc, pkgs, args.out, args.cache, args.published, args.jobs, args.prune_cache, _previous(args))
     rep = pipeline.report(m)
     net.summary(rep)
     print(rep)
@@ -116,6 +126,10 @@ def main(argv=None):
         p.add_argument("--cache", default=".cache/downloads", help="download cache")
         p.add_argument("--published", default=published.DEFAULT_URL, help="Armbian stable repository")
         p.add_argument("--strict", action="store_true", help="exit 1 when a download or check fails")
+        p.add_argument("--previous", default="",
+                       help="manifest of the last successful upload: skip files it already has")
+        p.add_argument("--prune-cache", action="store_true",
+                       help="remove cached files this run did not use (for a persistent cache)")
         p.set_defaults(fn=fn)
         if name == "fetch":
             p.add_argument("--plan", default="plan.json")
