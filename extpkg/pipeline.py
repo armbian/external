@@ -124,19 +124,21 @@ class Fetcher:
     def _place(self, src, repo, subdir, name):
         rel = os.path.join(repo, subdir, name) if subdir else os.path.join(repo, name)
         digest = net.sha256_file(src)
-        with self._guard:
+        # An _all.deb lands in one directory from several architectures.
+        # Hold the path until the file is in place.
+        with self._lock("place:" + rel):
             seen = self._placed.get(rel)
             if seen and seen != digest:
                 raise RuntimeError(f"{rel}: two different files with one name")
             if seen:
                 return rel, digest, False
+            dest = os.path.join(self.out, rel)
+            os.makedirs(os.path.dirname(dest), exist_ok=True)
+            try:
+                os.link(src, dest)
+            except OSError:
+                shutil.copy2(src, dest)
             self._placed[rel] = digest
-        dest = os.path.join(self.out, rel)
-        os.makedirs(os.path.dirname(dest), exist_ok=True)
-        try:
-            os.link(src, dest)
-        except OSError:
-            shutil.copy2(src, dest)
         return rel, digest, True
 
     def one(self, entry):
@@ -161,7 +163,7 @@ class Fetcher:
                 check = ("sig+sha" if x["signature"] == "verified" else "sha") if x["checksum"] == "verified" \
                     else ("sig" if x["signature"] == "verified" else "unverified")
                 how = "cached" if cand.get("_cached") else "downloaded"
-                size = net.human(os.path.getsize(os.path.join(self.out, x["beta"])))
+                size = net.human(x["size"])
                 dest = f"stable+beta (published {x['published'] or 'none'})" if x["stable"] else "beta only"
                 self.progress.step(f"{where}: {how} {x['filename']} {size} {check} -> {dest}")
             except Exception as e:
@@ -203,6 +205,7 @@ class Fetcher:
             "deb_arch": fields["Architecture"],
             "filename": name,
             "sha256": digest,
+            "size": os.path.getsize(path),
             "source": cand["url"],
             "signature": cand.get("signature", "none"),
             "checksum": "verified" if cand.get("sha256") else "none",
