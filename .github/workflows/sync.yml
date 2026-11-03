@@ -45,6 +45,20 @@ jobs:
       DRY_RUN: ${{ github.event_name != 'workflow_dispatch' && 'false' || inputs.dry_run }}
       UPLOAD_PATH: ${{ vars.UPLOAD_PATH || 'storage/incoming/external-next' }}
     steps:
+      - name: Free disk space (GitHub-hosted runner)
+        if: runner.environment == 'github-hosted'
+        run: |
+          df -h / | tail -1
+          # Preinstalled toolchains this job does not use: about 30 GB.
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup \
+            /opt/hostedtoolcache/CodeQL /usr/share/swift /usr/local/share/boost
+          sudo docker image prune --all --force > /dev/null 2>&1 || true
+          df -h / | tail -1
+
+      - name: Runner clean (self-hosted runner)
+        if: runner.environment != 'github-hosted'
+        uses: armbian/actions/runner-clean@main
+
       - uses: actions/checkout@v7
 
       - name: Checkout armbian/build (supported releases only)
@@ -102,3 +116,7 @@ jobs:
             output/manifest.json
           if-no-files-found: ignore
           retention-days: 30
+
+      - name: Remove downloads
+        if: always()
+        run: rm -rf output "${RUNNER_TEMP}/cache"
