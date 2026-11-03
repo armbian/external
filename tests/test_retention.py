@@ -1,6 +1,10 @@
 import unittest
 
-from extpkg import pipeline, retention
+import json
+import os
+import tempfile
+
+from extpkg import pipeline, retention, status
 
 
 def entry(config, version, release="noble", arch="amd64", package=None, stable=True, name=None):
@@ -78,14 +82,61 @@ class Removable(unittest.TestCase):
         return {"entries": [{"config": "gh"}], "covered": ["gh", "rpi-off"], "shard": None, "full": full}
 
     def test_disabled_config_is_removable(self):
-        self.assertIn("rpi-off", pipeline.removable_configs(self.plan(False), self.PKGS, self.PREV))
+        names, deleted = pipeline.removable_configs(self.plan(False), self.PKGS, self.PREV)
+        self.assertIn("rpi-off", names)
+        self.assertNotIn("rpi-off", deleted)
 
     def test_deleted_config_only_in_full_run(self):
-        self.assertIn("deleted", pipeline.removable_configs(self.plan(True), self.PKGS, self.PREV))
-        self.assertNotIn("deleted", pipeline.removable_configs(self.plan(False), self.PKGS, self.PREV))
+        names, deleted = pipeline.removable_configs(self.plan(True), self.PKGS, self.PREV)
+        self.assertEqual(deleted, {"deleted"})
+        names, deleted = pipeline.removable_configs(self.plan(False), self.PKGS, self.PREV)
+        self.assertNotIn("deleted", names)
 
     def test_existing_config_of_another_shard_is_not_removable(self):
-        self.assertNotIn("other-shard", pipeline.removable_configs(self.plan(True), self.PKGS, self.PREV))
+        names, _ = pipeline.removable_configs(self.plan(True), self.PKGS, self.PREV)
+        self.assertNotIn("other-shard", names)
+
+
+class CrossShard(unittest.TestCase):
+    """armbian/external#17 review: a renamed config can move to another shard."""
+
+    def test_path_listed_by_another_shard_stays(self):
+        old = entry("code-old", "1.0")
+        carried, removed = retention.plan_removal({"files": [old]}, [], [], {"code-old"}, {},
+                                                  others={old["beta"], old["stable"]})
+        self.assertEqual(removed, [])
+
+    def test_deleted_config_waits_one_run(self):
+        old = entry("code-old", "1.0")
+        carried, removed = retention.plan_removal({"files": [old]}, [], [], {"code-old"}, {}, deleted={"code-old"})
+        self.assertEqual(removed, [])
+        self.assertEqual(carried[0]["carried"], "orphan-pending")
+        # Next run: still deleted, no other shard lists the files: removed.
+        carried, removed = retention.plan_removal({"files": carried}, [], [], {"code-old"}, {}, deleted={"code-old"})
+        self.assertEqual(len(removed), 2)
+        # Next run, but the renamed config's shard now lists them: kept.
+        pending = [{**old, "carried": "orphan-pending"}]
+        carried, removed = retention.plan_removal({"files": pending}, [], [], {"code-old"}, {},
+                                                  deleted={"code-old"}, others={old["beta"], old["stable"]})
+        self.assertEqual(removed, [])
+
+    def test_unknown_other_shards_remove_nothing(self):
+        carried, removed = retention.plan_removal({"files": [entry("code", "1.0")]}, [entry("code", "2.0")], [],
+                                                  {"code"}, {}, others=None)
+        self.assertEqual(removed, [])
+        self.assertEqual(carried[0]["carried"], "pending-check")
+
+
+class OtherPaths(unittest.TestCase):
+    def test_reads_other_manifests(self):
+        with tempfile.TemporaryDirectory() as d:
+            self.assertEqual(status.other_paths(d, "0/4"), set())      # no .sync yet
+            os.makedirs(f"{d}/.sync")
+            for n, path in (("0", "debs-beta/extra/noble-desktop/a_1_all.deb"),
+                            ("1", "debs-beta/extra/noble-desktop/b_1_all.deb")):
+                with open(f"{d}/.sync/manifest-shard-{n}.json", "w") as f:
+                    json.dump({"files": [{"beta": path, "stable": None}]}, f)
+            self.assertEqual(status.other_paths(d, "0/4"), {"debs-beta/extra/noble-desktop/b_1_all.deb"})
 
 
 if __name__ == "__main__":

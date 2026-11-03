@@ -89,3 +89,37 @@ class Status:
         self._put({f"{self.name}.json": self._state("failed", reason=str(reason)[:500])})
         net.log(f"status: {self.name} failed")
 
+
+
+def other_paths(dest, shard, port=22, known_hosts=None):
+    """Paths that the other shards list in their last manifest on the server.
+
+    Returns a set, or None when the manifests could not be read. A missing
+    .sync directory (first run ever) gives an empty set.
+    """
+    own = f"manifest-{name(shard)}.json"
+    ssh = ["ssh", "-p", str(port), "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=yes"]
+    if known_hosts:
+        ssh += ["-o", f"UserKnownHostsFile={known_hosts}"]
+    with tempfile.TemporaryDirectory() as tmp:
+        cmd = ["rsync", "-r", "--include=manifest-shard-*.json", "--exclude=*", "-e", " ".join(ssh),
+               f"{dest.rstrip('/')}/{DIR}/", f"{tmp}/"]
+        r = subprocess.run(cmd, capture_output=True, text=True)
+        if r.returncode != 0:
+            if "No such file or directory" in r.stderr and r.returncode == 23:
+                return set()
+            net.warn(f"cannot read the other shards' manifests (rsync exit {r.returncode})")
+            return None
+        paths = set()
+        for f in os.listdir(tmp):
+            if f == own or not f.endswith(".json"):
+                continue
+            try:
+                with open(os.path.join(tmp, f)) as fh:
+                    doc = json.load(fh)
+            except (OSError, ValueError):
+                net.warn(f"unreadable manifest {f}")
+                return None
+            for x in doc.get("files", []):
+                paths.update(p for p in (x.get("beta"), x.get("stable")) if p)
+        return paths

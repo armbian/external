@@ -210,6 +210,11 @@ The run removes nothing when:
 
 The run does remove the files of a config that is disabled (`enabled: false`), and in a full run (no `--only`) the files of a config that was deleted from `packages/`.
 
+Shards share the server directories:
+
+- Before a removal, a live run reads the other shards' manifests (`.sync/manifest-shard-*.json`). It never removes a path that another shard lists: two configs in two shards can place the same file, for example after a rename. If the manifests cannot be read, the run removes nothing and keeps the entries for the next run.
+- A deleted config waits one run (`orphan-pending`). By then every shard has published its manifest, also the shard that a renamed config moved to.
+
 A dry run prints `would remove` lines. Files that this tool did not upload are never touched.
 
 #### Runners

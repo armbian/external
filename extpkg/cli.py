@@ -104,8 +104,14 @@ def _run(args, pkgs, releases, st):
     if args.dest or args.dry_run:
         up = upload.StreamUploader(args.out, args.dest or "<dest>", args.port, args.known_hosts,
                                    dry_run=args.dry_run or not args.dest, streams=args.streams)
+    # Before removing old files, see which paths the other shards still list.
+    # A dry run only reports, so it does not need them.
+    others = frozenset()
+    if args.dest and not args.dry_run:
+        others = status.other_paths(args.dest, args.shard, args.port, args.known_hosts)
     m = pipeline.fetch(doc, pkgs, args.out, args.cache, args.published, args.jobs, args.prune_cache,
-                       _previous(args), sink=up.add if up else None, stop=up.failed if up else None)
+                       _previous(args), sink=up.add if up else None, stop=up.failed if up else None,
+                       others=others)
     if args.depcheck:
         _depcheck(args, pkgs, m)
     rep = pipeline.report(m) + depcheck.report(m.get("depcheck", []))

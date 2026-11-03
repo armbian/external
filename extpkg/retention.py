@@ -19,18 +19,26 @@ def safe_path(path):
             and ".." not in parts and "" not in parts and not path.startswith("/"))
 
 
-def plan_removal(previous, files, skipped, planned_configs, keep):
+def plan_removal(previous, files, skipped, planned_configs, keep, deleted=(), others=frozenset()):
     """Return (carried, removed).
 
     previous         manifest of the last successful run (or None)
     files            file entries of this run
     skipped          skipped entries of this run
-    planned_configs  config names that this run planned
+    planned_configs  config names whose old files this run may remove
     keep             {config: number of versions to keep}, default 1
+    deleted          configs that no longer exist (subset of planned_configs)
+    others           paths that other shards list in their last manifest,
+                     or None when they could not be read
 
-    carried  previous entries to keep in the new manifest: configs this run
-             did not plan, and older versions within 'keep'
+    carried  previous entries to keep in the new manifest
     removed  server paths to delete
+
+    A path that another shard lists is never removed: two configs in two
+    shards can place the same file (for example after a rename).
+    A deleted config waits one run ("orphan-pending"): by then every shard
+    has published its manifest, also the shard of a renamed config.
+    When the other manifests are unknown, nothing is removed.
     """
     if not previous:
         return [], []
@@ -51,9 +59,12 @@ def plan_removal(previous, files, skipped, planned_configs, keep):
         if (x["config"], x["release"], x["arch"]) in protected:
             carried.append({**x, "carried": "failed"})        # do not touch
             continue
+        if x["config"] in deleted and x.get("carried") != "orphan-pending":
+            carried.append({**x, "carried": "orphan-pending"})  # remove next run
+            continue
         old.setdefault((x["config"], x["release"], x["arch"], x["package"]), []).append(x)
 
-    removed = set()
+    candidates = []
     for key, entries in old.items():
         if key not in current:
             # No current version of this package: upstream dropped it.
@@ -63,8 +74,16 @@ def plan_removal(previous, files, skipped, planned_configs, keep):
         entries.sort(key=lambda e: debver.Version(e["version"]), reverse=True)
         for e in entries[:keep_n]:
             carried.append({**e, "carried": "keep"})
-        for e in entries[keep_n:]:
-            removed.update(p for p in _paths(e) if p not in current_paths)
+        candidates += entries[keep_n:]
+
+    if others is None:
+        # Other shards unknown: remove nothing, keep tracking for the next run.
+        for e in candidates:
+            carried.append({**e, "carried": e.get("carried") or "pending-check"})
+        return carried, []
+    removed = set()
+    for e in candidates:
+        removed.update(p for p in _paths(e) if p not in current_paths and p not in others)
     # Paths that a carried entry still uses stay.
     in_use = {p for x in carried for p in _paths(x)}
     return carried, sorted(p for p in removed if p not in in_use and safe_path(p))
