@@ -1,0 +1,10 @@
+name: charsiu
+method: github
+source:
+  url: https://github.com/gahingwoo/charsiu
+releases: all
+architectures:
+- arm64
+target: utils
+install:
+- charsiu
