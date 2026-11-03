@@ -47,3 +47,43 @@ def upload(out, dest, port=22, known_hosts=None, dry_run=True):
         if r.returncode != 0:
             raise RuntimeError(f"rsync of {repo} failed (exit {r.returncode})")
     return len(files)
+
+
+def remove(paths, dest, port=22, known_hosts=None, dry_run=True):
+    """Delete exactly these paths (relative to dest) on the server.
+
+    rsync --delete-missing-args with --files-from: every listed path is
+    missing in the empty source, so rsync deletes it on the destination.
+    Nothing else is touched.
+    """
+    from . import retention
+
+    bad = [p for p in paths if not retention.safe_path(p)]
+    if bad:
+        raise ValueError(f"refusing to remove unsafe paths: {bad[:5]}")
+    if not paths:
+        return 0
+    if dry_run:
+        for p in paths:
+            net.log(f"dry-run: would remove {dest.rstrip('/')}/{p}")
+        return len(paths)
+    import tempfile
+    ssh = ["ssh", "-p", str(port), "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=yes"]
+    if known_hosts:
+        ssh += ["-o", f"UserKnownHostsFile={known_hosts}"]
+    with tempfile.TemporaryDirectory() as tmp:
+        empty = os.path.join(tmp, "src")
+        # The parent directories exist in the source; only the files are missing.
+        for p in paths:
+            os.makedirs(os.path.join(empty, os.path.dirname(p)), exist_ok=True)
+        listfile = os.path.join(tmp, "remove-list")
+        with open(listfile, "w") as f:
+            f.write("\n".join(paths) + "\n")
+        cmd = ["rsync", "-v", "--delete-missing-args", f"--files-from={listfile}",
+               "-e", " ".join(ssh), f"{empty}/", f"{dest.rstrip('/')}/"]
+        r = subprocess.run(cmd)
+    if r.returncode != 0:
+        raise RuntimeError(f"rsync remove failed (exit {r.returncode})")
+    for p in paths:
+        net.log(f"removed {p}")
+    return len(paths)

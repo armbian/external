@@ -34,7 +34,7 @@ def _check(pkg, path):
     need(isinstance(pkg, dict), "not a mapping")
     allowed = {"name", "method", "source", "filter", "with_deps", "releases", "architectures",
                "target", "install", "verify", "repack", "assets", "exclude", "filename",
-               "enabled", "notes"}
+               "enabled", "notes", "keep"}
     unknown = set(pkg) - allowed
     need(not unknown, f"unknown keys: {sorted(unknown)}")
     need(pkg.get("name") == os.path.basename(path)[:-5], "name must match the file name")
@@ -55,6 +55,7 @@ def _check(pkg, path):
             raise ConfigError(f"{path}: filter: {e}") from e
     if pkg["method"] == "github":
         need("github.com/" in src["url"], "source.url must be a github.com repository")
+    need(isinstance(pkg.get("keep", 1), int) and pkg.get("keep", 1) >= 1, "keep must be a number >= 1")
     rp = pkg.get("repack")
     if rp is not None:
         need(isinstance(rp, dict) and rp.get("packages"), "repack.packages is required")

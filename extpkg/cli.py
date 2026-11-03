@@ -90,11 +90,15 @@ def cmd_run(args):
     print(rep)
     if args.dest:
         upload.upload(args.out, args.dest, args.port, args.known_hosts, dry_run=args.dry_run)
+        # Old versions go only after the new files are in place.
+        upload.remove(m["removed"], args.dest, args.port, args.known_hosts, dry_run=args.dry_run)
     elif not args.dry_run:
         net.warn("no --dest: output stays in " + args.out)
     else:
         for f in upload.plan_upload(args.out):
             net.log(f"dry-run: would upload {f}")
+        for f in m["removed"]:
+            net.log(f"dry-run: would remove {f}")
     return 1 if args.strict and _failed(m) else 0
 
 
