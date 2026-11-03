@@ -51,6 +51,16 @@ def get_bytes(url, headers=None, timeout=60):
     return _with_retry(go, url)
 
 
+def head(url, headers=None, timeout=30):
+    """Final URL after redirects, and ETag, Last-Modified, Content-Length."""
+    def go():
+        with urllib.request.urlopen(_request(url, headers, method="HEAD"), timeout=timeout) as r:
+            h = r.headers
+            return {"url": r.geturl(), "etag": h.get("ETag", ""), "modified": h.get("Last-Modified", ""),
+                    "length": h.get("Content-Length", "")}
+    return _with_retry(go, url)
+
+
 def get_json(url, headers=None):
     return json.loads(get_bytes(url, headers))
 
