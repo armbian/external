@@ -1,0 +1,10 @@
+name: edk2-qualcomm
+method: github
+source:
+  url: https://github.com/radxa-pkg/edk2-qualcomm
+releases: all
+architectures:
+- arm64
+target: utils
+install:
+- edk2-radxa-dragon-q6a

@@ -1,0 +1,16 @@
+name: codium
+method: github
+source:
+  url: https://github.com/VSCodium/vscodium
+releases:
+- noble
+- resolute
+- bookworm
+- trixie
+- forky
+architectures:
+- arm64
+- amd64
+target: desktop
+install:
+- codium

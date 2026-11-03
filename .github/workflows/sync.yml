@@ -1,0 +1,177 @@
+name: "Sync external packages"
+
+# Download, verify and sort external packages into the incoming/external layout:
+#   debs-beta/extra/<release>-<target>/   every package
+#   debs/extra/<release>-<target>/        only when newer than the published stable version
+#
+# Dry-run is the default. An upload needs dry_run=false and the upload secrets.
+# Every runner uploads with rsync over SSH to the repository server.
+#
+# Repository variables:
+#   RUNNER_LABELS  JSON runner labels, e.g. ["self-hosted","Linux","X64"]. Default: GitHub-hosted.
+#   CACHE_DIR      persistent download cache on self-hosted runners. Default: per job.
+#   UPLOAD_PATH    destination on the server. Default keeps test runs out of production.
+
+on:
+  workflow_dispatch:
+    inputs:
+      only:
+        description: "Package configs, comma separated (empty: all)"
+        type: string
+        default: ""
+      dry_run:
+        description: "Dry run: do everything except the upload"
+        type: boolean
+        default: true
+  # Enable after the first uploads are verified:
+  # schedule:
+  #   - cron: "15 */6 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: "Shard ${{ matrix.shard }}/4"
+    runs-on: ${{ fromJSON(vars.RUNNER_LABELS || '"ubuntu-latest"') }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    env:
+      ARMBIAN_BUILD_DIR: ${{ github.workspace }}/build
+      GITHUB_TOKEN: ${{ github.token }}
+      DRY_RUN: ${{ github.event_name != 'workflow_dispatch' && 'false' || inputs.dry_run }}
+      UPLOAD_PATH: ${{ vars.UPLOAD_PATH || 'storage/incoming/external-next' }}
+      CACHE_DIR: ${{ vars.CACHE_DIR }}
+    steps:
+      - name: Free disk space (GitHub-hosted runner)
+        if: runner.environment == 'github-hosted'
+        run: |
+          df -h / | tail -1
+          # Preinstalled toolchains this job does not use: about 30 GB.
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup \
+            /opt/hostedtoolcache/CodeQL /usr/share/swift /usr/local/share/boost
+          sudo docker image prune --all --force > /dev/null 2>&1 || true
+          df -h / | tail -1
+
+      - name: Runner clean (self-hosted runner)
+        if: runner.environment != 'github-hosted'
+        uses: armbian/actions/runner-clean@main
+
+      - uses: actions/checkout@v7
+
+      - name: Checkout armbian/build (supported releases only)
+        uses: actions/checkout@v7
+        with:
+          repository: armbian/build
+          path: build
+          sparse-checkout: config/distributions
+
+      - name: Install missing tools
+        run: |
+          need=()
+          for t in gpgv:gpgv dpkg-deb:dpkg fakeroot:fakeroot rsync:rsync ssh:openssh-client; do
+            command -v "${t%%:*}" >/dev/null || need+=("${t##*:}")
+          done
+          python3 -c 'import yaml' 2>/dev/null || need+=(python3-yaml)
+          if [ ${#need[@]} -gt 0 ]; then
+            echo "Installing: ${need[*]}"
+            SUDO=$(command -v sudo || true)
+            $SUDO apt-get update -qq
+            $SUDO apt-get install -y --no-install-recommends "${need[@]}"
+          fi
+
+      - name: Download cache
+        id: cache
+        run: |
+          # Persistent on self-hosted runners (CACHE_DIR), else per job.
+          # One directory per shard: shards prune their own cache only.
+          if [ -n "$CACHE_DIR" ]; then
+            dir="${CACHE_DIR}/shard-${{ matrix.shard }}"; prune=--prune-cache
+          else
+            dir="${RUNNER_TEMP}/cache"; prune=
+          fi
+          mkdir -p "$dir"
+          echo "dir=$dir" >> "$GITHUB_OUTPUT"
+          echo "prune=$prune" >> "$GITHUB_OUTPUT"
+          df -h "$dir" | tail -1
+
+      - name: Restore state (last successful run)
+        # manifest.json of the last successful run of this shard. Files it lists
+        # with the same upstream SHA256 are not downloaded again. Dry runs keep
+        # their own state, so a test never marks a file as uploaded.
+        uses: actions/cache/restore@v4
+        with:
+          path: state
+          key: state-${{ env.DRY_RUN == 'true' && 'dry' || 'live' }}-shard-${{ matrix.shard }}-${{ github.run_id }}
+          restore-keys: state-${{ env.DRY_RUN == 'true' && 'dry' || 'live' }}-shard-${{ matrix.shard }}-
+
+      - name: Upload credentials
+        id: creds
+        env:
+          KEY: ${{ secrets.KEY_UPLOAD }}
+          KNOWN_HOSTS: ${{ secrets.KNOWN_HOSTS_ARMBIAN_UPLOAD }}
+          HOST: ${{ secrets.HOST_UPLOAD }}
+          USER: ${{ secrets.HOST_UPLOAD_USER }}
+          PORT: ${{ secrets.HOST_UPLOAD_PORT }}
+        run: |
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "dest=" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          if [ -z "$KEY" ] || [ -z "$KNOWN_HOSTS" ] || [ -z "$HOST" ] || [ -z "$USER" ]; then
+            echo "::error::Upload requested, but the upload secrets are not available"
+            exit 1
+          fi
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$KEY" > ~/.ssh/id_upload && chmod 600 ~/.ssh/id_upload
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts_upload
+          printf 'Host %s\n  IdentityFile ~/.ssh/id_upload\n  IdentitiesOnly yes\n' "$HOST" > ~/.ssh/config
+          echo "dest=${USER}@${HOST}:${UPLOAD_PATH}" >> "$GITHUB_OUTPUT"
+          echo "port=${PORT:-22}" >> "$GITHUB_OUTPUT"
+
+      - name: Sync
+        run: |
+          args=(--jobs 12 --shard "${{ matrix.shard }}/4" --out output --cache "${{ steps.cache.outputs.dir }}")
+          [ -n "${{ steps.cache.outputs.prune }}" ] && args+=(--prune-cache)
+          [ -f state/manifest.json ] && args+=(--previous state/manifest.json)
+          [ -n "${{ inputs.only }}" ] && args+=(--only "${{ inputs.only }}")
+          if [ -n "${{ steps.creds.outputs.dest }}" ]; then
+            args+=(--dest "${{ steps.creds.outputs.dest }}" --port "${{ steps.creds.outputs.port }}"
+                   --known-hosts ~/.ssh/known_hosts_upload)
+          else
+            args+=(--dry-run)
+          fi
+          python3 -m extpkg run "${args[@]}"
+
+      - name: Save state
+        if: success()
+        run: mkdir -p state && cp output/manifest.json state/manifest.json
+
+      - name: Store state
+        if: success()
+        uses: actions/cache/save@v4
+        with:
+          path: state
+          key: state-${{ env.DRY_RUN == 'true' && 'dry' || 'live' }}-shard-${{ matrix.shard }}-${{ github.run_id }}
+
+      - name: Keep plan and manifest
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: manifest-shard-${{ matrix.shard }}
+          path: |
+            output/plan.json
+            output/manifest.json
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: Remove output
+        if: always()
+        # The persistent cache stays; the job cache goes with RUNNER_TEMP.
+        run: rm -rf output

@@ -1,0 +1,18 @@
+name: thunderbird-resolute
+method: apt
+source:
+  url: http://ppa.launchpadcontent.net/mozillateam/ppa/ubuntu
+  suite: resolute
+  components:
+  - main
+releases:
+- resolute
+architectures:
+- armhf
+- arm64
+- amd64
+- riscv64
+target: desktop
+install:
+- thunderbird
+filter: Name (% thunderbird*)

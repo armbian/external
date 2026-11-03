@@ -1,0 +1,18 @@
+name: rpi-raspi-config
+method: apt
+source:
+  url: http://ports.ubuntu.com/ubuntu-ports
+  suite: noble
+  components:
+  - main
+  - restricted
+  - universe
+  - multiverse
+releases: all
+architectures:
+- arm64
+- armhf
+target: utils
+install:
+- raspi-config
+filter: Name (% raspi-config*)

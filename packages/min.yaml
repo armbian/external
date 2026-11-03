@@ -1,0 +1,12 @@
+name: min
+method: github
+source:
+  url: https://github.com/minbrowser/min
+releases: all
+architectures:
+- armhf
+- arm64
+- amd64
+target: utils
+install:
+- min

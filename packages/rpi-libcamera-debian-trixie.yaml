@@ -1,0 +1,16 @@
+name: rpi-libcamera-debian-trixie
+method: apt
+source:
+  url: http://archive.raspberrypi.com/debian/
+  suite: trixie
+  components:
+  - main
+releases:
+- trixie
+architectures:
+- arm64
+- armhf
+target: utils
+install:
+- python3-libcamera
+filter: Name (% python3-libcamera*)

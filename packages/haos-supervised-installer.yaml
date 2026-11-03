@@ -1,0 +1,17 @@
+name: haos-supervised-installer
+method: github
+source:
+  url: https://github.com/armbian/supervised-installer/
+  tag: 2.9.9
+releases:
+- bookworm
+- trixie
+architectures:
+- amd64
+- armhf
+- arm64
+target: utils
+install:
+- homeassistant-supervised
+assets:
+- '*.deb'

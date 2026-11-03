@@ -1,0 +1,16 @@
+name: chromium-jammy
+method: apt
+source:
+  url: https://ppa.launchpadcontent.net/xtradeb/apps/ubuntu/
+  suite: jammy
+  components:
+  - main
+releases:
+- jammy
+architectures:
+- arm64
+- amd64
+target: desktop
+install:
+- chromium
+filter: Name (% chromium) | Name (% chromium-*)

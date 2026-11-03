@@ -1,0 +1,17 @@
+name: rpi-debian-firmware-raspi
+method: apt
+source:
+  url: http://archive.raspberrypi.com/debian/
+  suite: bookworm
+  components:
+  - main
+releases:
+- bookworm
+architectures:
+- arm64
+- armhf
+target: utils
+install:
+- raspi-firmware
+filter: Name (% raspi-firmware) | Name (% firmware-brcm80211) | Name (% raspberrypi-sys-mods) | Name (% bluez-firmware) | Name (% bluez) | Name (% raspi-utils) | Name (% raspi-gpio) | Name (% raspi-utils-core)
+  | Name (% raspi-utils-otp) | Name (% raspi-utils-dt) | Name (% raspi-utils-eeprom) | Name (% raspinfo)
