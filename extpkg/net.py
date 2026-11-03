@@ -5,6 +5,7 @@ import json
 import os
 import shutil
 import sys
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -122,3 +123,29 @@ def summary(markdown):
 
 def have(cmd):
     return shutil.which(cmd) is not None
+
+
+class Progress:
+    """Numbered progress lines, flushed at once so CI logs show them live."""
+
+    def __init__(self, phase, total):
+        self.phase, self.total, self.n = phase, total, 0
+        self.start = time.monotonic()
+        self._lock = threading.Lock()
+        log(f"{phase}: {total} items")
+
+    def step(self, msg):
+        with self._lock:
+            self.n += 1
+            w = len(str(self.total))
+            log(f"[{self.n:>{w}}/{self.total}] {msg}")
+
+    def done(self, msg=""):
+        log(f"{self.phase}: done in {time.monotonic() - self.start:.0f} s{(' - ' + msg) if msg else ''}")
+
+
+def human(size):
+    for unit in ("B", "KB", "MB", "GB"):
+        if size < 1024 or unit == "GB":
+            return f"{size:.0f} {unit}" if unit == "B" else f"{size:.1f} {unit}"
+        size /= 1024

@@ -41,6 +41,8 @@ def plan(pkgs, releases_all, keys_dir, jobs=8, shard=None):
         for rel, arch in config.expand(pkg, releases_all):
             work.append((pkg, rel, arch))
 
+    prog = net.Progress("plan", len(work))
+
     def one(item):
         pkg, rel, arch = item
         entry = {"config": pkg["name"], "method": pkg["method"], "release": rel, "arch": arch,
@@ -53,10 +55,19 @@ def plan(pkgs, releases_all, keys_dir, jobs=8, shard=None):
         except Exception as e:  # one broken upstream must not stop the run
             entry["skip"] = f"{type(e).__name__}: {e}"
             entry["candidates"] = []
+        where = f"{pkg['name']} {rel}/{arch}"
+        if entry.get("skip"):
+            prog.step(f"{where}: SKIP {entry['skip'][:160]}")
+        else:
+            c = entry["candidates"]
+            first = c[0]["package"] and f"{c[0]['package']} {c[0]['version']}" or c[0]["filename"]
+            prog.step(f"{where}: {len(c)} file{'s' if len(c) != 1 else ''} ({first})")
         return entry
 
     with cf.ThreadPoolExecutor(jobs) as ex:
         entries = list(ex.map(one, work))
+    files = sum(len(e["candidates"]) for e in entries)
+    prog.done(f"{files} files, {sum(1 for e in entries if e.get('skip'))} skipped")
     return {"generated": _now(), "tool": TOOL, "releases": releases_all, "entries": entries}
 
 
@@ -77,6 +88,8 @@ class Fetcher:
         self.files = []
         self.skipped = []
         self._placed = {}
+        self.progress = None
+        self.bytes = 0
 
     def _lock(self, key):
         with self._guard:
@@ -88,6 +101,7 @@ class Fetcher:
         d = os.path.join(self.cache, key)
         path = os.path.join(d, cand["filename"])
         with self._lock(key):
+            cand["_cached"] = os.path.exists(path)
             if not os.path.exists(path):
                 os.makedirs(d, exist_ok=True)
                 digest, size = net.download(cand["url"], path,
@@ -98,6 +112,8 @@ class Fetcher:
                 if cand.get("sha256") and digest != cand["sha256"]:
                     os.unlink(path)
                     raise net.FetchError(f"{cand['filename']}: SHA256 does not match the source")
+                with self._guard:
+                    self.bytes += size
         return path
 
     def _place(self, src, repo, subdir, name):
@@ -125,10 +141,18 @@ class Fetcher:
             self.skipped.append({**base, "reason": entry["skip"]})
             return
         for cand in entry["candidates"]:
+            where = f"{entry['config']} {entry['release']}/{entry['arch']}"
             try:
-                self._one_file(pkg, entry, cand, base)
+                x = self._one_file(pkg, entry, cand, base)
+                check = ("sig+sha" if x["signature"] == "verified" else "sha") if x["checksum"] == "verified" \
+                    else ("sig" if x["signature"] == "verified" else "unverified")
+                how = "cached" if cand.get("_cached") else "downloaded"
+                size = net.human(os.path.getsize(os.path.join(self.out, x["beta"])))
+                dest = f"stable+beta (published {x['published'] or 'none'})" if x["stable"] else "beta only"
+                self.progress.step(f"{where}: {how} {x['filename']} {size} {check} -> {dest}")
             except Exception as e:
                 self.skipped.append({**base, "file": cand["filename"], "reason": f"{type(e).__name__}: {e}"})
+                self.progress.step(f"{where}: FAILED {cand['filename']}: {type(e).__name__}: {e}")
 
     def _one_file(self, pkg, entry, cand, base):
         path = self._download(cand)
@@ -155,7 +179,7 @@ class Fetcher:
         stable_rel = None
         if newer:
             stable_rel, _, _ = self._place(path, "debs", entry["dir"], name)
-        self.files.append({
+        rec = {
             **base,
             "package": fields["Package"],
             "version": version,
@@ -169,15 +193,20 @@ class Fetcher:
             "published": have,
             "beta": beta_rel,
             "stable": stable_rel,
-        })
+        }
+        with self._guard:
+            self.files.append(rec)
+        return rec
 
 
 def fetch(plan_doc, pkgs, out, cache, pub_url=published.DEFAULT_URL, jobs=8):
     os.makedirs(out, exist_ok=True)
     os.makedirs(cache, exist_ok=True)
     f = Fetcher(pkgs, out, cache, published.Published(pub_url))
+    f.progress = net.Progress("fetch", sum(len(e["candidates"]) for e in plan_doc["entries"]))
     with cf.ThreadPoolExecutor(jobs) as ex:
         list(ex.map(f.one, plan_doc["entries"]))
+    f.progress.done(f"{len(f.files)} files, {net.human(f.bytes)} downloaded, {len(f.skipped)} skipped")
     manifest = {
         "generated": _now(),
         "tool": TOOL,
