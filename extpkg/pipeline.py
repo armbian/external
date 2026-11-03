@@ -93,6 +93,8 @@ class Fetcher:
         self.used = set()   # cache paths this run used
         self.previous = {}  # (config, release, arch, source, sha256) -> manifest entry
         self.unchanged = 0
+        self.sink = None    # called with [(path, size)] after each upstream file
+        self.stop = None    # returns True to stop early (upload failed)
 
     def _lock(self, key):
         with self._guard:
@@ -141,35 +143,48 @@ class Fetcher:
             self._placed[rel] = digest
         return rel, digest, True
 
-    def one(self, entry):
+    def group(self, items):
+        """All uses of one upstream file: download once, place every path.
+
+        Then hand the new paths to the sink (the upload queue) together, so a
+        file and its hardlinks go in one upload batch.
+        """
+        new_paths = []
+        for entry, cand in items:
+            new_paths += self._one_use(entry, cand)
+        if new_paths and self.sink:
+            self.sink(new_paths)
+
+    def _one_use(self, entry, cand):
         pkg = self.pkgs[entry["config"]]
         base = {k: entry[k] for k in ("config", "release", "arch", "target")}
-        if entry.get("skip"):
-            self.skipped.append({**base, "reason": entry["skip"]})
-            return
-        for cand in entry["candidates"]:
-            where = f"{entry['config']} {entry['release']}/{entry['arch']}"
-            prev = cand.get("sha256") and self.previous.get(
-                (entry["config"], entry["release"], entry["arch"], cand["url"], cand["sha256"]))
-            if prev:
-                # Uploaded by an earlier run, and the server keeps it.
-                with self._guard:
-                    rec = {k: v for k, v in prev.items() if k != "carried"}
-                    self.files.append({**rec, "unchanged": True})
-                    self.unchanged += 1
-                self.progress.step(f"{where}: unchanged {prev['filename']}")
-                continue
-            try:
-                x = self._one_file(pkg, entry, cand, base)
-                check = ("sig+sha" if x["signature"] == "verified" else "sha") if x["checksum"] == "verified" \
-                    else ("sig" if x["signature"] == "verified" else "unverified")
-                how = "cached" if cand.get("_cached") else "downloaded"
-                size = net.human(x["size"])
-                dest = f"stable+beta (published {x['published'] or 'none'})" if x["stable"] else "beta only"
-                self.progress.step(f"{where}: {how} {x['filename']} {size} {check} -> {dest}")
-            except Exception as e:
-                self.skipped.append({**base, "file": cand["filename"], "reason": f"{type(e).__name__}: {e}"})
-                self.progress.step(f"{where}: FAILED {cand['filename']}: {type(e).__name__}: {e}")
+        where = f"{entry['config']} {entry['release']}/{entry['arch']}"
+        if self.stop and self.stop():
+            self.skipped.append({**base, "file": cand["filename"], "reason": "stopped: upload failed"})
+            return []
+        prev = cand.get("sha256") and self.previous.get(
+            (entry["config"], entry["release"], entry["arch"], cand["url"], cand["sha256"]))
+        if prev:
+            # Uploaded by an earlier run, and the server keeps it.
+            with self._guard:
+                rec = {k: v for k, v in prev.items() if k != "carried"}
+                self.files.append({**rec, "unchanged": True})
+                self.unchanged += 1
+            self.progress.step(f"{where}: unchanged {prev['filename']}")
+            return []
+        try:
+            x, created = self._one_file(pkg, entry, cand, base)
+            check = ("sig+sha" if x["signature"] == "verified" else "sha") if x["checksum"] == "verified" \
+                else ("sig" if x["signature"] == "verified" else "unverified")
+            how = "cached" if cand.get("_cached") else "downloaded"
+            size = net.human(x["size"])
+            dest = f"stable+beta (published {x['published'] or 'none'})" if x["stable"] else "beta only"
+            self.progress.step(f"{where}: {how} {x['filename']} {size} {check} -> {dest}")
+            return [(p, x["size"]) for p in created]
+        except Exception as e:
+            self.skipped.append({**base, "file": cand["filename"], "reason": f"{type(e).__name__}: {e}"})
+            self.progress.step(f"{where}: FAILED {cand['filename']}: {type(e).__name__}: {e}")
+            return []
 
     def _one_file(self, pkg, entry, cand, base):
         path = self._download(cand)
@@ -194,10 +209,15 @@ class Fetcher:
         have = self.pub.version(entry["release"], entry["target"], entry["arch"], fields["Package"])
         newer = have is None or debver.compare(version, have) > 0
 
-        beta_rel, digest, _ = self._place(path, "debs-beta", entry["dir"], name)
+        created = []
+        beta_rel, digest, made = self._place(path, "debs-beta", entry["dir"], name)
+        if made:
+            created.append(beta_rel)
         stable_rel = None
         if newer:
-            stable_rel, _, _ = self._place(path, "debs", entry["dir"], name)
+            stable_rel, _, made = self._place(path, "debs", entry["dir"], name)
+            if made:
+                created.append(stable_rel)
         rec = {
             **base,
             "package": fields["Package"],
@@ -217,7 +237,7 @@ class Fetcher:
         }
         with self._guard:
             self.files.append(rec)
-        return rec
+        return rec, created
 
 
 def prune_cache(cache, used):
@@ -235,17 +255,30 @@ def prune_cache(cache, used):
     return n, size
 
 
-def fetch(plan_doc, pkgs, out, cache, pub_url=published.DEFAULT_URL, jobs=8, prune=False, previous=None):
+def fetch(plan_doc, pkgs, out, cache, pub_url=published.DEFAULT_URL, jobs=8, prune=False, previous=None,
+          sink=None, stop=None):
+    """Download, check and place. sink() gets the new paths of each upstream
+    file as soon as they are placed (for upload while downloading)."""
     os.makedirs(out, exist_ok=True)
     os.makedirs(cache, exist_ok=True)
     f = Fetcher(pkgs, out, cache, published.Published(pub_url))
+    f.sink, f.stop = sink, stop
     f.progress = net.Progress("fetch", sum(len(e["candidates"]) for e in plan_doc["entries"]))
     if previous:
         for x in previous.get("files", []):
             if x.get("upstream_sha256"):
                 f.previous[(x["config"], x["release"], x["arch"], x["source"], x["upstream_sha256"])] = x
+    groups = {}
+    for e in plan_doc["entries"]:
+        if e.get("skip"):
+            f.skipped.append({**{k: e[k] for k in ("config", "release", "arch", "target")}, "reason": e["skip"]})
+            continue
+        for c in e["candidates"]:
+            groups.setdefault(c["url"], []).append((e, c))
+    # Largest files first: they take longest, and the upload starts on them early.
+    order = sorted(groups.values(), key=lambda g: -(g[0][1].get("size") or 0))
     with cf.ThreadPoolExecutor(jobs) as ex:
-        list(ex.map(f.one, plan_doc["entries"]))
+        list(ex.map(f.group, order))
     f.progress.done(f"{len(f.files)} files ({f.unchanged} unchanged), {net.human(f.bytes)} downloaded, "
                     f"{len(f.skipped)} skipped")
     if prune:
