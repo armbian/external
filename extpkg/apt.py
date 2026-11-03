@@ -12,6 +12,7 @@ import os
 import re
 import subprocess
 import tempfile
+import threading
 
 from . import debver, net, query
 
@@ -132,6 +133,9 @@ class Repo:
         self.signature = "unchecked"
         self._release = None
         self.by_hash = False
+        self._lock = threading.Lock()
+        self._packages = {}        # arch -> stanzas
+        self._arch_locks = {}
 
     def _base(self):
         if self.flat:
@@ -142,6 +146,10 @@ class Repo:
         return net.get_bytes(f"{self._base()}/{path}")
 
     def release(self):
+        with self._lock:
+            return self._release_locked()
+
+    def _release_locked(self):
         if self._release is not None:
             return self._release
         text, ok = None, False
@@ -170,7 +178,15 @@ class Repo:
         return self._release
 
     def packages(self, arch):
-        """Return stanzas for one architecture, from every component."""
+        """Stanzas for one architecture. Fetched and checked once per run."""
+        with self._lock:
+            lock = self._arch_locks.setdefault(arch, threading.Lock())
+        with lock:
+            if arch not in self._packages:
+                self._packages[arch] = self._fetch_packages(arch)
+            return self._packages[arch]
+
+    def _fetch_packages(self, arch):
         hashes = self.release()
         out = []
         comps = self.components or [""]
@@ -256,6 +272,19 @@ def select(stanzas, filter_text, arch, with_deps=False):
     return result
 
 
+_repos = {}
+_repos_lock = threading.Lock()
+
+
+def _repo(url, suite, components, keyring, verify_signature):
+    """One Repo per repository in a run: configs and releases share its indexes."""
+    key = (url, suite, tuple(components), verify_signature)
+    with _repos_lock:
+        if key not in _repos:
+            _repos[key] = Repo(url, suite, components, keyring, verify_signature)
+        return _repos[key]
+
+
 def resolve(pkg, release, arch, keyring):
     """Return candidate dicts for one package config, release and architecture."""
     src = pkg["source"]
@@ -266,7 +295,7 @@ def resolve(pkg, release, arch, keyring):
     if url.startswith("http://"):
         urls.insert(0, "https://" + url[len("http://"):])
     for i, u in enumerate(urls):
-        repo = Repo(u, src["suite"], src["components"], keyring, pkg["verify"]["signature"])
+        repo = _repo(u, src["suite"], src["components"], keyring, pkg["verify"]["signature"])
         try:
             stanzas = repo.packages(arch)
             break

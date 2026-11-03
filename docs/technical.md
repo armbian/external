@@ -7,7 +7,7 @@ packages/*.yaml ──plan──► plan.json ──fetch──► output/ ─�
                   (no download)      (download, check, sort)   (rsync over SSH)
 ```
 
-1. **plan** expands each config to (release, architecture) entries and resolves the upstream files. It downloads indexes and release metadata only.
+1. **plan** expands each config to (release, architecture) entries and resolves the upstream files. It downloads indexes and release metadata only, once per repository, suite and architecture.
 2. **fetch** downloads each file once, checks it, repacks it when the config says so, and places it in the output tree.
 3. **upload** copies the output tree to the server while the downloads go on. It never replaces a file that is already there.
 
@@ -155,6 +155,8 @@ State is saved only after a successful run. Dry runs and live runs keep separate
 
 The upload starts during the download. After an upstream file is downloaded, checked and placed in every directory, its new paths go to an upload queue. A batch goes to the server every 30 s, or at 500 MB.
 
+Up to 3 batches go at the same time (`--streams`): one SSH stream to the repository server reaches only 10-18 MB/s.
+
 Each batch is one `rsync -H --files-from`. A file placed in several directories (releases, `debs` and `debs-beta`) is a hardlink, so rsync sends its data once and links it on the server. Without `-H` a full run sends 40 GiB; with it, 12 GiB.
 
 If a batch fails, the run stops downloading, removes nothing and saves no state.
@@ -205,7 +207,7 @@ A dry run prints `would remove` lines. Files that this tool did not upload are n
 | | GitHub-hosted | Self-hosted |
 |---|---|---|
 | Select | default | `RUNNER_LABELS` |
-| Before the job | remove unused toolchains (15 GB → 44 GB free) | `armbian/actions/runner-clean` |
+| Before the job | nothing (public repositories get 145 GB disks, 88 GB free) | `armbian/actions/runner-clean` |
 | Download cache | per job | `CACHE_DIR/shard-<n>`, pruned each run |
 
 Missing tools (`gpgv`, `dpkg-deb`, `fakeroot`, `rsync`, `ssh`, `python3-yaml`) are installed. `sudo` is used only when it exists.
