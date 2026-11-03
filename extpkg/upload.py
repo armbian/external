@@ -32,7 +32,7 @@ def upload(out, dest, port=22, known_hosts=None, dry_run=True):
     """
     files = plan_upload(out)
     if not files:
-        net.log("nothing to upload")
+        net.log("nothing to send")
         return 0
     ssh = ["ssh", "-p", str(port), "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=yes"]
     if known_hosts:
@@ -137,7 +137,7 @@ class StreamUploader:
         if self.dry_run:
             for p in paths:
                 net.log(f"dry-run: would upload {p}")
-            net.log(f"upload batch {n}: {len(paths)} paths, {net.human(size)} (dry-run)")
+            net.log(f"send batch {n}: {len(paths)} paths, {net.human(size)} (dry-run)")
         else:
             start = time.monotonic()
             with tempfile.NamedTemporaryFile("w", suffix=".list") as lf:
@@ -147,9 +147,9 @@ class StreamUploader:
                        "-e", " ".join(self.ssh), f"{self.out}/", f"{self.dest}/"]
                 r = subprocess.run(cmd, capture_output=True, text=True)
             if r.returncode != 0:
-                raise RuntimeError(f"upload batch {n} failed (exit {r.returncode}): {r.stderr.strip()[-300:]}")
+                raise RuntimeError(f"send batch {n} failed (exit {r.returncode}): {r.stderr.strip()[-300:]}")
             secs = max(time.monotonic() - start, 0.1)
-            net.log(f"upload batch {n}: {len(paths)} paths, {net.human(size)} in {secs:.0f} s "
+            net.log(f"send batch {n}: {len(paths)} paths, {net.human(size)} in {secs:.0f} s "
                     f"({net.human(size / secs)}/s)")
         self.files += len(paths)
         self.bytes += size
@@ -186,6 +186,6 @@ class StreamUploader:
         self.thread.join()
         if self.error:
             raise RuntimeError(f"upload failed: {self.error}")
-        net.log(f"upload: {self.files} paths, {net.human(self.bytes)} sent in {self.batches} batches"
+        net.log(f"sent: {self.files} paths, {net.human(self.bytes)} in {self.batches} batches"
                 f"{' (dry-run)' if self.dry_run else ''}")
         return self.files
