@@ -103,6 +103,7 @@ python3 -m extpkg run --dry-run --only <name> --out /tmp/out
 Check the output:
 
 - `plan`: no `SKIP` line, except "no package matched" for an architecture that upstream does not build.
+- Dependencies: add `--depcheck` to `run`. Every check must say `ok`. The pull request check does the same.
 - `run`: each line says `sig+sha` (apt) or `sha` (github). `unverified` is expected for `url` only.
 - `/tmp/out/debs-beta/extra/<release>-<target>/` holds the expected files.
 

@@ -240,6 +240,24 @@ Needed for an upload only. Organisation secrets, shared with armbian.github.io.
 
 `GITHUB_TOKEN` comes from Actions. It raises the GitHub API rate limit.
 
+### Dependency check
+
+Can apt install a package on the Armbian release? `extpkg depcheck` (or `run --depcheck`) answers this for the new files of a run, without installing anything:
+
+- One temporary apt root per release and architecture. It does not touch the host apt and needs no root access. `APT_CONFIG` keeps the host apt configuration out.
+- Sources: the distribution (Debian or Ubuntu, from `config/distributions/<release>/name` in armbian/build, with `-updates` and `-security`), the Armbian repository, and a local repository with the new files. The local files win (pin 1001).
+- `apt-get install --simulate <package>=<version>` for the `install` packages of each config. apt resolves dependencies for any architecture, so one x86 runner checks all of them.
+- Index lists are kept compressed in `.cache/apt-lists` (about 650 MB for all releases and architectures). The next `apt update` only checks for changes.
+
+Where it runs:
+
+| Workflow | Scope | On failure |
+|---|---|---|
+| Check (pull requests) | changed configs, up to 8 | the check fails |
+| Dependency check (daily) | files that changed upstream since the last check | one open issue, label `depcheck` |
+
+A failing package that does not change upstream is not checked again. Fix its config, then close the issue.
+
 ## Command line
 
 ```
@@ -250,6 +268,7 @@ python3 -m extpkg run   [--only a,b] [--shard i/n] [--out output] [--cache dir]
                         [--previous manifest.json] [--prune-cache] [--strict]
                         [--dry-run | --dest user@host:/path --port n --known-hosts file]
 python3 -m extpkg upload --out output --dest user@host:/path [--dry-run]
+python3 -m extpkg depcheck --out output [--lists-cache dir] [--keyring file] [--strict]
 ```
 
 Common options: `--packages`, `--keys`, `--build-dir`, `--jobs`, `--published`.

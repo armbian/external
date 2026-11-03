@@ -5,7 +5,7 @@ import json
 import os
 import sys
 
-from . import config, net, pipeline, published, status, upload
+from . import config, depcheck, net, pipeline, published, status, upload
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -106,7 +106,9 @@ def _run(args, pkgs, releases, st):
                                    dry_run=args.dry_run or not args.dest, streams=args.streams)
     m = pipeline.fetch(doc, pkgs, args.out, args.cache, args.published, args.jobs, args.prune_cache,
                        _previous(args), sink=up.add if up else None, stop=up.failed if up else None)
-    rep = pipeline.report(m)
+    if args.depcheck:
+        _depcheck(args, pkgs, m)
+    rep = pipeline.report(m) + depcheck.report(m.get("depcheck", []))
     net.summary(rep)
     print(rep)
     if up:
@@ -117,8 +119,29 @@ def _run(args, pkgs, releases, st):
             st.done(os.path.join(args.out, "manifest.json"), up.files, up.bytes, len(m["removed"]))
     else:
         net.warn("no --dest: output stays in " + args.out)
-    # --strict: the upload is done; a skipped package only sets the exit code.
-    return 1 if args.strict and _failed(m) else 0
+    # --strict: the upload is done; a skipped package or a failed dependency
+    # check only sets the exit code.
+    dep_failed = any(x["ok"] is False for x in m.get("depcheck", []))
+    return 1 if args.strict and (_failed(m) or dep_failed) else 0
+
+
+def _depcheck(args, pkgs, m):
+    """Report only: results go into the manifest and the summary."""
+    m["depcheck"] = depcheck.check(m, args.out, pkgs, args.build_dir, args.lists_cache, args.keys,
+                                   extra_keyrings=[k for k in args.keyring if k])
+    with open(os.path.join(args.out, "manifest.json"), "w") as f:
+        json.dump(m, f, indent=1)
+
+
+def cmd_depcheck(args):
+    pkgs, _ = _load(args)
+    with open(os.path.join(args.out, "manifest.json")) as f:
+        m = json.load(f)
+    _depcheck(args, pkgs, m)
+    rep = depcheck.report(m["depcheck"])
+    net.summary(rep)
+    print(rep)
+    return 1 if args.strict and any(x["ok"] is False for x in m["depcheck"]) else 0
 
 
 def cmd_status(args):
@@ -173,6 +196,17 @@ def main(argv=None):
             p.add_argument("--known-hosts", default=None)
             p.add_argument("--dry-run", action="store_true", help="do everything except the upload")
             p.add_argument("--streams", type=int, default=3, help="upload batches at the same time")
+            p.add_argument("--depcheck", action="store_true", help="check dependencies of new files (report only)")
+            p.add_argument("--lists-cache", default=".cache/apt-lists", help="apt index lists for --depcheck")
+            p.add_argument("--keyring", action="append", default=[], help="extra apt keyring for --depcheck")
+
+    p = sub.add_parser("depcheck", help="check dependencies of the new files in an output tree")
+    _common(p)
+    p.add_argument("--out", default="output")
+    p.add_argument("--lists-cache", default=".cache/apt-lists")
+    p.add_argument("--keyring", action="append", default=[], help="extra apt keyring")
+    p.add_argument("--strict", action="store_true", help="exit 1 when a check fails")
+    p.set_defaults(fn=cmd_depcheck)
 
     p = sub.add_parser("status", help="write the sync status of a shard on the server")
     p.add_argument("--dest", required=True)
