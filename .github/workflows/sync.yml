@@ -149,6 +149,14 @@ jobs:
           fi
           python3 -m extpkg run "${args[@]}"
 
+      - name: Mark the shard failed
+        # A cancelled or failed job: the repository update must not wait for it.
+        if: (failure() || cancelled()) && steps.creds.outputs.dest != ''
+        run: |
+          python3 -m extpkg status --dest "${{ steps.creds.outputs.dest }}" --port "${{ steps.creds.outputs.port }}" \
+            --known-hosts ~/.ssh/known_hosts_upload --shard "${{ matrix.shard }}/4" \
+            --state failed --reason "job ${{ job.status }}" || true
+
       - name: Save state
         if: success()
         run: mkdir -p state && cp output/manifest.json state/manifest.json

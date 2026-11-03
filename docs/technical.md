@@ -159,6 +159,29 @@ Each batch is one `rsync -H --files-from`. A file placed in several directories 
 
 If a batch fails, the run stops downloading, removes nothing and saves no state.
 
+#### Status for the repository update
+
+Each shard writes its state to the server, next to the packages:
+
+```
+<UPLOAD_PATH>/.sync/shard-<n>.json            "running", "done" or "failed"
+<UPLOAD_PATH>/.sync/manifest-shard-<n>.json   manifest of the last successful run
+```
+
+`shard-<n>.json` holds the run ID and URL, the runner, start and finish times. When the state is `done`, it also holds the number of paths, the bytes sent, the number of removed files and `manifest_sha256`: the fingerprint of the set that the shard put on the server.
+
+- `running` is written before the first download. If it cannot be written, the run stops.
+- `done` is written after the upload and the removal of old versions. The manifest is written first.
+- `failed` is written when the run stops with an error, or when the job fails or is cancelled.
+- Each file is written to a temporary name and renamed, so a reader never sees half a file.
+
+Rules for the repository update:
+
+- Publish only when no `shard-<n>.json` is `running`.
+- A `running` file older than the Sync timeout (2 h) means the runner died. Treat it as `failed`.
+- After a `failed` shard, the files of its last `done` run are still on the server.
+- Copy only `*.deb`. The `.sync/` directory is not a package directory.
+
 #### Old versions
 
 The upload never replaces files. Without a cleanup, each new upstream version (for example a daily VS Code build) adds a file.

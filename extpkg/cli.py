@@ -5,7 +5,7 @@ import json
 import os
 import sys
 
-from . import config, net, pipeline, published, upload
+from . import config, net, pipeline, published, status, upload
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -80,6 +80,21 @@ def cmd_fetch(args):
 
 def cmd_run(args):
     pkgs, releases = _load(args)
+    live = bool(args.dest) and not args.dry_run
+    # Tell the repository update that this shard is uploading.
+    st = status.Status(args.dest, args.shard, args.port, args.known_hosts, dry_run=not live) if args.dest else None
+    if st:
+        st.running()
+    try:
+        rc = _run(args, pkgs, releases, st)
+    except BaseException as e:
+        if st:
+            st.failed(f"{type(e).__name__}: {e}")
+        raise
+    return rc
+
+
+def _run(args, pkgs, releases, st):
     doc = pipeline.plan(pkgs, releases, args.keys, args.jobs, _shard(args.shard))
     os.makedirs(args.out, exist_ok=True)
     with open(os.path.join(args.out, "plan.json"), "w") as f:
@@ -98,9 +113,22 @@ def cmd_run(args):
         up.finish()   # raises when a batch failed: no removal, no state
         upload.remove(m["removed"], args.dest or "<dest>", args.port, args.known_hosts,
                       dry_run=args.dry_run or not args.dest)
+        if st:
+            st.done(os.path.join(args.out, "manifest.json"), up.files, up.bytes, len(m["removed"]))
     else:
         net.warn("no --dest: output stays in " + args.out)
+    # --strict: the upload is done; a skipped package only sets the exit code.
     return 1 if args.strict and _failed(m) else 0
+
+
+def cmd_status(args):
+    """Mark a shard failed, for a job that was cancelled or failed outside the tool."""
+    st = status.Status(args.dest, args.shard, args.port, args.known_hosts, dry_run=False)
+    if args.state == "failed":
+        st.failed(args.reason)
+    else:
+        st.running()
+    return 0
 
 
 def cmd_upload(args):
@@ -144,6 +172,15 @@ def main(argv=None):
             p.add_argument("--port", type=int, default=22)
             p.add_argument("--known-hosts", default=None)
             p.add_argument("--dry-run", action="store_true", help="do everything except the upload")
+
+    p = sub.add_parser("status", help="write the sync status of a shard on the server")
+    p.add_argument("--dest", required=True)
+    p.add_argument("--shard", default="")
+    p.add_argument("--state", choices=["failed", "running"], required=True)
+    p.add_argument("--reason", default="")
+    p.add_argument("--port", type=int, default=22)
+    p.add_argument("--known-hosts", default=None)
+    p.set_defaults(fn=cmd_status)
 
     p = sub.add_parser("upload", help="upload an output tree")
     p.add_argument("--out", default="output")
