@@ -14,7 +14,7 @@ import subprocess
 import tempfile
 import threading
 
-from . import debver, net, query
+from . import config, debver, net, query
 
 FLAT_SUITES = ("./", "public")
 
@@ -303,6 +303,8 @@ def resolve(pkg, release, arch, keyring):
             if i == len(urls) - 1:
                 raise
     picked = select(stanzas, pkg["filter"], arch, with_deps)
+    if not pkg.get("include_debug"):
+        picked = [st for st in picked if not config.is_debug(st["Package"])]
     out = []
     for st in picked:
         out.append({

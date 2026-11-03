@@ -3,7 +3,7 @@ import shutil
 import subprocess
 import unittest
 
-from extpkg import debfile, debver, query
+from extpkg import config, debfile, debver, query
 
 VERSIONS = [
     "1.0", "1.0-1", "1.0-2", "1:0.9", "9:156.0+build1-0ubuntu0.24.04.1~mt1armbian1",
@@ -55,6 +55,14 @@ class Query(unittest.TestCase):
     def test_bad(self):
         with self.assertRaises(query.QueryError):
             query.compile_query("Name (% x")
+
+
+class Debug(unittest.TestCase):
+    def test_is_debug(self):
+        for name in ("firefox-dbg", "thunderbird-gnome-support-dbg", "libfoo1-dbgsym"):
+            self.assertTrue(config.is_debug(name), name)
+        for name in ("firefox", "firefox-dev", "dbgview", "gdb"):
+            self.assertFalse(config.is_debug(name), name)
 
 
 class Repack(unittest.TestCase):

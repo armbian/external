@@ -34,7 +34,7 @@ def _check(pkg, path):
     need(isinstance(pkg, dict), "not a mapping")
     allowed = {"name", "method", "source", "filter", "with_deps", "releases", "architectures",
                "target", "install", "verify", "repack", "assets", "exclude", "filename",
-               "enabled", "notes", "keep"}
+               "enabled", "notes", "keep", "include_debug"}
     unknown = set(pkg) - allowed
     need(not unknown, f"unknown keys: {sorted(unknown)}")
     need(pkg.get("name") == os.path.basename(path)[:-5], "name must match the file name")
@@ -61,12 +61,22 @@ def _check(pkg, path):
         need(isinstance(rp, dict) and rp.get("packages"), "repack.packages is required")
 
 
+DEBUG_PATTERNS = ("*-dbg", "*-dbgsym")
+
+
+def is_debug(package):
+    """Debug symbol packages: not mirrored unless a config asks for them."""
+    import fnmatch
+    return any(fnmatch.fnmatchcase(package, p) for p in DEBUG_PATTERNS)
+
+
 def load_one(path):
     with open(path) as f:
         pkg = yaml.safe_load(f)
     _check(pkg, path)
     pkg.setdefault("target", "main")
     pkg.setdefault("enabled", True)
+    pkg.setdefault("include_debug", False)
     pkg.setdefault("verify", {})
     pkg["verify"].setdefault("signature", True)   # apt: InRelease must verify
     pkg["verify"].setdefault("checksums", True)   # apt: deb SHA256 must match the index

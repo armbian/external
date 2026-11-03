@@ -78,6 +78,7 @@ Signature rules, as apt uses them:
 | `filename` | no | url: output file name. |
 | `repack` | no | `packages`, `epoch`, `suffix`: rebuild these packages with a new version. |
 | `verify` | no | `signature`, `checksums`. Both default to true. |
+| `include_debug` | no | Also mirror debug packages (`*-dbg`, `*-dbgsym`). Default: false. |
 | `keep` | no | Versions of each package to keep on the server, per release and architecture. Default: 1. |
 | `enabled` | no | false skips the config. Default: true. |
 | `notes` | no | Free text. Say why an exception exists. |

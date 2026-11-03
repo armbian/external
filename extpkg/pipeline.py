@@ -19,6 +19,10 @@ import threading
 
 from . import apt, config, debfile, debver, github, net, published, retention, url
 
+class SkipDebug(Exception):
+    """A debug package from a source that cannot filter before download."""
+
+
 RESOLVERS = {"apt": apt.resolve, "github": github.resolve, "url": url.resolve}
 TOOL = "armbian-external/1"
 
@@ -181,6 +185,9 @@ class Fetcher:
             dest = f"stable+beta (published {x['published'] or 'none'})" if x["stable"] else "beta only"
             self.progress.step(f"{where}: {how} {x['filename']} {size} {check} -> {dest}")
             return [(p, x["size"]) for p in created]
+        except SkipDebug as e:
+            self.progress.step(f"{where}: debug package {e} not mirrored")
+            return []
         except Exception as e:
             self.skipped.append({**base, "file": cand["filename"], "reason": f"{type(e).__name__}: {e}"})
             self.progress.step(f"{where}: FAILED {cand['filename']}: {type(e).__name__}: {e}")
@@ -191,6 +198,8 @@ class Fetcher:
         fields = debfile.control(path)
         if fields["Architecture"] not in (entry["arch"], "all"):
             net.warn(f"{cand['filename']}: Architecture {fields['Architecture']}, wanted {entry['arch']}")
+        if config.is_debug(fields["Package"]) and not pkg.get("include_debug"):
+            raise SkipDebug(fields["Package"])
         if cand.get("version") and fields["Version"] != cand["version"]:
             raise debfile.DebError(f"{cand['filename']}: Version {fields['Version']}, index says {cand['version']}")
 
