@@ -15,3 +15,6 @@ install:
 - zfs-dkms
 - zfsutils-linux
 filter: Name (% zfsutils-linux) | Name (% libnvpair3linux) | Name (% libzfs7linux) | Name (% libzpool7linux) | Name (% libuutil3linux) | Name (% zfs-dkms) | Name (% zfs-zed)
+skip:
+- resolute/arm64
+notes: 'resolute arm64: the PPA build needs python3-distutils, which resolute does not have.'

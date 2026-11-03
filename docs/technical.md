@@ -68,7 +68,7 @@ Signature rules, as apt uses them:
 | `source.tag` | no | github: release tag. Default: latest release. |
 | `source.sha256` | no | url: expected SHA256. |
 | `filter` | apt | Which packages to take. See below. |
-| `with_deps` | no | Also take the dependencies found in the same index. Default: true when `filter` has no `Name` or `Version`. |
+| `with_deps` | no | Also take the dependencies found in the same index. Default: true when `filter` has no `Name` or `Version`. Careful: a vendor archive may carry its own base packages (the Raspberry Pi archive has `libc6`). Prefer naming the packages in `filter`. |
 | `releases` | yes | `all` or a list of releases. |
 | `architectures` | yes | `amd64`, `arm64`, `armhf`, `riscv64`, `loong64`, `i386`. |
 | `target` | no | `main`, `utils` or `desktop`. Default: `main`. |
@@ -79,6 +79,8 @@ Signature rules, as apt uses them:
 | `repack` | no | `packages`, `epoch`, `suffix`: rebuild these packages with a new version. |
 | `verify` | no | `signature`, `checksums`. Both default to true. |
 | `include_debug` | no | Also mirror debug packages (`*-dbg`, `*-dbgsym`). Default: false. |
+| `skip` | no | `release/arch` pairs to leave out, for example `trixie/armhf`. Say why in `notes`. |
+| `depcheck` | no | false: leave the config out of the dependency check (it needs a source that the check does not have). Say why in `notes`. |
 | `keep` | no | Versions of each package to keep on the server, per release and architecture. Default: 1. |
 | `enabled` | no | false skips the config. Default: true. |
 | `notes` | no | Free text. Say why an exception exists. |

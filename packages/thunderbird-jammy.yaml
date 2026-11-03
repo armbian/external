@@ -11,8 +11,8 @@ architectures:
 - armhf
 - arm64
 - amd64
-- riscv64
 target: desktop
 install:
 - thunderbird
 filter: Name (% thunderbird*)
+notes: 'No riscv64: the PPA lacks some locale packages for riscv64.'

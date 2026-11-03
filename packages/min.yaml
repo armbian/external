@@ -10,3 +10,10 @@ architectures:
 target: utils
 install:
 - min
+skip:
+- noble/armhf
+- resolute/armhf
+- trixie/armhf
+- forky/armhf
+- sid/armhf
+notes: 'armhf: upstream builds against the library names before the 64-bit time_t transition (libasound2, not libasound2t64). It also needs libgtk2.0-0 and libgcrypt11.'

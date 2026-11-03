@@ -65,6 +65,13 @@ class Debug(unittest.TestCase):
             self.assertFalse(config.is_debug(name), name)
 
 
+class Expand(unittest.TestCase):
+    def test_skip(self):
+        pkg = {"releases": ["noble", "trixie"], "architectures": ["amd64", "armhf"], "skip": ["trixie/armhf"]}
+        self.assertEqual(sorted(config.expand(pkg, [])),
+                         [("noble", "amd64"), ("noble", "armhf"), ("trixie", "amd64")])
+
+
 class Repack(unittest.TestCase):
     def test_version(self):
         self.assertEqual(debfile.repack_version("159.0+build1-0ubuntu0.24.04.1~mt1", 9, "armbian1"),

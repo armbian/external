@@ -15,3 +15,5 @@ install:
 - homeassistant-supervised
 assets:
 - '*.deb'
+depcheck: false
+notes: 'No dependency check: it needs docker-ce from the Docker repository, which the user adds first.'
