@@ -84,21 +84,22 @@ def cmd_run(args):
     os.makedirs(args.out, exist_ok=True)
     with open(os.path.join(args.out, "plan.json"), "w") as f:
         json.dump(doc, f, indent=1)
-    m = pipeline.fetch(doc, pkgs, args.out, args.cache, args.published, args.jobs, args.prune_cache, _previous(args))
+    # With --dest, upload while downloading. Without it, a dry run lists the files.
+    up = None
+    if args.dest or args.dry_run:
+        up = upload.StreamUploader(args.out, args.dest or "<dest>", args.port, args.known_hosts,
+                                   dry_run=args.dry_run or not args.dest)
+    m = pipeline.fetch(doc, pkgs, args.out, args.cache, args.published, args.jobs, args.prune_cache,
+                       _previous(args), sink=up.add if up else None, stop=up.failed if up else None)
     rep = pipeline.report(m)
     net.summary(rep)
     print(rep)
-    if args.dest:
-        upload.upload(args.out, args.dest, args.port, args.known_hosts, dry_run=args.dry_run)
-        # Old versions go only after the new files are in place.
-        upload.remove(m["removed"], args.dest, args.port, args.known_hosts, dry_run=args.dry_run)
-    elif not args.dry_run:
-        net.warn("no --dest: output stays in " + args.out)
+    if up:
+        up.finish()   # raises when a batch failed: no removal, no state
+        upload.remove(m["removed"], args.dest or "<dest>", args.port, args.known_hosts,
+                      dry_run=args.dry_run or not args.dest)
     else:
-        for f in upload.plan_upload(args.out):
-            net.log(f"dry-run: would upload {f}")
-        for f in m["removed"]:
-            net.log(f"dry-run: would remove {f}")
+        net.warn("no --dest: output stays in " + args.out)
     return 1 if args.strict and _failed(m) else 0
 
 

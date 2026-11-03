@@ -9,7 +9,7 @@ packages/*.yaml ──plan──► plan.json ──fetch──► output/ ─�
 
 1. **plan** expands each config to (release, architecture) entries and resolves the upstream files. It downloads indexes and release metadata only.
 2. **fetch** downloads each file once, checks it, repacks it when the config says so, and places it in the output tree.
-3. **upload** copies the output tree to the server. It never replaces a file that is already there.
+3. **upload** copies the output tree to the server while the downloads go on. It never replaces a file that is already there.
 
 One failed source never stops the run. It becomes a "skipped" entry in the manifest and in the summary.
 
@@ -150,6 +150,14 @@ Each shard keeps the `manifest.json` of its last successful run in the GitHub Ac
 A file is not downloaded again when the config, release, architecture, URL and upstream SHA256 match an entry in that manifest. The server already has it.
 `url` files have no upstream hash, so they are always downloaded.
 State is saved only after a successful run. Dry runs and live runs keep separate state.
+
+#### Upload
+
+The upload starts during the download. After an upstream file is downloaded, checked and placed in every directory, its new paths go to an upload queue. A batch goes to the server every 30 s, or at 500 MB.
+
+Each batch is one `rsync -H --files-from`. A file placed in several directories (releases, `debs` and `debs-beta`) is a hardlink, so rsync sends its data once and links it on the server. Without `-H` a full run sends 40 GiB; with it, 12 GiB.
+
+If a batch fails, the run stops downloading, removes nothing and saves no state.
 
 #### Old versions
 
