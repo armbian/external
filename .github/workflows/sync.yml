@@ -106,7 +106,7 @@ jobs:
         # manifest.json of the last successful run of this shard. Files it lists
         # with the same upstream SHA256 are not downloaded again. Dry runs keep
         # their own state, so a test never marks a file as uploaded.
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: state
           key: state-${{ env.DRY_RUN == 'true' && 'dry' || 'live' }}-shard-${{ matrix.shard }}-${{ github.run_id }}
@@ -155,14 +155,14 @@ jobs:
 
       - name: Store state
         if: success()
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: state
           key: state-${{ env.DRY_RUN == 'true' && 'dry' || 'live' }}-shard-${{ matrix.shard }}-${{ github.run_id }}
 
       - name: Keep plan and manifest
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: manifest-shard-${{ matrix.shard }}
           path: |
