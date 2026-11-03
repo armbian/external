@@ -11,7 +11,8 @@ class Depcheck(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             for rel, name in (("noble", "Ubuntu noble 24.04"), ("trixie", "Debian 13 Trixie")):
                 os.makedirs(f"{d}/config/distributions/{rel}")
-                open(f"{d}/config/distributions/{rel}/name", "w").write(name)
+                with open(f"{d}/config/distributions/{rel}/name", "w") as f:
+                    f.write(name)
             self.assertEqual(depcheck.distro_of("noble", d), "ubuntu")
             self.assertEqual(depcheck.distro_of("trixie", d), "debian")
         self.assertEqual(depcheck.distro_of("bookworm", None), "debian")
@@ -20,7 +21,7 @@ class Depcheck(unittest.TestCase):
     def test_targets(self):
         files = [{"package": "chromium", "version": "2"}, {"package": "chromium-common", "version": "2"}]
         self.assertEqual(depcheck._targets(files, ["chromium"]), ["chromium=2"])
-        self.assertEqual(depcheck._targets(files, ["other"]), ["chromium-common=2", "chromium=2"])
+        self.assertEqual(depcheck._targets(files, ["other"]), ["chromium=2", "chromium-common=2"])
 
     def test_why_puts_cause_first(self):
         r = SimpleNamespace(stdout="NOTE: This is only a simulation!\n"
