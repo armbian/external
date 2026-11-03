@@ -1,0 +1,19 @@
+name: rpi-libcamera-ubuntu
+method: apt
+source:
+  url: http://ports.ubuntu.com/ubuntu-ports
+  suite: noble
+  components:
+  - main
+  - restricted
+  - universe
+  - multiverse
+releases:
+- jammy
+architectures:
+- arm64
+- armhf
+target: utils
+install:
+- python3-libcamera
+filter: Name (% python3-libcamera*)

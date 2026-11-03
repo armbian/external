@@ -1,0 +1,19 @@
+name: rpi-libraspberrypi-bin-plucky
+method: apt
+source:
+  url: http://ports.ubuntu.com/ubuntu-ports
+  suite: plucky
+  components:
+  - main
+  - restricted
+  - universe
+  - multiverse
+releases:
+- plucky
+architectures:
+- arm64
+- armhf
+target: utils
+install:
+- libraspberrypi-bin
+filter: Name (% libraspberrypi-bin*) | Name (% libraspberrypi0*)

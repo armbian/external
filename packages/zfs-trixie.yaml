@@ -1,0 +1,19 @@
+name: zfs-trixie
+method: apt
+source:
+  url: http://deb.debian.org/debian
+  suite: forky
+  components:
+  - contrib
+  - non-free
+releases:
+- trixie
+architectures:
+- armhf
+- arm64
+- amd64
+target: utils
+install:
+- zfs-dkms
+- zfsutils-linux
+filter: Name (% zfsutils-linux) | Name (% libnvpair3linux) | Name (% libzfs7linux) | Name (% libzpool7linux) | Name (% libuutil3linux) | Name (% zfs-dkms) | Name (% zfs-zed)

@@ -1,0 +1,17 @@
+name: libcec6-sid-to-jammy
+method: apt
+source:
+  url: http://deb.debian.org/debian
+  suite: bullseye
+  components:
+  - main
+releases:
+- jammy
+architectures:
+- armhf
+- arm64
+- amd64
+target: utils
+install:
+- libcec6
+filter: Name (% libcec6)

@@ -1,0 +1,11 @@
+name: obs-studio-rockchip-trixie
+method: url
+source:
+  url: https://github.com/HeyMeco/obs-jfmpp/releases/latest/download/obs-studio-rockchip_trixie_arm64.deb
+releases:
+- trixie
+architectures:
+- arm64
+target: desktop
+install:
+- obs-studio-rockchip

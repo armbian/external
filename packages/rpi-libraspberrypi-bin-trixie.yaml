@@ -1,0 +1,16 @@
+name: rpi-libraspberrypi-bin-trixie
+method: apt
+source:
+  url: http://archive.raspberrypi.com/debian/
+  suite: bookworm
+  components:
+  - main
+releases:
+- trixie
+architectures:
+- arm64
+- armhf
+target: utils
+install:
+- libraspberrypi-bin
+filter: Name (% libraspberrypi-bin*) | Name (% libraspberrypi0*)

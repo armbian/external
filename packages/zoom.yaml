@@ -1,0 +1,19 @@
+name: zoom
+method: apt
+source:
+  url: http://mirror.mwt.me/zoom/deb
+  suite: any
+  components:
+  - main
+releases:
+- noble
+- resolute
+- bookworm
+- trixie
+- forky
+architectures:
+- amd64
+target: desktop
+install:
+- zoom
+filter: Name (% zoom)

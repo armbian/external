@@ -1,0 +1,14 @@
+name: unudhcpd
+method: apt
+source:
+  url: https://ppa.launchpadcontent.net/liujianfeng1994/qcom-mainline/ubuntu
+  suite: jammy
+  components:
+  - main
+releases: all
+architectures:
+- arm64
+target: utils
+install:
+- unudhcpd
+filter: unudhcpd

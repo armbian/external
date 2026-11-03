@@ -1,0 +1,19 @@
+name: zfs-bookworm
+method: apt
+source:
+  url: http://deb.debian.org/debian
+  suite: bookworm-backports
+  components:
+  - contrib
+  - non-free
+releases:
+- bookworm
+architectures:
+- armhf
+- arm64
+- amd64
+target: utils
+install:
+- zfs-dkms
+- zfsutils-linux
+filter: Name (% zfsutils-linux) | Name (% libnvpair3linux) | Name (% libzfs6linux) | Name (% libzpool6linux) | Name (% libuutil3linux) | Name (% zfs-dkms) | Name (% zfs-zed)

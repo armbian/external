@@ -1,0 +1,21 @@
+name: edge
+method: apt
+source:
+  url: https://packages.microsoft.com/repos/edge
+  suite: stable
+  components:
+  - main
+releases:
+- bookworm
+- noble
+- resolute
+- trixie
+- forky
+architectures:
+- amd64
+target: desktop
+install:
+- microsoft-edge-stable
+filter: Name (% microsoft-edge-stable)
+verify:
+  checksums: false

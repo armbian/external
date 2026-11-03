@@ -1,0 +1,16 @@
+name: zulu
+method: apt
+source:
+  url: https://repos.azul.com/zulu/deb
+  suite: stable
+  components:
+  - main
+releases:
+- bookworm
+architectures:
+- arm64
+- amd64
+target: utils
+install:
+- zulu21
+filter: Name (% zulu21*), $Version (< 22.0)

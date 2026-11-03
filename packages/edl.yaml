@@ -1,0 +1,11 @@
+name: edl
+method: github
+source:
+  url: https://github.com/strongtz/edl-ng
+releases: all
+architectures:
+- arm64
+- amd64
+target: utils
+install:
+- gh

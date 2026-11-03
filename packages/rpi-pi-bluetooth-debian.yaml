@@ -1,0 +1,16 @@
+name: rpi-pi-bluetooth-debian
+method: apt
+source:
+  url: http://archive.raspberrypi.com/debian/
+  suite: bookworm
+  components:
+  - main
+releases:
+- bookworm
+architectures:
+- arm64
+- armhf
+target: utils
+install:
+- pi-bluetooth
+filter: Name (% pi-bluetooth* ) | Name (% bluez-firmware)

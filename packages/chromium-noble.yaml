@@ -1,0 +1,16 @@
+name: chromium-noble
+method: apt
+source:
+  url: https://ppa.launchpadcontent.net/xtradeb/apps/ubuntu/
+  suite: noble
+  components:
+  - main
+releases:
+- noble
+architectures:
+- arm64
+- amd64
+target: desktop
+install:
+- chromium
+filter: Name (% chromium) | Name (% chromium-*)

@@ -1,0 +1,19 @@
+name: rpi-libraspberrypi-bin-noble
+method: apt
+source:
+  url: http://ports.ubuntu.com/ubuntu-ports
+  suite: noble
+  components:
+  - main
+  - restricted
+  - universe
+  - multiverse
+releases:
+- noble
+architectures:
+- arm64
+- armhf
+target: utils
+install:
+- libraspberrypi-bin
+filter: Name (% libraspberrypi-bin*) | Name (% libraspberrypi0*)

@@ -1,0 +1,11 @@
+name: armbian-imager
+method: github
+source:
+  url: https://github.com/armbian/imager
+releases: all
+architectures:
+- arm64
+- amd64
+target: desktop
+install:
+- armbian-imager

@@ -1,0 +1,24 @@
+name: code
+method: apt
+source:
+  url: https://packages.microsoft.com/repos/code
+  suite: stable
+  components:
+  - main
+releases:
+- jammy
+- noble
+- resolute
+- bookworm
+- trixie
+- forky
+architectures:
+- armhf
+- arm64
+- amd64
+target: desktop
+install:
+- code
+filter: Name (% code)
+verify:
+  checksums: false

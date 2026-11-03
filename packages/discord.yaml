@@ -1,0 +1,15 @@
+name: discord
+method: url
+source:
+  url: https://discord.com/api/download?platform=linux&format=deb
+releases:
+- noble
+- resolute
+- bookworm
+- trixie
+- forky
+architectures:
+- amd64
+target: desktop
+install:
+- discord

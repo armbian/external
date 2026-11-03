@@ -1,0 +1,11 @@
+name: obs-studio-rockchip-resolute
+method: url
+source:
+  url: https://github.com/HeyMeco/obs-jfmpp/releases/latest/download/obs-studio-rockchip_resolute_arm64.deb
+releases:
+- resolute
+architectures:
+- arm64
+target: desktop
+install:
+- obs-studio-rockchip

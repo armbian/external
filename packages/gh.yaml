@@ -1,0 +1,12 @@
+name: gh
+method: github
+source:
+  url: https://github.com/cli/cli
+releases: all
+architectures:
+- armhf
+- arm64
+- amd64
+target: utils
+install:
+- gh

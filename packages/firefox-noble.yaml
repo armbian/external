@@ -1,0 +1,24 @@
+name: firefox-noble
+method: apt
+source:
+  url: http://ppa.launchpadcontent.net/mozillateam/ppa/ubuntu
+  suite: noble
+  components:
+  - main
+releases:
+- noble
+architectures:
+- armhf
+- arm64
+- amd64
+- riscv64
+target: desktop
+install:
+- firefox
+filter: Name (% firefox*)
+repack:
+  packages:
+  - firefox
+  epoch: 9
+  suffix: armbian1
+notes: Epoch 9 wins over the Ubuntu snap transitional package.

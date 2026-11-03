@@ -1,0 +1,17 @@
+name: zfs-jammy
+method: apt
+source:
+  url: https://ppa.launchpadcontent.net/arter97/zfs/ubuntu
+  suite: jammy
+  components:
+  - main
+releases:
+- jammy
+architectures:
+- arm64
+- amd64
+target: utils
+install:
+- zfs-dkms
+- zfsutils-linux
+filter: Name (% zfsutils-linux) | Name (% libnvpair3linux) | Name (% libzfs7linux) | Name (% libzpool7linux) | Name (% libuutil3linux) | Name (% zfs-dkms) | Name (% zfs-zed)

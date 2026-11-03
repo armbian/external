@@ -1,0 +1,15 @@
+name: urbackup-server-noble
+method: apt
+source:
+  url: https://ppa.launchpadcontent.net/uroni/urbackup/ubuntu
+  suite: jammy
+  components:
+  - main
+releases:
+- noble
+architectures:
+- amd64
+target: utils
+install:
+- urbackup-server
+filter: Name (% urbackup-server*)

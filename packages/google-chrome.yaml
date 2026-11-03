@@ -1,0 +1,21 @@
+name: google-chrome
+method: apt
+source:
+  url: http://dl.google.com/linux/chrome/deb/
+  suite: stable
+  components:
+  - main
+releases:
+- jammy
+- bookworm
+- noble
+- resolute
+- trixie
+- forky
+architectures:
+- amd64
+- arm64
+target: desktop
+install:
+- google-chrome-stable
+filter: Name (% google-chrome-stable)

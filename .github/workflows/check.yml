@@ -1,0 +1,78 @@
+name: "Check"
+
+# Pull requests: unit tests, config validation, a plan of every package, and a
+# dry-run download of the changed package configs. Nothing is uploaded.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      ARMBIAN_BUILD_DIR: ${{ github.workspace }}/build
+      GITHUB_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Checkout armbian/build (supported releases only)
+        uses: actions/checkout@v7
+        with:
+          repository: armbian/build
+          path: build
+          sparse-checkout: config/distributions
+
+      - name: Install tools
+        run: sudo apt-get install -y --no-install-recommends fakeroot python3-yaml
+
+      - name: Unit tests
+        run: python3 -m unittest discover -s tests -t . -v
+
+      - name: Validate package configs
+        run: python3 -m extpkg validate
+
+      - name: Plan every package
+        run: python3 -m extpkg plan --jobs 16 --out plan.json
+
+      - name: Changed package configs
+        id: changed
+        run: |
+          base="${{ github.event.pull_request.base.sha || github.event.before }}"
+          names=""
+          if [ -n "$base" ] && git cat-file -e "$base" 2>/dev/null; then
+            names=$(git diff --name-only "$base" HEAD -- 'packages/*.yaml' \
+              | xargs -r -n1 basename | sed 's/\.yaml$//' \
+              | while read -r n; do [ -f "packages/$n.yaml" ] && echo "$n"; done | paste -sd, -)
+          fi
+          echo "names=${names}" >> "$GITHUB_OUTPUT"
+          echo "Changed package configs: ${names:-none}"
+
+      - name: Dry-run download of changed configs
+        if: steps.changed.outputs.names != ''
+        run: |
+          python3 -m extpkg run --dry-run --strict --jobs 12 \
+            --only "${{ steps.changed.outputs.names }}" --out output --cache "${RUNNER_TEMP}/cache"
+
+      - name: Keep plan and manifest
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: check
+          path: |
+            plan.json
+            output/manifest.json
+          if-no-files-found: ignore
+          retention-days: 7

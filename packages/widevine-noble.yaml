@@ -1,0 +1,16 @@
+name: widevine-noble
+method: apt
+source:
+  url: https://ppa.launchpadcontent.net/liujianfeng1994/rockchip-multimedia/ubuntu
+  suite: noble
+  components:
+  - main
+releases:
+- noble
+architectures:
+- arm64
+- armhf
+target: desktop
+install:
+- libwidevinecdm0
+filter: Name (% libwidevinecdm0)

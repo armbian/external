@@ -1,0 +1,17 @@
+name: gnome-packagekit-to-trixie
+method: apt
+source:
+  url: http://deb.debian.org/debian
+  suite: bookworm
+  components:
+  - main
+releases:
+- trixie
+architectures:
+- armhf
+- arm64
+- amd64
+target: desktop
+install:
+- gnome-packagekit
+filter: Name (% gnome-packagekit*)
