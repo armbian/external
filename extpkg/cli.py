@@ -56,7 +56,7 @@ def cmd_validate(args):
 
 def cmd_plan(args):
     pkgs, releases = _load(args)
-    doc = pipeline.plan(pkgs, releases, args.keys, args.jobs, _shard(args.shard))
+    doc = pipeline.plan(pkgs, releases, args.keys, args.jobs, _shard(args.shard), full=not args.only)
     with open(args.out, "w") as f:
         json.dump(doc, f, indent=1)
     skipped = [e for e in doc["entries"] if e.get("skip")]
@@ -95,7 +95,7 @@ def cmd_run(args):
 
 
 def _run(args, pkgs, releases, st):
-    doc = pipeline.plan(pkgs, releases, args.keys, args.jobs, _shard(args.shard))
+    doc = pipeline.plan(pkgs, releases, args.keys, args.jobs, _shard(args.shard), full=not args.only)
     os.makedirs(args.out, exist_ok=True)
     with open(os.path.join(args.out, "plan.json"), "w") as f:
         json.dump(doc, f, indent=1)

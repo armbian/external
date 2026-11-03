@@ -23,9 +23,9 @@ on:
         description: "Dry run: do everything except the upload"
         type: boolean
         default: true
-  # Enable after the first uploads are verified:
-  # schedule:
-  #   - cron: "15 */6 * * *"
+  # Live run every 2 hours: a run without upstream changes takes under a minute.
+  schedule:
+    - cron: "20 */2 * * *"
 
 permissions:
   contents: read

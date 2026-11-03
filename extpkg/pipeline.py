@@ -33,14 +33,19 @@ def _now():
 
 # --- plan ----------------------------------------------------------------------
 
-def plan(pkgs, releases_all, keys_dir, jobs=8, shard=None):
-    """Resolve every (package, release, arch) to candidate files. No .deb download."""
+def plan(pkgs, releases_all, keys_dir, jobs=8, shard=None, full=False):
+    """Resolve every (package, release, arch) to candidate files. No .deb download.
+
+    full: the run covers every config of its shard (no --only). Retention then
+    also removes the files of configs that were deleted.
+    """
     keyring = apt.Keyring(keys_dir)
-    work = []
+    work, covered = [], []
     for pkg in pkgs:
-        if not pkg["enabled"]:
-            continue
         if shard and _shard_of(pkg["name"], shard[1]) != shard[0]:
+            continue
+        covered.append(pkg["name"])   # disabled too: its old files go
+        if not pkg["enabled"]:
             continue
         for rel, arch in config.expand(pkg, releases_all):
             work.append((pkg, rel, arch))
@@ -72,7 +77,8 @@ def plan(pkgs, releases_all, keys_dir, jobs=8, shard=None):
         entries = list(ex.map(one, work))
     files = sum(len(e["candidates"]) for e in entries)
     prog.done(f"{files} files, {sum(1 for e in entries if e.get('skip'))} skipped")
-    return {"generated": _now(), "tool": TOOL, "releases": releases_all, "entries": entries}
+    return {"generated": _now(), "tool": TOOL, "releases": releases_all, "entries": entries,
+            "covered": covered, "shard": list(shard) if shard else None, "full": full}
 
 
 def _shard_of(name, count):
@@ -250,6 +256,19 @@ class Fetcher:
         return rec, created
 
 
+def removable_configs(plan_doc, pkgs, previous):
+    """Configs whose old files this run may remove: planned ones, disabled ones
+    of this shard, and in a full run the deleted ones of this shard."""
+    names = {e["config"] for e in plan_doc["entries"]} | set(plan_doc.get("covered", []))
+    if plan_doc.get("full") and previous:
+        shard = plan_doc.get("shard")
+        known = {p["name"] for p in pkgs}
+        for x in previous.get("files", []):
+            if x["config"] not in known and (not shard or _shard_of(x["config"], shard[1]) == shard[0]):
+                names.add(x["config"])
+    return names
+
+
 def prune_cache(cache, used):
     """Remove cached files that this run did not use. Return (files, bytes)."""
     n = size = 0
@@ -295,7 +314,7 @@ def fetch(plan_doc, pkgs, out, cache, pub_url=published.DEFAULT_URL, jobs=8, pru
     if prune:
         n, size = prune_cache(cache, f.used)
         net.log(f"cache: removed {n} unused files, {net.human(size)}")
-    planned = {e["config"] for e in plan_doc["entries"]}
+    planned = removable_configs(plan_doc, pkgs, previous)
     keep = {p["name"]: p.get("keep", 1) for p in pkgs}
     carried, removed = retention.plan_removal(previous, f.files, f.skipped, planned, keep)
     if removed:

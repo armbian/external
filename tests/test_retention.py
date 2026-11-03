@@ -1,6 +1,6 @@
 import unittest
 
-from extpkg import retention
+from extpkg import pipeline, retention
 
 
 def entry(config, version, release="noble", arch="amd64", package=None, stable=True, name=None):
@@ -68,6 +68,24 @@ class Retention(unittest.TestCase):
         self.assertTrue(retention.safe_path("debs/extra/noble-utils/a_1_all.deb"))
         for bad in ("debs/../x.deb", "/debs/a.deb", "other/a.deb", "debs/a.txt", "debs//a.deb"):
             self.assertFalse(retention.safe_path(bad), bad)
+
+
+class Removable(unittest.TestCase):
+    PREV = {"files": [{"config": "gh"}, {"config": "rpi-off"}, {"config": "deleted"}, {"config": "other-shard"}]}
+    PKGS = [{"name": "gh"}, {"name": "rpi-off"}, {"name": "other-shard"}]
+
+    def plan(self, full):
+        return {"entries": [{"config": "gh"}], "covered": ["gh", "rpi-off"], "shard": None, "full": full}
+
+    def test_disabled_config_is_removable(self):
+        self.assertIn("rpi-off", pipeline.removable_configs(self.plan(False), self.PKGS, self.PREV))
+
+    def test_deleted_config_only_in_full_run(self):
+        self.assertIn("deleted", pipeline.removable_configs(self.plan(True), self.PKGS, self.PREV))
+        self.assertNotIn("deleted", pipeline.removable_configs(self.plan(False), self.PKGS, self.PREV))
+
+    def test_existing_config_of_another_shard_is_not_removable(self):
+        self.assertNotIn("other-shard", pipeline.removable_configs(self.plan(True), self.PKGS, self.PREV))
 
 
 if __name__ == "__main__":

@@ -141,7 +141,7 @@ Check uses no secrets.
 
 ### Sync (`.github/workflows/sync.yml`)
 
-Manual for now. Inputs: `only` (config names) and `dry_run` (default true).
+Runs every 2 hours (live), and by hand. Manual inputs: `only` (config names) and `dry_run` (default true).
 
 - 4 shards. A config always lands in the same shard (hash of its name).
 - Each shard plans, fetches and uploads its own configs.
@@ -207,6 +207,8 @@ The run removes nothing when:
 - a download or check of that config, release and architecture failed in this run;
 - the path is still in use (an `_all.deb` for several architectures);
 - the config is not in this run (`--only`, another shard). Its entries stay in the state.
+
+The run does remove the files of a config that is disabled (`enabled: false`), and in a full run (no `--only`) the files of a config that was deleted from `packages/`.
 
 A dry run prints `would remove` lines. Files that this tool did not upload are never touched.
 
