@@ -238,7 +238,9 @@ class Checker:
 
 def check(manifest, out, pkgs, build_dir, lists_cache, keys_dir, jobs=4, extra_keyrings=()):
     """Check the new files of a finished output tree (no download running)."""
-    new = [x for x in manifest["files"] if not x.get("carried") and not x.get("unchanged")]
+    skip = {p["name"] for p in pkgs if p.get("depcheck") is False}
+    new = [x for x in manifest["files"] if not x.get("carried") and not x.get("unchanged")
+           and x["config"] not in skip]
     groups = {}
     for x in new:
         groups.setdefault((x["config"], x["release"], x["arch"]), []).append(x)

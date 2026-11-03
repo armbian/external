@@ -34,7 +34,7 @@ def _check(pkg, path):
     need(isinstance(pkg, dict), "not a mapping")
     allowed = {"name", "method", "source", "filter", "with_deps", "releases", "architectures",
                "target", "install", "verify", "repack", "assets", "exclude", "filename",
-               "enabled", "notes", "keep", "include_debug"}
+               "enabled", "notes", "keep", "include_debug", "skip", "depcheck"}
     unknown = set(pkg) - allowed
     need(not unknown, f"unknown keys: {sorted(unknown)}")
     need(pkg.get("name") == os.path.basename(path)[:-5], "name must match the file name")
@@ -56,6 +56,10 @@ def _check(pkg, path):
     if pkg["method"] == "github":
         need("github.com/" in src["url"], "source.url must be a github.com repository")
     need(isinstance(pkg.get("keep", 1), int) and pkg.get("keep", 1) >= 1, "keep must be a number >= 1")
+    skip = pkg.get("skip", [])
+    need(isinstance(skip, list) and all(isinstance(x, str) and x.count("/") == 1 for x in skip),
+         "skip must be a list of release/arch")
+    need(isinstance(pkg.get("depcheck", True), bool), "depcheck must be true or false")
     rp = pkg.get("repack")
     if rp is not None:
         need(isinstance(rp, dict) and rp.get("packages"), "repack.packages is required")
@@ -118,9 +122,11 @@ def supported_releases(build_dir):
 def expand(pkg, releases_all):
     """Yield (release, arch) for one package."""
     releases = releases_all if pkg["releases"] == "all" else pkg["releases"]
+    skip = set(pkg.get("skip", []))
     for arch in pkg["architectures"]:
         for rel in releases:
-            yield rel, arch
+            if f"{rel}/{arch}" not in skip:
+                yield rel, arch
 
 
 def component_dir(pkg, release):

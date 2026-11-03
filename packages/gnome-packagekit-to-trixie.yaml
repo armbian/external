@@ -15,3 +15,6 @@ target: desktop
 install:
 - gnome-packagekit
 filter: Name (% gnome-packagekit*)
+skip:
+- trixie/armhf
+notes: Built for bookworm. On trixie armhf it needs the library names before the 64-bit time_t transition.

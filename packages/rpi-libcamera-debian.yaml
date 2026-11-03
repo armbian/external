@@ -13,4 +13,6 @@ architectures:
 target: utils
 install:
 - python3-libcamera
-filter: Name (% python3-libcamera*)
+filter: Name (% python3-libcamera*) | Name (= libcamera0.5) | Name (= libcamera-ipa) | Name (= libpisp-common) | Name (= libpisp1)
+notes: 'python3-libcamera needs these libraries from the same archive. Named one by one: with_deps would also take the Raspberry Pi libc6, which sorts above the Debian one. The daily dependency check reports
+  a new library version (for example libcamera0.8).'
