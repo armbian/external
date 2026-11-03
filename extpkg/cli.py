@@ -103,7 +103,7 @@ def _run(args, pkgs, releases, st):
     up = None
     if args.dest or args.dry_run:
         up = upload.StreamUploader(args.out, args.dest or "<dest>", args.port, args.known_hosts,
-                                   dry_run=args.dry_run or not args.dest)
+                                   dry_run=args.dry_run or not args.dest, streams=args.streams)
     m = pipeline.fetch(doc, pkgs, args.out, args.cache, args.published, args.jobs, args.prune_cache,
                        _previous(args), sink=up.add if up else None, stop=up.failed if up else None)
     rep = pipeline.report(m)
@@ -172,6 +172,7 @@ def main(argv=None):
             p.add_argument("--port", type=int, default=22)
             p.add_argument("--known-hosts", default=None)
             p.add_argument("--dry-run", action="store_true", help="do everything except the upload")
+            p.add_argument("--streams", type=int, default=3, help="upload batches at the same time")
 
     p = sub.add_parser("status", help="write the sync status of a shard on the server")
     p.add_argument("--dest", required=True)

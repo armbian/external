@@ -97,10 +97,13 @@ class StreamUploader:
     fetch() hands over the new paths of each upstream file at once, so a file
     and its hardlinks are in one batch: rsync -H sends the data once.
     A batch goes when it reaches batch_bytes, or batch_secs after its first file.
+    Up to `streams` batches go at the same time: one SSH stream is slow
+    (10-18 MB/s measured to the repository server).
     """
 
     def __init__(self, out, dest, port=22, known_hosts=None, dry_run=True,
-                 batch_bytes=500 << 20, batch_secs=30):
+                 batch_bytes=500 << 20, batch_secs=30, streams=3):
+        import concurrent.futures
         import queue
         import threading
         self.out, self.dest = out.rstrip("/"), dest.rstrip("/")
@@ -112,6 +115,9 @@ class StreamUploader:
         self.q = queue.Queue()
         self.error = None
         self.batches = self.files = self.bytes = 0
+        self._stats = threading.Lock()
+        self.pool = concurrent.futures.ThreadPoolExecutor(max(streams, 1))
+        self.pending = []
         self.thread = threading.Thread(target=self._run, daemon=True)
         self.thread.start()
 
@@ -132,8 +138,9 @@ class StreamUploader:
             st = os.stat(os.path.join(self.out, p))
             inodes[(st.st_dev, st.st_ino)] = st.st_size
         size = sum(inodes.values())
-        self.batches += 1
-        n = self.batches
+        with self._stats:
+            self.batches += 1
+            n = self.batches
         if self.dry_run:
             for p in paths:
                 net.log(f"dry-run: would upload {p}")
@@ -151,8 +158,9 @@ class StreamUploader:
             secs = max(time.monotonic() - start, 0.1)
             net.log(f"send batch {n}: {len(paths)} paths, {net.human(size)} in {secs:.0f} s "
                     f"({net.human(size / secs)}/s)")
-        self.files += len(paths)
-        self.bytes += size
+        with self._stats:
+            self.files += len(paths)
+            self.bytes += size
 
     def _run(self):
         import queue
@@ -173,12 +181,18 @@ class StreamUploader:
                 pass
             due = first is not None and (size >= self.batch_bytes or time.monotonic() - first >= self.batch_secs)
             if batch and (due or done) and self.error is None:
-                try:
-                    self._send(batch)
-                except Exception as e:  # stop the run: no state is saved
-                    self.error = e
-                    net.error(str(e))
+                self.pending.append(self.pool.submit(self._send_safe, batch))
                 batch, size, first = [], 0, None
+        self.pool.shutdown(wait=True)
+
+    def _send_safe(self, batch):
+        if self.error is not None:
+            return
+        try:
+            self._send(batch)
+        except Exception as e:  # stop the run: no state is saved
+            self.error = e
+            net.error(str(e))
 
     def finish(self):
         """Send the rest. Raise when a batch failed."""
