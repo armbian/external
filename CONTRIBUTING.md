@@ -87,6 +87,7 @@ Rules:
 - `releases: all` only when the package works on every supported release.
 - Use `exclude` or `assets` (github) and `filter` (apt) to take only the packages that you need.
 - Do not turn off `verify.signature` or `verify.checksums`. If upstream is broken, say why in `notes`.
+- One version of each package stays on the server. Set `keep: 2` to keep the previous version too.
 
 All keys: [docs/technical.md](docs/technical.md#package-config).
 

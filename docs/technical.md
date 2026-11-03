@@ -78,6 +78,7 @@ Signature rules, as apt uses them:
 | `filename` | no | url: output file name. |
 | `repack` | no | `packages`, `epoch`, `suffix`: rebuild these packages with a new version. |
 | `verify` | no | `signature`, `checksums`. Both default to true. |
+| `keep` | no | Versions of each package to keep on the server, per release and architecture. Default: 1. |
 | `enabled` | no | false skips the config. Default: true. |
 | `notes` | no | Free text. Say why an exception exists. |
 
@@ -149,6 +150,24 @@ Each shard keeps the `manifest.json` of its last successful run in the GitHub Ac
 A file is not downloaded again when the config, release, architecture, URL and upstream SHA256 match an entry in that manifest. The server already has it.
 `url` files have no upstream hash, so they are always downloaded.
 State is saved only after a successful run. Dry runs and live runs keep separate state.
+
+#### Old versions
+
+The upload never replaces files. Without a cleanup, each new upstream version (for example a daily VS Code build) adds a file.
+
+After a successful upload, the run removes the files that it uploaded earlier and that are no longer current:
+
+- The previous manifest of the shard lists every file that the last run put on the server.
+- A file in the previous manifest and not in the current set is old. The newest `keep` versions stay. The rest are removed.
+- The removal deletes only the listed paths, with `rsync --delete-missing-args --files-from`. Each path must be under `debs/` or `debs-beta/` and end in `.deb`.
+
+The run removes nothing when:
+
+- a download or check of that config, release and architecture failed in this run;
+- the path is still in use (an `_all.deb` for several architectures);
+- the config is not in this run (`--only`, another shard). Its entries stay in the state.
+
+A dry run prints `would remove` lines. Files that this tool did not upload are never touched.
 
 #### Runners
 
@@ -234,5 +253,6 @@ Keys added or replaced during the port, each checked against the signer of its r
 ## Known limits
 
 - `url` sources have no upstream hash, unless the config pins one.
+- Old versions are removed only for files that this tool uploaded. Files from the old pipeline need a one-time cleanup.
 - A `url` file has a fixed name (`discord.deb`). The upload does not overwrite, so the server keeps the first version. A name with the version needs a code change: the version is known only after the download.
 - Package types `source-patch` and `build` are planned, not implemented.

@@ -17,7 +17,7 @@ import os
 import shutil
 import threading
 
-from . import apt, config, debfile, debver, github, net, published, url
+from . import apt, config, debfile, debver, github, net, published, retention, url
 
 RESOLVERS = {"apt": apt.resolve, "github": github.resolve, "url": url.resolve}
 TOOL = "armbian-external/1"
@@ -154,7 +154,8 @@ class Fetcher:
             if prev:
                 # Uploaded by an earlier run, and the server keeps it.
                 with self._guard:
-                    self.files.append({**prev, "unchanged": True})
+                    rec = {k: v for k, v in prev.items() if k != "carried"}
+                    self.files.append({**rec, "unchanged": True})
                     self.unchanged += 1
                 self.progress.step(f"{where}: unchanged {prev['filename']}")
                 continue
@@ -250,12 +251,19 @@ def fetch(plan_doc, pkgs, out, cache, pub_url=published.DEFAULT_URL, jobs=8, pru
     if prune:
         n, size = prune_cache(cache, f.used)
         net.log(f"cache: removed {n} unused files, {net.human(size)}")
+    planned = {e["config"] for e in plan_doc["entries"]}
+    keep = {p["name"]: p.get("keep", 1) for p in pkgs}
+    carried, removed = retention.plan_removal(previous, f.files, f.skipped, planned, keep)
+    if removed:
+        net.log(f"retention: {len(removed)} old files to remove")
     manifest = {
         "generated": _now(),
         "tool": TOOL,
         "releases": plan_doc["releases"],
-        "files": sorted(f.files, key=lambda x: (x["config"], x["release"], x["arch"], x["filename"])),
+        "files": sorted(f.files + carried, key=lambda x: (x["config"], x["release"], x["arch"], x["filename"])),
         "skipped": sorted(f.skipped, key=lambda x: (x["config"], x["release"], x["arch"])),
+        "removed": removed,
+        "configs": sorted(planned),
     }
     with open(os.path.join(out, "manifest.json"), "w") as fh:
         json.dump(manifest, fh, indent=1)
@@ -266,7 +274,8 @@ def fetch(plan_doc, pkgs, out, cache, pub_url=published.DEFAULT_URL, jobs=8, pru
 
 def report(manifest):
     """Markdown summary: one row per config, release and architecture."""
-    files, skipped = manifest["files"], manifest["skipped"]
+    files = [x for x in manifest["files"] if not x.get("carried")]
+    skipped = manifest["skipped"]
     groups = {}
     for x in files:
         groups.setdefault((x["config"], x["release"], x["arch"]), []).append(x)
@@ -285,6 +294,12 @@ def report(manifest):
         check = "sig+sha" if sig and sha else ("sig" if sig else ("sha" if sha else "none"))
         lines.append(f"| {cfg} | {rel} | {arch} | {len(xs)} | {len(st)} | "
                      f"{ex['package']} {ex['version']} | {ex['published'] or '-'} | {check} |")
+    removed = manifest.get("removed", [])
+    if removed:
+        lines += ["", f"#### Old files to remove: {len(removed)}", ""]
+        lines += [f"- `{r}`" for r in removed[:50]]
+        if len(removed) > 50:
+            lines.append(f"- ... and {len(removed) - 50} more")
     if skipped:
         lines += ["", "#### Skipped", "", "| config | release | arch | reason |", "|---|---|---|---|"]
         for sk in skipped:
