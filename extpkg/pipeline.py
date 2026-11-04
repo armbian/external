@@ -308,6 +308,8 @@ class Fetcher:
             "upstream_sha256": cand.get("sha256"),
             "upstream_id": cand.get("identity"),
             "published": have,
+            "description": fields.get("Description"),
+            "homepage": fields.get("Homepage"),
             "beta": beta_rel,
             "stable": stable_rel,
         }

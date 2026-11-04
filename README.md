@@ -2,6 +2,8 @@
 
 Third-party Debian packages for the Armbian apt repository: VS Code, Chromium, Firefox, ZFS, Raspberry Pi userspace, mesa, and more.
 
+Package list with versions per release and architecture: https://github.armbian.com/external/
+
 This repository holds the package list, the upstream signing keys and the tool that downloads, builds, checks and sorts the packages.
 The Armbian repository update takes the result and publishes it.
 
@@ -23,6 +25,7 @@ extpkg/                   the tool
 | Sync | `mirror/` | every 2 hours | by hand: `dry_run` (default true) |
 | Build | `build/` | daily, pull requests | always for pull requests; scheduled runs until `BUILD_LIVE` is `true` |
 | Check | both | pull requests | always |
+| Package site | both | after Sync and Build | - |
 
 ## What it produces
 
