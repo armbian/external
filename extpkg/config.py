@@ -13,6 +13,8 @@ METHODS = MIRROR_METHODS + BUILD_METHODS
 # Native GitHub-hosted runners only: no emulation.
 BUILD_ARCHES = ("amd64", "arm64")
 TARGETS = ("main", "utils", "desktop")
+# Old configs: REPOSITORY=B (beta), S (stable), BS (both).
+REPOSITORIES = ("stable", "beta")
 ARCHES = ("amd64", "arm64", "armhf", "riscv64", "loong64", "i386")
 # Used when the armbian/build checkout is not available.
 DEFAULT_RELEASES = ["bookworm", "trixie", "forky", "jammy", "noble", "resolute"]
@@ -39,7 +41,7 @@ def _check(pkg, path):
     allowed = {"name", "method", "source", "filter", "with_deps", "releases", "architectures",
                "target", "install", "verify", "repack", "assets", "exclude", "filename",
                "enabled", "notes", "keep", "include_debug", "skip", "depcheck",
-               "packaging", "upstream", "revision", "build_depends"}
+               "packaging", "upstream", "revision", "build_depends", "repositories"}
     unknown = set(pkg) - allowed
     need(not unknown, f"unknown keys: {sorted(unknown)}")
     need(pkg.get("name") == os.path.basename(path)[:-5], "name must match the file name")
@@ -54,6 +56,9 @@ def _check(pkg, path):
     need(isinstance(skip, list) and all(isinstance(x, str) and x.count("/") == 1 for x in skip),
          "skip must be a list of release/arch")
     need(isinstance(pkg.get("depcheck", True), bool), "depcheck must be true or false")
+    repos = pkg.get("repositories", list(REPOSITORIES))
+    need(isinstance(repos, list) and repos and set(repos) <= set(REPOSITORIES),
+         f"repositories must be a list from {REPOSITORIES}")
     if pkg["method"] == "build":
         _check_build(pkg, path, need)
         return
@@ -117,6 +122,7 @@ def load_one(path):
     pkg.setdefault("target", "main")
     pkg.setdefault("enabled", True)
     pkg.setdefault("include_debug", False)
+    pkg.setdefault("repositories", list(REPOSITORIES))
     pkg.setdefault("verify", {})
     pkg["verify"].setdefault("signature", True)   # apt: InRelease must verify
     pkg["verify"].setdefault("checksums", True)   # apt: deb SHA256 must match the index

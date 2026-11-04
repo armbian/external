@@ -69,6 +69,7 @@ class Config(unittest.TestCase):
     def test_rejects(self):
         pk = {"url": "https://deb.debian.org/debian", "suite": "sid", "package": "x"}
         for bad in ({"architectures": ["armhf"]}, {"filter": "Name (% x)"}, {"source": {"url": "u"}},
+                    {"repositories": ["testing"]}, {"repositories": []},
                     {"upstream": {"url": "u", "rebase": {"url": "v"}}}, {"revision": 0}):
             with self.subTest(bad=bad), self.assertRaises(config.ConfigError):
                 self.load({**self.base(packaging=pk), **bad})
@@ -289,6 +290,17 @@ class Publish(unittest.TestCase):
             "debs-beta/extra/noble-utils/fastfetch-extra_2.70.0-1+armbian1~noble_amd64.deb",
             "debs-beta/extra/noble-utils/fastfetch_2.70.0-1+armbian1~noble_amd64.deb"])
         self.assertEqual({x["upstream_id"] for x in f.files}, {self.cand["identity"]})
+
+    def test_repositories(self):
+        self.built(self.cand["identity"])
+        for repos, beta, stable in ((["beta"], True, False), (["stable"], False, True), (["stable", "beta"], True, True)):
+            with self.subTest(repos=repos):
+                self.pkg["repositories"] = repos
+                f = self.fetcher()
+                f.out = os.path.join(self.tmp, "out-" + "-".join(repos))
+                f.group([(self.entry, self.cand)])
+                self.assertEqual(bool(f.files[0]["beta"]), beta)
+                self.assertEqual(bool(f.files[0]["stable"]), stable)
 
     def test_other_identity_is_not_built(self):
         self.built("build1|old")

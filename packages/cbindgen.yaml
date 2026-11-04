@@ -1,0 +1,14 @@
+name: cbindgen
+method: build
+# Local packaging: upstream cbindgen built with cargo.
+# Mesa NVK needs cbindgen 0.28 or newer; trixie has 0.27. Debian's 0.29 needs Rust crates that trixie does not have.
+upstream:
+  url: https://github.com/mozilla/cbindgen
+releases:
+- trixie
+architectures:
+- arm64
+- amd64
+target: desktop
+install:
+- cbindgen

@@ -1,12 +1,13 @@
 name: libdrm
 method: build
-# Debian packaging. Mesa needs libdrm 2.4.133 or newer (amdgpu); resolute has 2.4.131.
+# Debian packaging. Mesa needs libdrm 2.4.133 or newer (amdgpu): resolute has 2.4.131, trixie 2.4.124.
 packaging:
   url: https://deb.debian.org/debian
   suite: sid
   components: [main]
   package: libdrm
 releases:
+- trixie
 - resolute
 architectures:
 - arm64

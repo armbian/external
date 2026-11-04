@@ -273,12 +273,14 @@ class Fetcher:
         newer = have is None or debver.compare(version, have) > 0
 
         created = []
-        beta_rel, digest, made = self._place(path, "debs-beta", entry["dir"], name)
-        if made:
-            created.append(beta_rel)
-        stable_rel = None
-        if newer:
-            stable_rel, _, made = self._place(path, "debs", entry["dir"], name)
+        repos = pkg.get("repositories", config.REPOSITORIES)
+        beta_rel = stable_rel = digest = None
+        if "beta" in repos:
+            beta_rel, digest, made = self._place(path, "debs-beta", entry["dir"], name)
+            if made:
+                created.append(beta_rel)
+        if newer and "stable" in repos:
+            stable_rel, digest, made = self._place(path, "debs", entry["dir"], name)
             if made:
                 created.append(stable_rel)
         rec = {
@@ -288,7 +290,7 @@ class Fetcher:
             "upstream_version": fields["Version"],
             "deb_arch": fields["Architecture"],
             "filename": name,
-            "sha256": digest,
+            "sha256": digest or net.sha256_file(path),
             "size": os.path.getsize(path),
             "source": cand["url"],
             "signature": cand.get("signature", "none"),

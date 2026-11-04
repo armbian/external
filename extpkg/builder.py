@@ -7,7 +7,8 @@ on a runner of the architecture. Steps:
    index), or take packages/<name>/debian.
 2. Upstream: clone the tag or branch, rebase it when the config asks, and put
    the packaging on top.
-3. Patches: packages/<name>/patches/series, applied with patch -p1.
+3. Patches: packages/<name>/patches/series, then patches/<release>/series,
+   applied with patch -p1.
 4. Changelog entry with the Armbian version.
 5. build_depends: a local apt repository with the files that the Build
    workflow built for those configs in its first stage.
@@ -82,15 +83,17 @@ def _replace_debian(tree, debian):
     shutil.copytree(debian, os.path.join(tree, "debian"))
 
 
-def _patches(pkg, packages_dir, tree):
-    series = os.path.join(source.local_dir(pkg, packages_dir), "patches", "series")
-    if not os.path.exists(series):
-        return
-    with open(series) as f:
-        names = [line.split("#")[0].strip() for line in f]
-    for name in filter(None, names):
-        _run(["patch", "-p1", "--forward", "--no-backup-if-mismatch", "-i",
-              os.path.join(os.path.dirname(series), name)], cwd=tree)
+def _patches(pkg, packages_dir, tree, release):
+    """Common patches, then the patches of this release."""
+    root = os.path.join(source.local_dir(pkg, packages_dir), "patches")
+    for series in (os.path.join(root, "series"), os.path.join(root, release, "series")):
+        if not os.path.exists(series):
+            continue
+        with open(series) as f:
+            names = [line.split("#")[0].strip() for line in f]
+        for name in filter(None, names):
+            _run(["patch", "-p1", "--forward", "--no-backup-if-mismatch", "-i",
+                  os.path.join(os.path.dirname(series), name)], cwd=tree)
 
 
 def _changelog(tree, b, release):
@@ -173,7 +176,7 @@ def build(plan_doc, pkgs, packages_dir, name, release, arch, out, jobs=None, dep
     else:
         _upstream(b["upstream"], tree)
         _replace_debian(tree, os.path.join(source.local_dir(pkg, packages_dir), "debian"))
-    _patches(pkg, packages_dir, tree)
+    _patches(pkg, packages_dir, tree, release)
     _changelog(tree, b, release)
 
     # Architecture-independent packages come from the first architecture only:

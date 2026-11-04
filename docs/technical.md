@@ -32,6 +32,7 @@ The layout is the same as `storage/incoming/external` of the old download workfl
 
 - Beta gets every file.
 - Stable gets a file only when its version is newer than the version of the same binary package in the published stable repository.
+- `repositories: [beta]` or `[stable]` limits a config to one repository.
   The tool reads `dists/<release>/<component>/binary-<arch>/Packages.gz` from `https://fi.mirror.armbian.de/apt`.
   `<component>` is `main` for target `main`, else `<release>-<target>`.
 - Versions are compared as Debian versions, with epochs (`extpkg/debver.py`, a port of dpkg).
@@ -81,6 +82,7 @@ Signature rules, as apt uses them:
 | `include_debug` | no | Also mirror debug packages (`*-dbg`, `*-dbgsym`). Default: false. |
 | `skip` | no | `release/arch` pairs to leave out, for example `trixie/armhf`. Say why in `notes`. |
 | `depcheck` | no | false: leave the config out of the dependency check (it needs a source that the check does not have). Say why in `notes`. |
+| `repositories` | no | `stable`, `beta` or both. Default: both. Old configs: `REPOSITORY=S`, `B`, `BS`. |
 | `keep` | no | Versions of each package to keep on the server, per release and architecture. Default: 1. |
 | `enabled` | no | false skips the config. Default: true. |
 | `notes` | no | Free text. Say why an exception exists. |
@@ -134,7 +136,7 @@ Set `ARMBIAN_BUILD_DIR` to a checkout. Without it, the tool uses a fixed list in
 |---|---|---|
 | Packaging | `packaging:` a Debian or Ubuntu source package, or `packages/<name>/debian/` | `debian/` directory. The source package also gives the code when there is no `upstream`. |
 | Upstream | `upstream:` a git tag or branch | Code in place of the packaged code. Its own `debian/` is replaced. |
-| Patches | `packages/<name>/patches/series` | Optional. Applied with `patch -p1` after packaging and upstream. For code that we do not control or fork. |
+| Patches | `packages/<name>/patches/series`, then `patches/<release>/series` | Optional. Applied with `patch -p1` after packaging and upstream. For code that we do not control or fork. Release patches apply to that release only, for example `trixie/` for an older LLVM. |
 
 ```yaml
 name: fastfetch

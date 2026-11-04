@@ -1,0 +1,14 @@
+Source: cbindgen
+Section: devel
+Priority: optional
+Maintainer: Armbian <info@armbian.com>
+Build-Depends: debhelper-compat (= 13), cargo, rustc (>= 1.74)
+Standards-Version: 4.7.0
+Homepage: https://github.com/mozilla/cbindgen
+
+Package: cbindgen
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: generate C bindings from Rust code
+ cbindgen creates C and C++ headers for Rust libraries.
+ Built from upstream with cargo and the versions in its Cargo.lock.
