@@ -1,7 +1,7 @@
 name: fastfetch
 method: build
 # Debian packaging on the newest upstream release.
-# Patch: bundled yyjson. jammy and bookworm: no C23 compiler (fastfetch-upstream covers them).
+# Patch: bundled yyjson. Not built: jammy and bookworm (no C23 compiler), armhf (no native runner).
 packaging:
   url: https://deb.debian.org/debian
   suite: sid

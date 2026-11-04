@@ -50,7 +50,7 @@ If upstream offers a different repository for each Ubuntu or Debian release, wri
 Create `mirror/<name>.yaml`. A build from source goes to `build/<name>.yaml` instead (see `docs/technical.md`, section "Builds"). Copy the closest existing config. The keys are in `docs/technical.md` (section "Package config").
 
 - apt: write a `filter` that takes only the needed packages. Use `Name (% <glob>)` and `|`. Debug packages (`*-dbg`, `*-dbgsym`) are left out by default; set `include_debug: true` only if the user asks.
-- github: add `exclude` for assets that the architecture patterns take by mistake (see `mirror/fastfetch-upstream.yaml`).
+- github: add `exclude` for assets that the architecture patterns take by mistake (for example `exclude: ['*polyfilled*', '*armv6l.deb']`).
 - Do not set `verify.signature: false` or `verify.checksums: false`. If upstream needs it, stop and ask the user.
 
 ## 5. Test
