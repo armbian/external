@@ -91,6 +91,17 @@ class Config(unittest.TestCase):
         self.assertNotEqual(h1, source.local_hash(pkg, self.dir))
 
 
+class Wraps(unittest.TestCase):
+    def test_globs(self):
+        with tempfile.TemporaryDirectory() as tree:
+            os.makedirs(f"{tree}/subprojects")
+            for n in ("venus-protocol", "xml-rs", "paste-1-rs", "zlib"):
+                open(f"{tree}/subprojects/{n}.wrap", "w").close()
+            self.assertEqual(builder._wraps(tree, ["venus-protocol", "*-rs"]), ["paste-1-rs", "venus-protocol", "xml-rs"])
+            with self.assertRaises(builder.BuildError):
+                builder._wraps(tree, ["nothing-*"])
+
+
 class Changelog(unittest.TestCase):
     def test_entry(self):
         with tempfile.TemporaryDirectory() as tree:

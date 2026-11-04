@@ -163,7 +163,7 @@ install: [fastfetch]
 | `upstream.version` | For a branch: the next upstream release, for example `27.0.0`. |
 | `upstream.version_file` | For a branch: a file that holds that version, for example `VERSION` (`27.0.0-devel` gives `27.0.0`). Read from the rebase base when `rebase` is set. |
 | `upstream.rebase.url`, `.ref` | Optional, off by default. A fork: rebase it onto this branch before each build. A conflict fails the build, and the last good packages stay. |
-| `upstream.meson_subprojects` | Meson wraps to download before the build. Debian packaging builds with `--wrap-mode=nodownload`. |
+| `upstream.meson_subprojects` | Meson wraps to download before the build: names or globs, for example `*-rs`. Debian packaging builds with `--wrap-mode=nodownload`. Meson uses a wrap only when the system has no copy. |
 | `revision` | Armbian revision. Default 1. Increase it when the patches or the build keys change, but the sources do not. A live run fails when changed inputs give a version that is already uploaded: the upload never replaces a file. A dry run warns. |
 | `build_depends` | Other build configs whose packages this build needs, for example `libdrm` for `mesa`. One level only. |
 

@@ -20,6 +20,7 @@ Output: <out>/<config>/<release>/<arch>/*.deb and build.json.
 """
 
 import email.utils
+import fnmatch
 import glob
 import json
 import os
@@ -144,6 +145,16 @@ def _deps_repo(pkg, release, arch, deps, work):
     _run(["apt-get", "update", "-qq"])
 
 
+def _wraps(tree, patterns):
+    """Wrap names in subprojects/ that match the patterns (globs, for example *-rs)."""
+    names = sorted(os.path.basename(p)[:-5] for p in glob.glob(os.path.join(tree, "subprojects", "*.wrap")))
+    out = [n for n in names if any(fnmatch.fnmatchcase(n, p) for p in patterns)]
+    missing = [p for p in patterns if not any(fnmatch.fnmatchcase(n, p) for n in names)]
+    if missing:
+        raise BuildError(f"meson_subprojects: no wrap matches {missing}")
+    return out
+
+
 def _has_arch_any(tree):
     with open(os.path.join(tree, "debian", "control")) as f:
         archs = [line.split(":", 1)[1].split() for line in f if line.startswith("Architecture:")]
@@ -191,7 +202,7 @@ def build(plan_doc, pkgs, packages_dir, name, release, arch, out, jobs=None, dep
         _deps_repo(pkg, release, arch, deps, work)
         _run(["apt-get", "-y", "--no-install-recommends", "build-dep", "./"] + (["--arch-only"] if mode == "-B" else []),
              cwd=tree, env=env)
-        subprojects = (b["upstream"] or {}).get("meson_subprojects") or []
+        subprojects = _wraps(tree, (b["upstream"] or {}).get("meson_subprojects") or [])
         if subprojects:
             _run(["meson", "subprojects", "download", *subprojects], cwd=tree)
         _run(["dpkg-buildpackage", mode, "-uc", "-us"], cwd=tree, env=env)
