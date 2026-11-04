@@ -30,6 +30,8 @@ architectures:
 - arm64
 - amd64
 target: desktop
+repositories:
+- beta
 install:
 - libgl1-mesa-dri
 - libegl-mesa0
