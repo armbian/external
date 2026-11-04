@@ -210,7 +210,8 @@ class Checker:
             else:
                 with self.locks[key]:
                     root = self.roots[key]
-                    r = root.add([os.path.join(self.out, x["beta"]) for x in files])
+                    r = root.add([os.path.join(self.out, x["beta"] or x["stable"]) for x in files
+                                  if x["beta"] or x["stable"]])
                     if r.returncode != 0:
                         res["message"] = "local repository: " + (r.stderr or r.stdout).strip()[-300:]
                     else:

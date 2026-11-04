@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Convert armbian/os external/*.conf (shell) into packages/<name>.yaml.
+"""Convert armbian/os external/*.conf (shell) into mirror/<name>.yaml.
 
-Usage: tools/import-os.py <os checkout>/external packages/
+Usage: tools/import-os.py <os checkout>/external mirror/
 
 The old download workflow had per-package code paths. They become config:
 - fastfetch: drop the polyfilled and armv6l assets

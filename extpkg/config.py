@@ -1,4 +1,9 @@
-"""Load and validate packages/<name>.yaml."""
+"""Load and validate package configs.
+
+mirror/<name>.yaml   built packages to download (apt, github, url)
+build/<name>.yaml    packages to build from source (method build), with
+                     optional build/<name>/patches and build/<name>/debian
+"""
 
 import glob
 import os
@@ -13,6 +18,8 @@ METHODS = MIRROR_METHODS + BUILD_METHODS
 # Native GitHub-hosted runners only: no emulation.
 BUILD_ARCHES = ("amd64", "arm64")
 TARGETS = ("main", "utils", "desktop")
+# Old configs: REPOSITORY=B (beta), S (stable), BS (both).
+REPOSITORIES = ("stable", "beta")
 ARCHES = ("amd64", "arm64", "armhf", "riscv64", "loong64", "i386")
 # Used when the armbian/build checkout is not available.
 DEFAULT_RELEASES = ["bookworm", "trixie", "forky", "jammy", "noble", "resolute"]
@@ -39,7 +46,7 @@ def _check(pkg, path):
     allowed = {"name", "method", "source", "filter", "with_deps", "releases", "architectures",
                "target", "install", "verify", "repack", "assets", "exclude", "filename",
                "enabled", "notes", "keep", "include_debug", "skip", "depcheck",
-               "packaging", "upstream", "revision"}
+               "packaging", "upstream", "revision", "build_depends", "repositories"}
     unknown = set(pkg) - allowed
     need(not unknown, f"unknown keys: {sorted(unknown)}")
     need(pkg.get("name") == os.path.basename(path)[:-5], "name must match the file name")
@@ -54,10 +61,14 @@ def _check(pkg, path):
     need(isinstance(skip, list) and all(isinstance(x, str) and x.count("/") == 1 for x in skip),
          "skip must be a list of release/arch")
     need(isinstance(pkg.get("depcheck", True), bool), "depcheck must be true or false")
+    repos = pkg.get("repositories", list(REPOSITORIES))
+    need(isinstance(repos, list) and repos and set(repos) <= set(REPOSITORIES),
+         f"repositories must be a list from {REPOSITORIES}")
     if pkg["method"] == "build":
         _check_build(pkg, path, need)
         return
-    need(not {"packaging", "upstream", "revision"} & set(pkg), "packaging, upstream and revision are for method build")
+    need(not {"packaging", "upstream", "revision", "build_depends"} & set(pkg),
+         "packaging, upstream, revision and build_depends are for method build")
     src = pkg.get("source") or {}
     need(isinstance(src, dict) and src.get("url"), "source.url is required")
     if pkg["method"] == "apt":
@@ -75,7 +86,7 @@ def _check(pkg, path):
 
 
 def _check_build(pkg, path, need):
-    """method build: packaging and/or upstream; packages/<name>/debian without packaging."""
+    """method build: packaging and/or upstream; build/<name>/debian without packaging."""
     need("source" not in pkg, "method build uses packaging and upstream, not source")
     need(set(_list(pkg["architectures"])) <= set(BUILD_ARCHES),
          f"method build: architectures must be from {BUILD_ARCHES}")
@@ -94,6 +105,8 @@ def _check_build(pkg, path, need):
              "upstream.rebase needs url and ref")
     rev = pkg.get("revision", 1)
     need(isinstance(rev, int) and rev >= 1, "revision must be a number >= 1")
+    deps = pkg.get("build_depends", [])
+    need(isinstance(deps, list) and all(isinstance(d, str) for d in deps), "build_depends must be a list of configs")
     for key in ("filter", "with_deps", "assets", "exclude", "filename", "repack"):
         need(key not in pkg, f"{key} is not for method build")
 
@@ -114,6 +127,7 @@ def load_one(path):
     pkg.setdefault("target", "main")
     pkg.setdefault("enabled", True)
     pkg.setdefault("include_debug", False)
+    pkg.setdefault("repositories", list(REPOSITORIES))
     pkg.setdefault("verify", {})
     pkg["verify"].setdefault("signature", True)   # apt: InRelease must verify
     pkg["verify"].setdefault("checksums", True)   # apt: deb SHA256 must match the index
@@ -126,17 +140,36 @@ def load_one(path):
 
 
 def load_all(directory, names=None):
+    """Configs of one directory. mirror/ takes apt, github, url; build/ takes build."""
+    kind = os.path.basename(os.path.normpath(directory))
+    allowed = {"mirror": MIRROR_METHODS, "build": BUILD_METHODS}.get(kind, METHODS)
     pkgs = []
     for path in sorted(glob.glob(os.path.join(directory, "*.yaml"))):
         name = os.path.basename(path)[:-5]
         if names and name not in names:
             continue
-        pkgs.append(load_one(path))
+        pkg = load_one(path)
+        if pkg["method"] not in allowed:
+            raise ConfigError(f"{path}: method {pkg['method']} does not belong in {kind}/")
+        pkgs.append(pkg)
+    _check_build_depends(directory, pkgs)
     if names:
         missing = set(names) - {p["name"] for p in pkgs}
         if missing:
             raise ConfigError(f"unknown packages: {sorted(missing)}")
     return pkgs
+
+
+def _check_build_depends(directory, pkgs):
+    """build_depends: other build configs, one level deep (the Build workflow has two stages)."""
+    for pkg in pkgs:
+        for dep in pkg.get("build_depends", []):
+            path = os.path.join(directory, f"{dep}.yaml")
+            if not os.path.exists(path):
+                raise ConfigError(f"{pkg['name']}: build_depends: no config {dep}")
+            d = load_one(path)
+            if d["method"] != "build" or d.get("build_depends"):
+                raise ConfigError(f"{pkg['name']}: build_depends: {dep} must be a build config without build_depends")
 
 
 def supported_releases(build_dir):

@@ -4,17 +4,23 @@ Runs as root in a container of the release (debian:<release>, ubuntu:<release>),
 on a runner of the architecture. Steps:
 
 1. Packaging: unpack the source package (hashes checked against the signed
-   index), or take packages/<name>/debian.
+   index), or take build/<name>/debian.
 2. Upstream: clone the tag or branch, rebase it when the config asks, and put
    the packaging on top.
-3. Patches: packages/<name>/patches/series, applied with patch -p1.
+3. Patches: build/<name>/patches/series, then patches/<release>/series,
+   applied with patch -p1.
 4. Changelog entry with the Armbian version.
-5. apt-get build-dep, dpkg-buildpackage.
+5. build_depends: a local apt repository with the files that the Build
+   workflow built for those configs in its first stage.
+6. apt-get build-dep. upstream.meson_subprojects: download those meson wraps,
+   because Debian packaging builds with --wrap-mode=nodownload.
+7. dpkg-buildpackage.
 
 Output: <out>/<config>/<release>/<arch>/*.deb and build.json.
 """
 
 import email.utils
+import fnmatch
 import glob
 import json
 import os
@@ -78,15 +84,17 @@ def _replace_debian(tree, debian):
     shutil.copytree(debian, os.path.join(tree, "debian"))
 
 
-def _patches(pkg, packages_dir, tree):
-    series = os.path.join(source.local_dir(pkg, packages_dir), "patches", "series")
-    if not os.path.exists(series):
-        return
-    with open(series) as f:
-        names = [line.split("#")[0].strip() for line in f]
-    for name in filter(None, names):
-        _run(["patch", "-p1", "--forward", "--no-backup-if-mismatch", "-i",
-              os.path.join(os.path.dirname(series), name)], cwd=tree)
+def _patches(pkg, packages_dir, tree, release):
+    """Common patches, then the patches of this release."""
+    root = os.path.join(source.local_dir(pkg, packages_dir), "patches")
+    for series in (os.path.join(root, "series"), os.path.join(root, release, "series")):
+        if not os.path.exists(series):
+            continue
+        with open(series) as f:
+            names = [line.split("#")[0].strip() for line in f]
+        for name in filter(None, names):
+            _run(["patch", "-p1", "--forward", "--no-backup-if-mismatch", "-i",
+                  os.path.join(os.path.dirname(series), name)], cwd=tree)
 
 
 def _changelog(tree, b, release):
@@ -109,13 +117,51 @@ def _changelog(tree, b, release):
         f.write(entry + old)
 
 
+def _deps_repo(pkg, release, arch, deps, work):
+    """Local apt repository with the build outputs of build_depends. Its versions win."""
+    names = pkg.get("build_depends", [])
+    if not names:
+        return
+    repo = os.path.join(work, "deps")
+    os.makedirs(repo)
+    for name in names:
+        found = glob.glob(os.path.join(deps or "", name, release, arch, "*.deb"))
+        # _all.deb files come from the first architecture of that build.
+        found += [p for p in glob.glob(os.path.join(deps or "", name, release, "*", "*_all.deb"))
+                  if os.path.basename(p) not in {os.path.basename(f) for f in found}]
+        if not found:
+            net.log(f"build_depends {name}: no build for {release}/{arch}, the release has its own")
+            continue
+        for path in found:
+            shutil.copy2(path, repo)
+    if not os.listdir(repo):
+        return
+    with open(os.path.join(repo, "Packages"), "w") as f:
+        subprocess.run(["dpkg-scanpackages", "-m", "."], cwd=repo, stdout=f, check=True)
+    with open("/etc/apt/sources.list.d/extpkg-deps.list", "w") as f:
+        f.write(f"deb [trusted=yes] file:{repo} ./\n")
+    with open("/etc/apt/preferences.d/extpkg-deps", "w") as f:
+        f.write("Package: *\nPin: origin \"\"\nPin-Priority: 1001\n")
+    _run(["apt-get", "update", "-qq"])
+
+
+def _wraps(tree, patterns):
+    """Wrap names in subprojects/ that match the patterns (globs, for example *-rs)."""
+    names = sorted(os.path.basename(p)[:-5] for p in glob.glob(os.path.join(tree, "subprojects", "*.wrap")))
+    out = [n for n in names if any(fnmatch.fnmatchcase(n, p) for p in patterns)]
+    missing = [p for p in patterns if not any(fnmatch.fnmatchcase(n, p) for n in names)]
+    if missing:
+        raise BuildError(f"meson_subprojects: no wrap matches {missing}")
+    return out
+
+
 def _has_arch_any(tree):
     with open(os.path.join(tree, "debian", "control")) as f:
         archs = [line.split(":", 1)[1].split() for line in f if line.startswith("Architecture:")]
     return any(a != ["all"] for a in archs)
 
 
-def build(plan_doc, pkgs, packages_dir, name, release, arch, out, jobs=None):
+def build(plan_doc, pkgs, packages_dir, name, release, arch, out, jobs=None, deps=None):
     pkg = next((p for p in pkgs if p["name"] == name), None)
     entry = next((e for e in plan_doc["entries"]
                   if e["config"] == name and e["release"] == release and e["arch"] == arch), None)
@@ -123,6 +169,8 @@ def build(plan_doc, pkgs, packages_dir, name, release, arch, out, jobs=None):
         raise BuildError(f"{name} {release}/{arch}: not in the plan ({entry and entry.get('skip')})")
     cand = entry["candidates"][0]
     b = cand["build"]
+    # apt takes only absolute file: paths (local repository of build_depends).
+    out, deps = os.path.abspath(out), deps and os.path.abspath(deps)
     dest = os.path.join(out, name, release, arch)
     work = os.path.join(out, ".work", name, release, arch)
     shutil.rmtree(work, ignore_errors=True)
@@ -139,7 +187,7 @@ def build(plan_doc, pkgs, packages_dir, name, release, arch, out, jobs=None):
     else:
         _upstream(b["upstream"], tree)
         _replace_debian(tree, os.path.join(source.local_dir(pkg, packages_dir), "debian"))
-    _patches(pkg, packages_dir, tree)
+    _patches(pkg, packages_dir, tree, release)
     _changelog(tree, b, release)
 
     # Architecture-independent packages come from the first architecture only:
@@ -151,8 +199,12 @@ def build(plan_doc, pkgs, packages_dir, name, release, arch, out, jobs=None):
         env = {"DEBIAN_FRONTEND": "noninteractive",
                "DEB_BUILD_OPTIONS": f"nocheck parallel={jobs or os.cpu_count()}"
                                     + ("" if pkg.get("include_debug") else " noautodbgsym noddebs")}
+        _deps_repo(pkg, release, arch, deps, work)
         _run(["apt-get", "-y", "--no-install-recommends", "build-dep", "./"] + (["--arch-only"] if mode == "-B" else []),
              cwd=tree, env=env)
+        subprojects = _wraps(tree, (b["upstream"] or {}).get("meson_subprojects") or [])
+        if subprojects:
+            _run(["meson", "subprojects", "download", *subprojects], cwd=tree)
         _run(["dpkg-buildpackage", mode, "-uc", "-us"], cwd=tree, env=env)
         os.makedirs(dest, exist_ok=True)
         for path in sorted(glob.glob(os.path.join(work, "*.deb"))):

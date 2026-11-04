@@ -1,0 +1,18 @@
+name: directx-headers
+method: build
+# Debian packaging. Mesa needs directx-headers 1.619.1 or newer (d3d12); trixie has 1.614.1.
+packaging:
+  url: https://deb.debian.org/debian
+  suite: sid
+  components: [main]
+  package: directx-headers
+releases:
+- trixie
+architectures:
+- arm64
+- amd64
+target: desktop
+repositories:
+- beta
+install:
+- directx-headers-dev

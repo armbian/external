@@ -1,0 +1,41 @@
+name: mesa
+method: build
+# mojyack/mesa t210-develop (Tegra X1) on Debian packaging.
+# Patches: adapt Debian's 26.2 packaging to 27.0 code. trixie: LLVM 19.
+# forky: no llvm-spirv-22 yet. noble, jammy, bookworm: LLVM, SPIR-V tools or meson too old.
+packaging:
+  url: https://deb.debian.org/debian
+  suite: sid
+  components: [main]
+  package: mesa
+upstream:
+  url: https://gitlab.freedesktop.org/mojyack/mesa.git
+  ref: t210-develop
+  version_file: VERSION
+  meson_subprojects:     # not in Debian's build dependencies; used only when Debian has no copy
+  - venus-protocol       # virtio drivers
+  - "*-rs"               # Rust crates, for example of the panfrost kraid compiler (arm64)
+  # Switch: rebase onto mesa main before each build. A conflict fails the build.
+  # rebase:
+  #   url: https://gitlab.freedesktop.org/mesa/mesa.git
+  #   ref: main
+build_depends:
+- libdrm
+- directx-headers
+- cbindgen
+releases:
+- sid
+- trixie
+- resolute
+architectures:
+- arm64
+- amd64
+target: desktop
+repositories:
+- beta
+install:
+- libgl1-mesa-dri
+- libegl-mesa0
+- libglx-mesa0
+- libgbm1
+- mesa-vulkan-drivers

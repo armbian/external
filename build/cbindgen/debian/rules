@@ -1,0 +1,17 @@
+#!/usr/bin/make -f
+# Upstream build with cargo. Crates come from crates.io, pinned by Cargo.lock.
+export CARGO_HOME = $(CURDIR)/debian/cargo-home
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	cargo build --release --locked
+
+override_dh_auto_install:
+	install -D -m755 target/release/cbindgen debian/cbindgen/usr/bin/cbindgen
+
+override_dh_auto_test:
+
+override_dh_auto_clean:
+	rm -rf target debian/cargo-home

@@ -2,17 +2,19 @@
 
 A build takes:
   packaging  debian/ from a Debian or Ubuntu source package,
-             or packages/<name>/debian when the config has no packaging
+             or build/<name>/debian when the config has no packaging
   upstream   optional: code in place of the packaged code (a tag or a branch),
              optionally rebased onto another branch (a fork)
-  patches    optional: packages/<name>/patches/series
+  patches    optional: build/<name>/patches/series
 
 The plan resolves these and gives the build an identity. The build runs later,
 in a container of the release (extpkg/builder.py).
 """
 
 import datetime
+import fnmatch
 import hashlib
+import json
 import os
 import re
 import subprocess
@@ -29,12 +31,12 @@ _lock = threading.Lock()
 
 
 def local_dir(pkg, packages_dir):
-    """packages/<name>/: patches/, and debian/ when the config has no packaging."""
+    """build/<name>/: patches/, and debian/ when the config has no packaging."""
     return os.path.join(packages_dir, pkg["name"])
 
 
 def local_hash(pkg, packages_dir):
-    """SHA256 of every file under packages/<name>/, or "" when there is none."""
+    """SHA256 of every file under build/<name>/, or "" when there is none."""
     root = local_dir(pkg, packages_dir)
     h = hashlib.sha256()
     found = False
@@ -76,6 +78,39 @@ def _ref(url, ref):
     raise net.FetchError(f"{url}: no tag or branch {ref!r}")
 
 
+def latest_tag(url, pattern="*"):
+    """Newest release tag that matches pattern. Pre-releases (rc, alpha, beta) are left out."""
+    out = _git("ls-remote", "--tags", "--refs", url)
+    best = None
+    for line in out.splitlines():
+        tag = line.split("\t", 1)[1][len("refs/tags/"):]
+        if not fnmatch.fnmatchcase(tag, pattern):
+            continue
+        try:
+            ver = tag_version(tag)
+        except ValueError:
+            continue
+        if "~" in ver or re.search(r"(alpha|beta|rc|devel|branchpoint)", ver, re.I) or not re.match(r"^[0-9][0-9.]*$", ver):
+            continue
+        if best is None or debver.compare(ver, best[1]) > 0:
+            best = (tag, ver)
+    if not best:
+        raise net.FetchError(f"{url}: no release tag matches {pattern!r}")
+    return best[0]
+
+
+def _read_file(url, ref, path):
+    """One file of a branch, without a full clone."""
+    with tempfile.TemporaryDirectory() as tmp:
+        _git("clone", "-q", "--depth", "1", "--filter=blob:none", "--no-checkout", "--branch", ref, url, tmp)
+        return _git("show", f"HEAD:{path}", cwd=tmp).strip()
+
+
+def file_version(text):
+    """27.0.0-devel -> 27.0.0, 26.3.0-rc1 -> 26.3.0~rc1."""
+    return text.split()[0].replace("-devel", "").replace("-rc", "~rc")
+
+
 def _commit_time(url, commit):
     """Commit time, from a fetch of that one commit without file contents."""
     with tempfile.TemporaryDirectory() as tmp:
@@ -96,32 +131,46 @@ def _once(key, fn):
 def upstream(up):
     """{url, ref, commit, version, rebase} of the upstream code. Once per run.
 
+    ref latest: the latest GitHub release, or on other hosts the newest
+    release tag that matches upstream.tags (default *).
+
     A tag gives the version (v2.70.0 -> 2.70.0). A branch needs
-    upstream.version, the next upstream release; the snapshot then sorts
-    below it: <version>~git<YYYYMMDDHHMM>.<commit>.
+    upstream.version, the next upstream release, or upstream.version_file, a
+    file that holds it (mesa: VERSION). The snapshot then sorts below that
+    release: <version>~git<YYYYMMDDHHMM>.<commit>.
     """
     def go():
         ref = up.get("ref", "latest")
         if ref == "latest":
-            ref = github.release(up["url"])["tag_name"]
+            if "github.com/" in up["url"] and not up.get("tags"):
+                ref = github.release(up["url"])["tag_name"]
+            else:
+                ref = latest_tag(up["url"], up.get("tags", "*"))
         commit, kind = _ref(up["url"], ref)
         rebase = None
         if up.get("rebase"):
             base_commit, _ = _ref(up["rebase"]["url"], up["rebase"]["ref"])
             rebase = {**up["rebase"], "commit": base_commit}
+        version = up.get("version")
+        if not version and up.get("version_file"):
+            # The rebase base sets the version: the code is that branch plus the fork.
+            src = rebase or {"url": up["url"], "ref": ref}
+            version = file_version(_read_file(src["url"], src["ref"], up["version_file"]))
         if kind == "tag" and not rebase:
-            ver = up.get("version") or tag_version(ref)
+            ver = version or tag_version(ref)
         else:
-            if not up.get("version"):
-                raise ValueError(f"{up['url']} {ref}: a branch or a rebase needs upstream.version")
+            if not version:
+                raise ValueError(f"{up['url']} {ref}: a branch or a rebase needs upstream.version or version_file")
             t = _commit_time(up["url"], commit)
             if rebase:
                 t = max(t, _commit_time(rebase["url"], rebase["commit"]))
             stamp = datetime.datetime.fromtimestamp(t, datetime.timezone.utc).strftime("%Y%m%d%H%M")
-            ver = f"{up['version']}~git{stamp}.{commit[:10]}"
-        return {"url": up["url"], "ref": ref, "commit": commit, "version": ver, "rebase": rebase}
+            ver = f"{version}~git{stamp}.{commit[:10]}"
+        return {"url": up["url"], "ref": ref, "commit": commit, "version": ver, "rebase": rebase,
+                "meson_subprojects": up.get("meson_subprojects", [])}
 
-    key = (up["url"], up.get("ref", "latest"), up.get("version"), repr(up.get("rebase")))
+    key = (up["url"], up.get("ref", "latest"), up.get("tags"), up.get("version"), up.get("version_file"),
+           repr(up.get("rebase")), repr(up.get("meson_subprojects")))
     return _once(key, go)
 
 
@@ -156,9 +205,12 @@ def resolve(pkg, release, arch, keyring, packages_dir):
     up = upstream(pkg["upstream"]) if pkg.get("upstream") else None
     ver = version(pkg, release, packaged, up)
     local = local_hash(pkg, packages_dir)
+    # Config keys that change the build. releases, notes, install and the like do not.
+    keys = {k: pkg.get(k) for k in ("packaging", "upstream", "revision", "build_depends", "include_debug")}
+    local = hashlib.sha256((local + json.dumps(keys, sort_keys=True)).encode()).hexdigest()
     commits = [up["commit"][:12], up["rebase"]["commit"][:12] if up["rebase"] else ""] if up else []
     identity = "|".join([f"build{RECIPE}", dsc["sha256"][:16] if dsc else "-",
-                         "+".join(c for c in commits if c) or "-", local[:16] or "-", ver])
+                         "+".join(c for c in commits if c) or "-", local[:16], ver])
     return [{
         "package": None,
         "version": None,          # read from each built .deb

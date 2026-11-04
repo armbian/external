@@ -69,6 +69,7 @@ class Config(unittest.TestCase):
     def test_rejects(self):
         pk = {"url": "https://deb.debian.org/debian", "suite": "sid", "package": "x"}
         for bad in ({"architectures": ["armhf"]}, {"filter": "Name (% x)"}, {"source": {"url": "u"}},
+                    {"repositories": ["testing"]}, {"repositories": []},
                     {"upstream": {"url": "u", "rebase": {"url": "v"}}}, {"revision": 0}):
             with self.subTest(bad=bad), self.assertRaises(config.ConfigError):
                 self.load({**self.base(packaging=pk), **bad})
@@ -88,6 +89,17 @@ class Config(unittest.TestCase):
         with open(os.path.join(self.dir, "x", "patches", "series"), "w") as f:
             f.write("b.patch\n")
         self.assertNotEqual(h1, source.local_hash(pkg, self.dir))
+
+
+class Wraps(unittest.TestCase):
+    def test_globs(self):
+        with tempfile.TemporaryDirectory() as tree:
+            os.makedirs(f"{tree}/subprojects")
+            for n in ("venus-protocol", "xml-rs", "paste-1-rs", "zlib"):
+                open(f"{tree}/subprojects/{n}.wrap", "w").close()
+            self.assertEqual(builder._wraps(tree, ["venus-protocol", "*-rs"]), ["paste-1-rs", "venus-protocol", "xml-rs"])
+            with self.assertRaises(builder.BuildError):
+                builder._wraps(tree, ["nothing-*"])
 
 
 class Changelog(unittest.TestCase):
@@ -152,6 +164,22 @@ class Upstream(unittest.TestCase):
         with self.assertRaises(builder.BuildError):
             builder._upstream(up, os.path.join(self.tmp, "tree"))
 
+    def test_version_file(self):
+        self.assertEqual(source.file_version("27.0.0-devel\n"), "27.0.0")
+        self.assertEqual(source.file_version("26.3.0-rc1"), "26.3.0~rc1")
+        commit(self.base, "VERSION", "27.1.0-devel\n")
+        head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=self.base, capture_output=True, text=True).stdout.strip()
+        source._cache.clear()
+        # Without rebase, the fork's own VERSION. With rebase, the base's.
+        with self.assertRaises(net.FetchError):
+            source.upstream({"url": f"file://{self.fork}", "ref": "feature", "version_file": "VERSION"})
+        info = source.upstream({"url": f"file://{self.fork}", "ref": "feature", "version_file": "VERSION",
+                                "meson_subprojects": ["venus-protocol"],
+                                "rebase": {"url": f"file://{self.base}", "ref": "main"}})
+        self.assertTrue(info["version"].startswith("27.1.0~git"))
+        self.assertEqual(info["rebase"]["commit"], head)
+        self.assertEqual(info["meson_subprojects"], ["venus-protocol"])
+
     def test_resolve_branch_version(self):
         source._cache.clear()
         info = source.upstream({"url": f"file://{self.fork}", "ref": "feature", "version": "2.0",
@@ -161,6 +189,86 @@ class Upstream(unittest.TestCase):
         self.assertRegex(info["version"], r"^2\.0~git\d{12}\.[0-9a-f]{10}$")
         with self.assertRaises(ValueError):
             source.upstream({"url": f"file://{self.fork}", "ref": "feature"})
+
+
+@unittest.skipUnless(shutil.which("git"), "needs git")
+class LatestTag(unittest.TestCase):
+    def test_newest_release(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = os.path.join(tmp, "r")
+            git(tmp, "init", "-q", "-b", "main", repo)
+            commit(repo, "a", "1")
+            for tag in ("mesa-26.2.5", "mesa-26.2.10", "mesa-26.3.0-rc3", "18.0-branchpoint", "other-99.0"):
+                git(repo, "tag", tag)
+            self.assertEqual(source.latest_tag(f"file://{repo}", "mesa-*"), "mesa-26.2.10")
+            self.assertEqual(source.latest_tag(f"file://{repo}"), "other-99.0")
+            with self.assertRaises(net.FetchError):
+                source.latest_tag(f"file://{repo}", "none-*")
+
+
+class Matrix(unittest.TestCase):
+    """build-matrix: dependencies build first, and together with what needs them."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tmp)
+        pk = {"url": "https://deb.debian.org/debian", "suite": "sid", "package": "x"}
+        for name, extra in (("libdrm", {}), ("mesa", {"build_depends": ["libdrm"]})):
+            with open(os.path.join(self.tmp, f"{name}.yaml"), "w") as f:
+                yaml.safe_dump({"name": name, "method": "build", "packaging": pk, "releases": ["resolute"],
+                                "architectures": ["amd64"], **extra}, f)
+        self.plan = os.path.join(self.tmp, "plan.json")
+        entries = [{"config": n, "release": "resolute", "arch": "amd64", "target": "main",
+                    "candidates": [{"url": n, "identity": f"{n}-1", "build": {"version": "1"}}]}
+                   for n in ("libdrm", "mesa")]
+        with open(self.plan, "w") as f:
+            json.dump({"entries": entries}, f)
+
+    def run_matrix(self, previous_ids, version="0", live=True):
+        prev = os.path.join(self.tmp, "prev.json")
+        with open(prev, "w") as f:
+            json.dump({"files": [{"config": n, "release": "resolute", "arch": "amd64", "source": n,
+                                  "upstream_id": i, "filename": f"{n}.deb", "version": version}
+                                 for n, i in previous_ids]}, f)
+        return subprocess.run(["python3", "-m", "extpkg", "build-matrix", "--configs", self.tmp, "--plan", self.plan,
+                               "--previous", prev] + (["--live"] if live else []), capture_output=True, text=True)
+
+    def matrix(self, previous_ids):
+        r = self.run_matrix([(n, f"{n}-1") for n in previous_ids])
+        self.assertEqual(r.returncode, 0, r.stderr)
+        doc = json.loads(r.stdout)
+        return [j["config"] for j in doc["deps"]], [j["config"] for j in doc["builds"]]
+
+    def test_both_new(self):
+        self.assertEqual(self.matrix([]), (["libdrm"], ["mesa"]))
+
+    def test_mesa_changed_builds_libdrm_too(self):
+        self.assertEqual(self.matrix(["libdrm"]), (["libdrm"], ["mesa"]))
+
+    def test_libdrm_changed_alone(self):
+        self.assertEqual(self.matrix(["mesa"]), (["libdrm"], []))
+
+    def test_nothing_changed(self):
+        self.assertEqual(self.matrix(["libdrm", "mesa"]), ([], []))
+
+    def test_changed_inputs_need_a_new_version(self):
+        # mesa-1 is planned; mesa-0 with the same version "1" is uploaded.
+        r = self.run_matrix([("libdrm", "libdrm-1"), ("mesa", "mesa-0")], version="1")
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("Increase revision in build/mesa.yaml", r.stderr + r.stdout)
+        # A dry run warns and builds.
+        r = self.run_matrix([("libdrm", "libdrm-1"), ("mesa", "mesa-0")], version="1", live=False)
+        self.assertEqual(r.returncode, 0)
+        self.assertEqual(json.loads(r.stdout)["builds"][0]["config"], "mesa")
+
+    def test_dependency_with_dependencies_is_rejected(self):
+        with open(os.path.join(self.tmp, "libdrm.yaml")) as f:
+            doc = yaml.safe_load(f)
+        doc["build_depends"] = ["mesa"]
+        with open(os.path.join(self.tmp, "libdrm.yaml"), "w") as f:
+            yaml.safe_dump(doc, f)
+        with self.assertRaises(config.ConfigError):
+            config.load_all(self.tmp)
 
 
 class NoPublished:
@@ -209,12 +317,39 @@ class Publish(unittest.TestCase):
             "debs-beta/extra/noble-utils/fastfetch_2.70.0-1+armbian1~noble_amd64.deb"])
         self.assertEqual({x["upstream_id"] for x in f.files}, {self.cand["identity"]})
 
+    def test_repositories(self):
+        self.built(self.cand["identity"])
+        for repos, beta, stable in ((["beta"], True, False), (["stable"], False, True), (["stable", "beta"], True, True)):
+            with self.subTest(repos=repos):
+                self.pkg["repositories"] = repos
+                f = self.fetcher()
+                f.out = os.path.join(self.tmp, "out-" + "-".join(repos))
+                f.group([(self.entry, self.cand)])
+                self.assertEqual(bool(f.files[0]["beta"]), beta)
+                self.assertEqual(bool(f.files[0]["stable"]), stable)
+
     def test_other_identity_is_not_built(self):
         self.built("build1|old")
         f = self.fetcher()
         f.group([(self.entry, self.cand)])
         self.assertEqual(f.files, [])
         self.assertEqual(f.skipped[0]["reason"], "build output is from another plan")
+
+    def test_unchanged_follows_repositories(self):
+        """A file built for both repositories, then the config says beta only."""
+        self.built(self.cand["identity"])
+        f = self.fetcher()
+        f.group([(self.entry, self.cand)])
+        self.assertTrue(f.files[0]["stable"])
+        self.pkg["repositories"] = ["beta"]
+        g = self.fetcher({"files": f.files})
+        g.group([(self.entry, self.cand)])
+        self.assertTrue(g.files[0]["unchanged"])
+        self.assertIsNone(g.files[0]["stable"])
+        self.assertTrue(g.files[0]["beta"])
+        from extpkg import retention
+        _, removed = retention.plan_removal({"files": f.files}, g.files, [], {"fastfetch"}, {})
+        self.assertEqual(removed, [f.files[0]["stable"]])
 
     def test_unchanged_carries_every_file(self):
         self.built(self.cand["identity"], ("fastfetch", "fastfetch-extra"))
