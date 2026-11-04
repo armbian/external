@@ -1,15 +1,23 @@
 name: fastfetch
-method: github
-source:
+method: build
+# Debian packaging on the newest upstream release.
+# Patch: bundled yyjson. jammy and bookworm: no C23 compiler (fastfetch-upstream covers them).
+packaging:
+  url: https://deb.debian.org/debian
+  suite: sid
+  components: [main]
+  package: fastfetch
+upstream:
   url: https://github.com/fastfetch-cli/fastfetch
 releases: all
 architectures:
-- armhf
 - arm64
 - amd64
 target: utils
 install:
 - fastfetch
-exclude:
-- '*polyfilled*'
-- '*armv6l.deb'
+skip:
+- jammy/arm64
+- jammy/amd64
+- bookworm/arm64
+- bookworm/amd64

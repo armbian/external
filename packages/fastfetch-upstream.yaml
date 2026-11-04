@@ -1,0 +1,28 @@
+name: fastfetch-upstream
+# Upstream .deb files where the fastfetch build does not cover:
+# armhf, and jammy and bookworm (no C23 compiler).
+method: github
+source:
+  url: https://github.com/fastfetch-cli/fastfetch
+releases: all
+architectures:
+- armhf
+- arm64
+- amd64
+target: utils
+install:
+- fastfetch
+exclude:
+- '*polyfilled*'
+- '*armv6l.deb'
+skip:
+- noble/arm64
+- noble/amd64
+- resolute/arm64
+- resolute/amd64
+- trixie/arm64
+- trixie/amd64
+- forky/arm64
+- forky/amd64
+- sid/arm64
+- sid/amd64

@@ -7,7 +7,11 @@ import yaml
 
 from . import query
 
-METHODS = ("apt", "github", "url")
+MIRROR_METHODS = ("apt", "github", "url")
+BUILD_METHODS = ("build",)
+METHODS = MIRROR_METHODS + BUILD_METHODS
+# Native GitHub-hosted runners only: no emulation.
+BUILD_ARCHES = ("amd64", "arm64")
 TARGETS = ("main", "utils", "desktop")
 ARCHES = ("amd64", "arm64", "armhf", "riscv64", "loong64", "i386")
 # Used when the armbian/build checkout is not available.
@@ -34,7 +38,8 @@ def _check(pkg, path):
     need(isinstance(pkg, dict), "not a mapping")
     allowed = {"name", "method", "source", "filter", "with_deps", "releases", "architectures",
                "target", "install", "verify", "repack", "assets", "exclude", "filename",
-               "enabled", "notes", "keep", "include_debug", "skip", "depcheck"}
+               "enabled", "notes", "keep", "include_debug", "skip", "depcheck",
+               "packaging", "upstream", "revision"}
     unknown = set(pkg) - allowed
     need(not unknown, f"unknown keys: {sorted(unknown)}")
     need(pkg.get("name") == os.path.basename(path)[:-5], "name must match the file name")
@@ -44,6 +49,15 @@ def _check(pkg, path):
     need(arches and all(a in ARCHES for a in arches), f"architectures must be from {ARCHES}")
     rel = pkg.get("releases")
     need(rel == "all" or (isinstance(rel, list) and rel), "releases must be 'all' or a list")
+    need(isinstance(pkg.get("keep", 1), int) and pkg.get("keep", 1) >= 1, "keep must be a number >= 1")
+    skip = pkg.get("skip", [])
+    need(isinstance(skip, list) and all(isinstance(x, str) and x.count("/") == 1 for x in skip),
+         "skip must be a list of release/arch")
+    need(isinstance(pkg.get("depcheck", True), bool), "depcheck must be true or false")
+    if pkg["method"] == "build":
+        _check_build(pkg, path, need)
+        return
+    need(not {"packaging", "upstream", "revision"} & set(pkg), "packaging, upstream and revision are for method build")
     src = pkg.get("source") or {}
     need(isinstance(src, dict) and src.get("url"), "source.url is required")
     if pkg["method"] == "apt":
@@ -55,14 +69,33 @@ def _check(pkg, path):
             raise ConfigError(f"{path}: filter: {e}") from e
     if pkg["method"] == "github":
         need("github.com/" in src["url"], "source.url must be a github.com repository")
-    need(isinstance(pkg.get("keep", 1), int) and pkg.get("keep", 1) >= 1, "keep must be a number >= 1")
-    skip = pkg.get("skip", [])
-    need(isinstance(skip, list) and all(isinstance(x, str) and x.count("/") == 1 for x in skip),
-         "skip must be a list of release/arch")
-    need(isinstance(pkg.get("depcheck", True), bool), "depcheck must be true or false")
     rp = pkg.get("repack")
     if rp is not None:
         need(isinstance(rp, dict) and rp.get("packages"), "repack.packages is required")
+
+
+def _check_build(pkg, path, need):
+    """method build: packaging and/or upstream; packages/<name>/debian without packaging."""
+    need("source" not in pkg, "method build uses packaging and upstream, not source")
+    need(set(_list(pkg["architectures"])) <= set(BUILD_ARCHES),
+         f"method build: architectures must be from {BUILD_ARCHES}")
+    pk, up = pkg.get("packaging"), pkg.get("upstream")
+    need(pk or up, "method build needs packaging, upstream or both")
+    if pk:
+        need(isinstance(pk, dict) and pk.get("url") and pk.get("suite") and pk.get("package"),
+             "packaging needs url, suite and package")
+    else:
+        need(os.path.isfile(os.path.join(os.path.dirname(path), pkg["name"], "debian", "control")),
+             f"without packaging, {pkg['name']}/debian/control is required")
+    if up:
+        need(isinstance(up, dict) and up.get("url"), "upstream.url is required")
+        rb = up.get("rebase")
+        need(rb is None or (isinstance(rb, dict) and rb.get("url") and rb.get("ref")),
+             "upstream.rebase needs url and ref")
+    rev = pkg.get("revision", 1)
+    need(isinstance(rev, int) and rev >= 1, "revision must be a number >= 1")
+    for key in ("filter", "with_deps", "assets", "exclude", "filename", "repack"):
+        need(key not in pkg, f"{key} is not for method build")
 
 
 DEBUG_PATTERNS = ("*-dbg", "*-dbgsym")
@@ -86,8 +119,9 @@ def load_one(path):
     pkg["verify"].setdefault("checksums", True)   # apt: deb SHA256 must match the index
     pkg["install"] = _list(pkg.get("install"))
     pkg["architectures"] = _list(pkg.get("architectures"))
-    src = pkg["source"]
-    src["components"] = _list(src.get("components"))
+    for key in ("source", "packaging"):
+        if key in pkg:
+            pkg[key]["components"] = _list(pkg[key].get("components"))
     return pkg
 
 

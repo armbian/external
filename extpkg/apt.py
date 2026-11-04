@@ -186,12 +186,19 @@ class Repo:
                 self._packages[arch] = self._fetch_packages(arch)
             return self._packages[arch]
 
+    def sources(self):
+        """Source stanzas of all components. Fetched and checked once per run."""
+        return self.packages("source")
+
     def _fetch_packages(self, arch):
         hashes = self.release()
         out = []
         comps = self.components or [""]
         for comp in comps:
-            stem = f"{comp}/binary-{arch}/Packages" if comp else "Packages"
+            if arch == "source":
+                stem = f"{comp}/source/Sources" if comp else "Sources"
+            else:
+                stem = f"{comp}/binary-{arch}/Packages" if comp else "Packages"
             for ext, unpack in ((".xz", lzma.decompress), (".gz", gzip.decompress), ("", lambda b: b)):
                 if stem + ext not in hashes:
                     continue
@@ -232,6 +239,26 @@ class Repo:
 
     def pool_url(self, filename):
         return f"{self.url}/{filename}"
+
+
+def source_files(stanza):
+    """[(name, sha256, size)] of a Sources stanza (.dsc, tarballs)."""
+    out = []
+    for line in stanza.get("Checksums-Sha256", "").splitlines():
+        parts = line.split()
+        if len(parts) == 3:
+            out.append((parts[2], parts[0], int(parts[1])))
+    return out
+
+
+def resolve_source(pkg, keyring):
+    """Newest source package <packaging.package>, and its repository."""
+    src = pkg["packaging"]
+    repo = _repo(src["url"], src["suite"], src["components"], keyring, pkg["verify"]["signature"])
+    stanzas = [s for s in repo.sources() if s.get("Package") == src["package"]]
+    if not stanzas:
+        raise AptError(f"source package {src['package']} not found in {src['url']} {src['suite']}")
+    return max(stanzas, key=lambda s: debver.Version(s["Version"])), repo
 
 
 def _dep_names(field):

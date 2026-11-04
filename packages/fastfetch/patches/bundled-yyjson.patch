@@ -1,0 +1,23 @@
+Use the yyjson that upstream bundles. Some releases have no libyyjson-dev, or an old one.
+
+--- a/debian/control
++++ b/debian/control
+@@ -24,7 +24,6 @@
+  libxcb-randr0-dev,
+  libxfconf-0-dev,
+  libxrandr-dev,
+- libyyjson-dev,
+  ocl-icd-opencl-dev,
+  pkgconf,
+ Standards-Version: 4.7.4
+--- a/debian/rules
++++ b/debian/rules
+@@ -10,7 +10,7 @@
+ 		-DCMAKE_BUILD_TYPE=RelWithDebInfo \
+ 		-DSET_TWEAK=OFF \
+ 		-DBUILD_TESTS=ON \
+-		-DENABLE_SYSTEM_YYJSON=ON \
++		-DENABLE_SYSTEM_YYJSON=OFF \
+ 		-DINSTALL_LICENSE=OFF \
+ 		-DBUILD_FLASHFETCH=OFF \
+ 		-DENABLE_WCWIDTH=OFF \

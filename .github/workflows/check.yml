@@ -62,7 +62,10 @@ jobs:
         run: python3 -m extpkg validate
 
       - name: Plan every package
-        run: python3 -m extpkg plan --jobs 16 --out plan.json
+        run: |
+          python3 -m extpkg plan --jobs 16 --out plan.json
+          # Method build: sources only. The Build workflow builds (dry run by default).
+          python3 -m extpkg plan --kind build --out plan-build.json
 
       - name: Changed package configs
         id: changed
@@ -106,6 +109,7 @@ jobs:
           name: check
           path: |
             plan.json
+            plan-build.json
             output/manifest.json
           if-no-files-found: ignore
           retention-days: 7
