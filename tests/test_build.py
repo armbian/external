@@ -152,6 +152,22 @@ class Upstream(unittest.TestCase):
         with self.assertRaises(builder.BuildError):
             builder._upstream(up, os.path.join(self.tmp, "tree"))
 
+    def test_version_file(self):
+        self.assertEqual(source.file_version("27.0.0-devel\n"), "27.0.0")
+        self.assertEqual(source.file_version("26.3.0-rc1"), "26.3.0~rc1")
+        commit(self.base, "VERSION", "27.1.0-devel\n")
+        head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=self.base, capture_output=True, text=True).stdout.strip()
+        source._cache.clear()
+        # Without rebase, the fork's own VERSION. With rebase, the base's.
+        with self.assertRaises(net.FetchError):
+            source.upstream({"url": f"file://{self.fork}", "ref": "feature", "version_file": "VERSION"})
+        info = source.upstream({"url": f"file://{self.fork}", "ref": "feature", "version_file": "VERSION",
+                                "meson_subprojects": ["venus-protocol"],
+                                "rebase": {"url": f"file://{self.base}", "ref": "main"}})
+        self.assertTrue(info["version"].startswith("27.1.0~git"))
+        self.assertEqual(info["rebase"]["commit"], head)
+        self.assertEqual(info["meson_subprojects"], ["venus-protocol"])
+
     def test_resolve_branch_version(self):
         source._cache.clear()
         info = source.upstream({"url": f"file://{self.fork}", "ref": "feature", "version": "2.0",

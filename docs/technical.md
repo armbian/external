@@ -158,8 +158,10 @@ install: [fastfetch]
 | `packaging.url`, `.suite`, `.components`, `.package` | apt repository and source package. Signature and hashes are checked, as for `apt`. |
 | `upstream.url`, `.ref` | git repository and tag or branch. `latest` (default): the latest GitHub release, or on other hosts the newest release tag. |
 | `upstream.tags` | Pattern for `latest`, for example `mesa-*`. Release candidates are left out. |
-| `upstream.version` | Needed for a branch: the next upstream release, for example `27.0.0`. |
-| `upstream.rebase.url`, `.ref` | A fork: rebase it onto this branch before the build. A conflict fails the build. |
+| `upstream.version` | For a branch: the next upstream release, for example `27.0.0`. |
+| `upstream.version_file` | For a branch: a file that holds that version, for example `VERSION` (`27.0.0-devel` gives `27.0.0`). Read from the rebase base when `rebase` is set. |
+| `upstream.rebase.url`, `.ref` | Optional, off by default. A fork: rebase it onto this branch before each build. A conflict fails the build, and the last good packages stay. |
+| `upstream.meson_subprojects` | Meson wraps to download before the build. Debian packaging builds with `--wrap-mode=nodownload`. |
 | `revision` | Armbian revision. Default 1. Increase it when only the patches change and the version must change. |
 | `build_depends` | Other build configs whose packages this build needs, for example `libdrm` for `mesa`. One level only. |
 
@@ -175,7 +177,7 @@ Version of the built packages:
 
 `~<release>` gives each release its own file name. One repository pool holds all releases.
 
-A build runs again only when its identity changes: the source package hash, the upstream commits, the files under `packages/<name>/`, or the version.
+A build runs again only when its identity changes: the source package hash, the upstream commits, the files under `packages/<name>/`, the build keys of the config (`packaging`, `upstream`, `revision`, `build_depends`, `include_debug`), or the version.
 Architecture-independent packages (`_all.deb`) come from the first architecture only.
 
 `build_depends`: the dependency builds first, in the same run. Its packages go into a local apt repository in the container, and they win over the release's own versions. A dependency always builds again with a config that needs it. When the dependency has no build for a release, the release's own version is used.

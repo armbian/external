@@ -1,15 +1,24 @@
 name: mesa
 method: build
-# Newest upstream mesa release on Debian packaging.
-# forky: no llvm-spirv-22 yet. trixie, noble, jammy, bookworm: LLVM 22, SPIR-V tools or meson too old.
+# mojyack/mesa t210-develop (Tegra X1) on Debian packaging.
+# Patch: drop a Debian backport that 27.0 code does not take.
+# forky: no llvm-spirv-22 yet. trixie, noble, jammy,
+# bookworm: LLVM 22, SPIR-V tools or meson too old.
 packaging:
   url: https://deb.debian.org/debian
   suite: sid
   components: [main]
   package: mesa
 upstream:
-  url: https://gitlab.freedesktop.org/mesa/mesa.git
-  tags: mesa-*
+  url: https://gitlab.freedesktop.org/mojyack/mesa.git
+  ref: t210-develop
+  version_file: VERSION
+  meson_subprojects:     # Debian has no venus-protocol package
+  - venus-protocol
+  # Switch: rebase onto mesa main before each build. A conflict fails the build.
+  # rebase:
+  #   url: https://gitlab.freedesktop.org/mesa/mesa.git
+  #   ref: main
 build_depends:
 - libdrm
 releases:

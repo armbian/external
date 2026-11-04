@@ -11,7 +11,9 @@ on a runner of the architecture. Steps:
 4. Changelog entry with the Armbian version.
 5. build_depends: a local apt repository with the files that the Build
    workflow built for those configs in its first stage.
-6. apt-get build-dep, dpkg-buildpackage.
+6. apt-get build-dep. upstream.meson_subprojects: download those meson wraps,
+   because Debian packaging builds with --wrap-mode=nodownload.
+7. dpkg-buildpackage.
 
 Output: <out>/<config>/<release>/<arch>/*.deb and build.json.
 """
@@ -186,6 +188,9 @@ def build(plan_doc, pkgs, packages_dir, name, release, arch, out, jobs=None, dep
         _deps_repo(pkg, release, arch, deps, work)
         _run(["apt-get", "-y", "--no-install-recommends", "build-dep", "./"] + (["--arch-only"] if mode == "-B" else []),
              cwd=tree, env=env)
+        subprojects = (b["upstream"] or {}).get("meson_subprojects") or []
+        if subprojects:
+            _run(["meson", "subprojects", "download", *subprojects], cwd=tree)
         _run(["dpkg-buildpackage", mode, "-uc", "-us"], cwd=tree, env=env)
         os.makedirs(dest, exist_ok=True)
         for path in sorted(glob.glob(os.path.join(work, "*.deb"))):

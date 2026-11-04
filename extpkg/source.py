@@ -14,6 +14,7 @@ in a container of the release (extpkg/builder.py).
 import datetime
 import fnmatch
 import hashlib
+import json
 import os
 import re
 import subprocess
@@ -98,6 +99,18 @@ def latest_tag(url, pattern="*"):
     return best[0]
 
 
+def _read_file(url, ref, path):
+    """One file of a branch, without a full clone."""
+    with tempfile.TemporaryDirectory() as tmp:
+        _git("clone", "-q", "--depth", "1", "--filter=blob:none", "--no-checkout", "--branch", ref, url, tmp)
+        return _git("show", f"HEAD:{path}", cwd=tmp).strip()
+
+
+def file_version(text):
+    """27.0.0-devel -> 27.0.0, 26.3.0-rc1 -> 26.3.0~rc1."""
+    return text.split()[0].replace("-devel", "").replace("-rc", "~rc")
+
+
 def _commit_time(url, commit):
     """Commit time, from a fetch of that one commit without file contents."""
     with tempfile.TemporaryDirectory() as tmp:
@@ -122,8 +135,9 @@ def upstream(up):
     release tag that matches upstream.tags (default *).
 
     A tag gives the version (v2.70.0 -> 2.70.0). A branch needs
-    upstream.version, the next upstream release; the snapshot then sorts
-    below it: <version>~git<YYYYMMDDHHMM>.<commit>.
+    upstream.version, the next upstream release, or upstream.version_file, a
+    file that holds it (mesa: VERSION). The snapshot then sorts below that
+    release: <version>~git<YYYYMMDDHHMM>.<commit>.
     """
     def go():
         ref = up.get("ref", "latest")
@@ -137,19 +151,26 @@ def upstream(up):
         if up.get("rebase"):
             base_commit, _ = _ref(up["rebase"]["url"], up["rebase"]["ref"])
             rebase = {**up["rebase"], "commit": base_commit}
+        version = up.get("version")
+        if not version and up.get("version_file"):
+            # The rebase base sets the version: the code is that branch plus the fork.
+            src = rebase or {"url": up["url"], "ref": ref}
+            version = file_version(_read_file(src["url"], src["ref"], up["version_file"]))
         if kind == "tag" and not rebase:
-            ver = up.get("version") or tag_version(ref)
+            ver = version or tag_version(ref)
         else:
-            if not up.get("version"):
-                raise ValueError(f"{up['url']} {ref}: a branch or a rebase needs upstream.version")
+            if not version:
+                raise ValueError(f"{up['url']} {ref}: a branch or a rebase needs upstream.version or version_file")
             t = _commit_time(up["url"], commit)
             if rebase:
                 t = max(t, _commit_time(rebase["url"], rebase["commit"]))
             stamp = datetime.datetime.fromtimestamp(t, datetime.timezone.utc).strftime("%Y%m%d%H%M")
-            ver = f"{up['version']}~git{stamp}.{commit[:10]}"
-        return {"url": up["url"], "ref": ref, "commit": commit, "version": ver, "rebase": rebase}
+            ver = f"{version}~git{stamp}.{commit[:10]}"
+        return {"url": up["url"], "ref": ref, "commit": commit, "version": ver, "rebase": rebase,
+                "meson_subprojects": up.get("meson_subprojects", [])}
 
-    key = (up["url"], up.get("ref", "latest"), up.get("tags"), up.get("version"), repr(up.get("rebase")))
+    key = (up["url"], up.get("ref", "latest"), up.get("tags"), up.get("version"), up.get("version_file"),
+           repr(up.get("rebase")), repr(up.get("meson_subprojects")))
     return _once(key, go)
 
 
@@ -184,9 +205,12 @@ def resolve(pkg, release, arch, keyring, packages_dir):
     up = upstream(pkg["upstream"]) if pkg.get("upstream") else None
     ver = version(pkg, release, packaged, up)
     local = local_hash(pkg, packages_dir)
+    # Config keys that change the build. releases, notes, install and the like do not.
+    keys = {k: pkg.get(k) for k in ("packaging", "upstream", "revision", "build_depends", "include_debug")}
+    local = hashlib.sha256((local + json.dumps(keys, sort_keys=True)).encode()).hexdigest()
     commits = [up["commit"][:12], up["rebase"]["commit"][:12] if up["rebase"] else ""] if up else []
     identity = "|".join([f"build{RECIPE}", dsc["sha256"][:16] if dsc else "-",
-                         "+".join(c for c in commits if c) or "-", local[:16] or "-", ver])
+                         "+".join(c for c in commits if c) or "-", local[:16], ver])
     return [{
         "package": None,
         "version": None,          # read from each built .deb
