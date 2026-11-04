@@ -335,6 +335,22 @@ class Publish(unittest.TestCase):
         self.assertEqual(f.files, [])
         self.assertEqual(f.skipped[0]["reason"], "build output is from another plan")
 
+    def test_unchanged_follows_repositories(self):
+        """A file built for both repositories, then the config says beta only."""
+        self.built(self.cand["identity"])
+        f = self.fetcher()
+        f.group([(self.entry, self.cand)])
+        self.assertTrue(f.files[0]["stable"])
+        self.pkg["repositories"] = ["beta"]
+        g = self.fetcher({"files": f.files})
+        g.group([(self.entry, self.cand)])
+        self.assertTrue(g.files[0]["unchanged"])
+        self.assertIsNone(g.files[0]["stable"])
+        self.assertTrue(g.files[0]["beta"])
+        from extpkg import retention
+        _, removed = retention.plan_removal({"files": f.files}, g.files, [], {"fastfetch"}, {})
+        self.assertEqual(removed, [f.files[0]["stable"]])
+
     def test_unchanged_carries_every_file(self):
         self.built(self.cand["identity"], ("fastfetch", "fastfetch-extra"))
         f = self.fetcher()

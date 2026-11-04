@@ -192,9 +192,16 @@ class Fetcher:
             prevs = []    # rename the file of the old pipeline
         if prevs:
             # Uploaded by an earlier run, and the server keeps it.
+            repos = pkg.get("repositories", config.REPOSITORIES)
             with self._guard:
                 for prev in prevs:
                     rec = {k: v for k, v in prev.items() if k != "carried"}
+                    # repositories changed: drop the paths it no longer allows.
+                    # Retention then removes them from the server.
+                    if "beta" not in repos:
+                        rec["beta"] = None
+                    if "stable" not in repos:
+                        rec["stable"] = None
                     self.files.append({**rec, "unchanged": True})
                     self.unchanged += 1
             self.progress.step(f"{where}: unchanged {', '.join(p['filename'] for p in prevs)}")
