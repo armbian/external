@@ -63,6 +63,13 @@ class UrlName(unittest.TestCase):
         self.assertNotEqual(pipeline.url_name("discord", "1:0.0.1", "amd64"),
                             pipeline.url_name("discord", "2:0.0.1", "amd64"))
 
+    def test_repacked_url_keeps_the_url_name(self):
+        """A repack with an epoch: the url name, so the next run sees it unchanged."""
+        self.pkg["repack"] = {"packages": ["discord"], "epoch": 9}
+        x = self.place(self.fetcher(1), self.cand("url:a"))
+        self.assertEqual(x["filename"], "discord_9%3a0.0.1_amd64.deb")
+        self.assertFalse(pipeline._legacy_name(self.pkg, x))
+
     def test_new_identity_downloads_again(self):
         self.place(self.fetcher(1), self.cand("url:a"))
         x = self.place(self.fetcher(2), self.cand("url:b"))
