@@ -274,7 +274,10 @@ class Fetcher:
                 path = debfile.repack(path, new_version, rdir)
             with self._guard:
                 self.used.add(path)
-            name, version = os.path.basename(path), new_version
+            # A url download keeps its own name rule (epoch as %3a): _legacy_name checks it.
+            name = url_name(fields["Package"], new_version, fields["Architecture"]) if _versioned_name(pkg) \
+                else os.path.basename(path)
+            version = new_version
 
         have = self.pub.version(entry["release"], entry["target"], entry["arch"], fields["Package"])
         newer = have is None or debver.compare(version, have) > 0
