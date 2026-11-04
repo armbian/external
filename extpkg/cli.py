@@ -5,7 +5,7 @@ import json
 import os
 import sys
 
-from . import config, depcheck, net, pipeline, published, status, upload
+from . import builder, config, depcheck, net, pipeline, published, status, upload
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -17,13 +17,24 @@ def _common(p):
     p.add_argument("--build-dir", default=os.environ.get("ARMBIAN_BUILD_DIR"),
                    help="armbian/build checkout, for the list of supported releases")
     p.add_argument("--jobs", type=int, default=8)
+    p.add_argument("--kind", choices=["mirror", "build", "all"], default="mirror",
+                   help="mirror: apt, github, url (Sync). build: method build (Build).")
 
 
 def _load(args):
     names = [n for n in args.only.split(",") if n]
     pkgs = config.load_all(args.packages, names or None)
+    kind = getattr(args, "kind", "all")
+    if kind != "all":
+        methods = config.BUILD_METHODS if kind == "build" else config.MIRROR_METHODS
+        pkgs = [p for p in pkgs if p["method"] in methods]
     releases = config.supported_releases(args.build_dir)
     return pkgs, releases
+
+
+def _plan(args, pkgs, releases):
+    return pipeline.plan(pkgs, releases, args.keys, args.jobs, _shard(getattr(args, "shard", "")),
+                         full=not args.only, packages_dir=args.packages)
 
 
 def _failed(manifest):
@@ -42,7 +53,8 @@ def _previous(args):
 
 
 def _shard(text):
-    if not text:
+    """i/n splits the configs. A plain name (build) only names the status file."""
+    if not text or "/" not in text:
         return None
     i, n = text.split("/")
     return int(i), int(n)
@@ -56,7 +68,7 @@ def cmd_validate(args):
 
 def cmd_plan(args):
     pkgs, releases = _load(args)
-    doc = pipeline.plan(pkgs, releases, args.keys, args.jobs, _shard(args.shard), full=not args.only)
+    doc = _plan(args, pkgs, releases)
     with open(args.out, "w") as f:
         json.dump(doc, f, indent=1)
     skipped = [e for e in doc["entries"] if e.get("skip")]
@@ -95,7 +107,12 @@ def cmd_run(args):
 
 
 def _run(args, pkgs, releases, st):
-    doc = pipeline.plan(pkgs, releases, args.keys, args.jobs, _shard(args.shard), full=not args.only)
+    if args.plan:
+        # The plan that the builds used: a new plan could name newer sources.
+        with open(args.plan) as f:
+            doc = json.load(f)
+    else:
+        doc = _plan(args, pkgs, releases)
     os.makedirs(args.out, exist_ok=True)
     with open(os.path.join(args.out, "plan.json"), "w") as f:
         json.dump(doc, f, indent=1)
@@ -111,7 +128,7 @@ def _run(args, pkgs, releases, st):
         others = status.other_paths(args.dest, args.shard, args.port, args.known_hosts)
     m = pipeline.fetch(doc, pkgs, args.out, args.cache, args.published, args.jobs, args.prune_cache,
                        _previous(args), sink=up.add if up else None, stop=up.failed if up else None,
-                       others=others)
+                       others=others, built=args.built)
     if args.depcheck:
         _depcheck(args, pkgs, m)
     rep = pipeline.report(m) + depcheck.report(m.get("depcheck", []))
@@ -150,6 +167,38 @@ def cmd_depcheck(args):
     return 1 if args.strict and any(x["ok"] is False for x in m["depcheck"]) else 0
 
 
+def cmd_build_matrix(args):
+    """Builds that the plan needs: not in the previous manifest with the same identity."""
+    pkgs, _ = _load(args)
+    with open(args.plan) as f:
+        doc = json.load(f)
+    prev = pipeline.index_previous(_previous(args))
+    known = {p["name"] for p in pkgs}
+    jobs = []
+    for e in doc["entries"]:
+        if e.get("skip") or e["config"] not in known:
+            if e.get("skip"):
+                net.warn(f"{e['config']} {e['release']}/{e['arch']}: {e['skip']}")
+            continue
+        if pipeline.previous_of(prev, e, e["candidates"][0]):
+            continue
+        jobs.append({"config": e["config"], "release": e["release"], "arch": e["arch"],
+                     "version": e["candidates"][0]["build"]["version"],
+                     "runner": "ubuntu-24.04-arm" if e["arch"] == "arm64" else "ubuntu-24.04",
+                     "image": f"{depcheck.distro_of(e['release'], args.build_dir)}:{e['release']}"})
+    print(json.dumps(jobs))
+    net.log(f"build-matrix: {len(jobs)} builds")
+    return 0
+
+
+def cmd_build(args):
+    pkgs, _ = _load(args)
+    with open(args.plan) as f:
+        doc = json.load(f)
+    builder.build(doc, pkgs, args.packages, args.config, args.release, args.arch, args.out)
+    return 0
+
+
 def cmd_status(args):
     """Mark a shard failed, for a job that was cancelled or failed outside the tool."""
     st = status.Status(args.dest, args.shard, args.port, args.known_hosts, dry_run=False)
@@ -172,7 +221,7 @@ def main(argv=None):
 
     p = sub.add_parser("validate", help="check package configs")
     _common(p)
-    p.set_defaults(fn=cmd_validate)
+    p.set_defaults(fn=cmd_validate, kind="all")
 
     p = sub.add_parser("plan", help="resolve versions and files; no .deb download")
     _common(p)
@@ -205,6 +254,23 @@ def main(argv=None):
             p.add_argument("--depcheck", action="store_true", help="check dependencies of new files (report only)")
             p.add_argument("--lists-cache", default=".cache/apt-lists", help="apt index lists for --depcheck")
             p.add_argument("--keyring", action="append", default=[], help="extra apt keyring for --depcheck")
+            p.add_argument("--built", default=None, help="build outputs (--kind build)")
+            p.add_argument("--plan", default="", help="use this plan, do not make a new one (--kind build)")
+
+    p = sub.add_parser("build-matrix", help="list the builds that a plan needs, as JSON")
+    _common(p)
+    p.add_argument("--plan", default="plan.json")
+    p.add_argument("--previous", default="", help="manifest of the last successful upload")
+    p.set_defaults(fn=cmd_build_matrix, kind="build")
+
+    p = sub.add_parser("build", help="build one package for one release and architecture")
+    _common(p)
+    p.add_argument("--plan", default="plan.json")
+    p.add_argument("--config", required=True)
+    p.add_argument("--release", required=True)
+    p.add_argument("--arch", required=True)
+    p.add_argument("--out", default="built")
+    p.set_defaults(fn=cmd_build, kind="build")
 
     p = sub.add_parser("depcheck", help="check dependencies of the new files in an output tree")
     _common(p)

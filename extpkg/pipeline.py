@@ -17,7 +17,7 @@ import os
 import shutil
 import threading
 
-from . import apt, config, debfile, debver, github, net, published, retention, url
+from . import apt, config, debfile, debver, github, net, published, retention, source, url
 
 class SkipDebug(Exception):
     """A debug package from a source that cannot filter before download."""
@@ -33,7 +33,7 @@ def _now():
 
 # --- plan ----------------------------------------------------------------------
 
-def plan(pkgs, releases_all, keys_dir, jobs=8, shard=None, full=False):
+def plan(pkgs, releases_all, keys_dir, jobs=8, shard=None, full=False, packages_dir=None):
     """Resolve every (package, release, arch) to candidate files. No .deb download.
 
     full: the run covers every config of its shard (no --only). Retention then
@@ -57,7 +57,10 @@ def plan(pkgs, releases_all, keys_dir, jobs=8, shard=None, full=False):
         entry = {"config": pkg["name"], "method": pkg["method"], "release": rel, "arch": arch,
                  "target": pkg["target"], "dir": config.component_dir(pkg, rel)}
         try:
-            cands = RESOLVERS[pkg["method"]](pkg, rel, arch, keyring)
+            if pkg["method"] == "build":
+                cands = source.resolve(pkg, rel, arch, keyring, packages_dir)
+            else:
+                cands = RESOLVERS[pkg["method"]](pkg, rel, arch, keyring)
             if not cands:
                 entry["skip"] = "no package matched"
             entry["candidates"] = cands
@@ -102,7 +105,8 @@ class Fetcher:
         self.bytes = 0
         self.used = set()   # cache paths this run used
         self._fresh = set() # cache paths this run downloaded
-        self.previous = {}  # (config, release, arch, source, sha256) -> manifest entry
+        self.previous = {}  # (config, release, arch, source, identity) -> [manifest entries]
+        self.built = None   # directory of build outputs (method build)
         self.unchanged = 0
         self.sink = None    # called with [(path, size)] after each upstream file
         self.stop = None    # returns True to stop early (upload failed)
@@ -183,17 +187,20 @@ class Fetcher:
             self.skipped.append({**base, "file": cand["filename"], "reason": "stopped: upload failed"})
             return []
         ident = cand.get("sha256") or cand.get("identity")
-        prev = ident and self.previous.get((entry["config"], entry["release"], entry["arch"], cand["url"], ident))
-        if prev and _legacy_name(pkg, prev):
-            prev = None   # rename the file of the old pipeline
-        if prev:
+        prevs = previous_of(self.previous, entry, cand)
+        if any(_legacy_name(pkg, p) for p in prevs):
+            prevs = []    # rename the file of the old pipeline
+        if prevs:
             # Uploaded by an earlier run, and the server keeps it.
             with self._guard:
-                rec = {k: v for k, v in prev.items() if k != "carried"}
-                self.files.append({**rec, "unchanged": True})
-                self.unchanged += 1
-            self.progress.step(f"{where}: unchanged {prev['filename']}")
+                for prev in prevs:
+                    rec = {k: v for k, v in prev.items() if k != "carried"}
+                    self.files.append({**rec, "unchanged": True})
+                    self.unchanged += 1
+            self.progress.step(f"{where}: unchanged {', '.join(p['filename'] for p in prevs)}")
             return []
+        if cand.get("build"):
+            return self._built(pkg, entry, cand, base, where)
         try:
             x, created = self._one_file(pkg, entry, cand, base)
             check = ("sig+sha" if x["signature"] == "verified" else "sha") if x["checksum"] == "verified" \
@@ -211,8 +218,33 @@ class Fetcher:
             self.progress.step(f"{where}: FAILED {cand['filename']}: {type(e).__name__}: {e}")
             return []
 
-    def _one_file(self, pkg, entry, cand, base):
-        path = self._download(cand)
+    def _built(self, pkg, entry, cand, base, where):
+        """Place the files of one build (method build)."""
+        d = os.path.join(self.built or "", entry["config"], entry["release"], entry["arch"])
+        try:
+            with open(os.path.join(d, "build.json")) as fh:
+                info = json.load(fh)
+        except (OSError, ValueError):
+            info = None
+        if not info or info.get("identity") != cand["identity"]:
+            reason = "not built" if not info else "build output is from another plan"
+            self.skipped.append({**base, "file": cand["filename"], "reason": reason})
+            self.progress.step(f"{where}: {reason.upper()}")
+            return []
+        created = []
+        for name in info["files"]:
+            try:
+                x, made = self._one_file(pkg, entry, cand, base, os.path.join(d, name))
+                created += [(p, x["size"]) for p in made]
+            except Exception as e:
+                self.skipped.append({**base, "file": name, "reason": f"{type(e).__name__}: {e}"})
+                self.progress.step(f"{where}: FAILED {name}: {type(e).__name__}: {e}")
+                return []
+        self.progress.step(f"{where}: built {len(info['files'])} files, {info['version']}")
+        return created
+
+    def _one_file(self, pkg, entry, cand, base, path=None):
+        path = path or self._download(cand)
         fields = debfile.control(path)
         if fields["Architecture"] not in (entry["arch"], "all"):
             net.warn(f"{cand['filename']}: Architecture {fields['Architecture']}, wanted {entry['arch']}")
@@ -221,7 +253,7 @@ class Fetcher:
         if cand.get("version") and fields["Version"] != cand["version"]:
             raise debfile.DebError(f"{cand['filename']}: Version {fields['Version']}, index says {cand['version']}")
 
-        name, version = cand["filename"], fields["Version"]
+        name, version = os.path.basename(path) if cand.get("build") else cand["filename"], fields["Version"]
         if _versioned_name(pkg):
             # A fixed name never changes: the upload and the repository update
             # skip existing files, so the server keeps the first version.
@@ -273,6 +305,23 @@ class Fetcher:
         with self._guard:
             self.files.append(rec)
         return rec, created
+
+
+def previous_of(previous, entry, cand):
+    """Manifest entries of an earlier run with the same upstream identity."""
+    ident = cand.get("sha256") or cand.get("identity")
+    if not ident:
+        return []
+    return previous.get((entry["config"], entry["release"], entry["arch"], cand["url"], ident), [])
+
+
+def index_previous(previous):
+    out = {}
+    for x in (previous or {}).get("files", []):
+        ident = x.get("upstream_sha256") or x.get("upstream_id")
+        if ident:
+            out.setdefault((x["config"], x["release"], x["arch"], x["source"], ident), []).append(x)
+    return out
 
 
 def url_name(package, version, arch):
@@ -331,19 +380,15 @@ def prune_cache(cache, used):
 
 
 def fetch(plan_doc, pkgs, out, cache, pub_url=published.DEFAULT_URL, jobs=8, prune=False, previous=None,
-          sink=None, stop=None, others=frozenset()):
+          sink=None, stop=None, others=frozenset(), built=None):
     """Download, check and place. sink() gets the new paths of each upstream
     file as soon as they are placed (for upload while downloading)."""
     os.makedirs(out, exist_ok=True)
     os.makedirs(cache, exist_ok=True)
     f = Fetcher(pkgs, out, cache, published.Published(pub_url))
-    f.sink, f.stop = sink, stop
+    f.sink, f.stop, f.built = sink, stop, built
     f.progress = net.Progress("fetch", sum(len(e["candidates"]) for e in plan_doc["entries"]))
-    if previous:
-        for x in previous.get("files", []):
-            ident = x.get("upstream_sha256") or x.get("upstream_id")
-            if ident:
-                f.previous[(x["config"], x["release"], x["arch"], x["source"], ident)] = x
+    f.previous = index_previous(previous)
     groups = {}
     for e in plan_doc["entries"]:
         if e.get("skip"):

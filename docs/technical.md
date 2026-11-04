@@ -61,7 +61,7 @@ Signature rules, as apt uses them:
 | Key | Required | Meaning |
 |---|---|---|
 | `name` | yes | Same as the file name. |
-| `method` | yes | `apt`, `github` or `url`. |
+| `method` | yes | `apt`, `github` or `url`: take built packages. `build`: build from source, see [Builds](#builds). |
 | `source.url` | yes | Repository, GitHub project or file URL. An `http://` apt URL is tried as `https://` first. |
 | `source.suite` | apt | Suite (`noble`, `stable`) or a flat repository (`./`). |
 | `source.components` | no | apt components. Default: `main`. |
@@ -126,6 +126,56 @@ Firefox needs epoch 9 to win over the Ubuntu snap transitional package.
 `releases: all` means the releases whose `config/distributions/<release>/support` in armbian/build is not `eos`.
 Set `ARMBIAN_BUILD_DIR` to a checkout. Without it, the tool uses a fixed list in `extpkg/config.py`.
 
+## Builds
+
+`method: build` builds packages from source for the Armbian repository. It takes three parts. Only one of packaging and upstream is required.
+
+| Part | Where | Use |
+|---|---|---|
+| Packaging | `packaging:` a Debian or Ubuntu source package, or `packages/<name>/debian/` | `debian/` directory. The source package also gives the code when there is no `upstream`. |
+| Upstream | `upstream:` a git tag or branch | Code in place of the packaged code. Its own `debian/` is replaced. |
+| Patches | `packages/<name>/patches/series` | Optional. Applied with `patch -p1` after packaging and upstream. For code that we do not control or fork. |
+
+```yaml
+name: fastfetch
+method: build
+packaging:                 # newest source package in this suite
+  url: https://deb.debian.org/debian
+  suite: sid
+  components: [main]
+  package: fastfetch
+upstream:                  # optional
+  url: https://github.com/fastfetch-cli/fastfetch
+  ref: latest              # latest GitHub release (default), a tag or a branch
+releases: all
+architectures: [arm64, amd64]
+target: utils
+install: [fastfetch]
+```
+
+| Key | Meaning |
+|---|---|
+| `packaging.url`, `.suite`, `.components`, `.package` | apt repository and source package. Signature and hashes are checked, as for `apt`. |
+| `upstream.url`, `.ref` | git repository and tag or branch. `latest`: the latest GitHub release. |
+| `upstream.version` | Needed for a branch: the next upstream release, for example `27.0.0`. |
+| `upstream.rebase.url`, `.ref` | A fork: rebase it onto this branch before the build. A conflict fails the build. |
+| `revision` | Armbian revision. Default 1. Increase it when only the patches change and the version must change. |
+
+Architectures: `amd64` and `arm64`, on native GitHub runners.
+
+Version of the built packages:
+
+| Build | Version |
+|---|---|
+| Packaging only | `<packaged version>+armbian<revision>~<release>` |
+| Upstream tag | `<tag version>-<packaged revision>+armbian<revision>~<release>` |
+| Upstream branch or rebase | `<upstream.version>~git<YYYYMMDDHHMM>.<commit>-<packaged revision>+armbian<revision>~<release>` |
+
+`~<release>` gives each release its own file name. One repository pool holds all releases.
+
+A build runs again only when its identity changes: the source package hash, the upstream commits, the files under `packages/<name>/`, or the version.
+Architecture-independent packages (`_all.deb`) come from the first architecture only.
+
 ## Workflows
 
 ### Check (`.github/workflows/check.yml`)
@@ -137,7 +187,20 @@ Runs on pull requests and on pushes to `main`.
 3. Plan all configs.
 4. Dry-run download of the changed configs. When more than 8 configs change, this step is skipped: use Sync with a dry run.
 
+Method `build` configs are planned only. The Build workflow builds them.
+
 Check uses no secrets.
+
+### Build (`.github/workflows/build.yml`)
+
+Runs daily, by hand, and on pull requests that change `packages/`, `extpkg/` or the workflow. Manual inputs: `only` and `dry_run` (default true).
+Pull requests are always dry runs. Scheduled runs are dry runs until the repository variable `BUILD_LIVE` is `true`.
+
+1. **plan**: resolve the sources. List the builds whose identity is not in the last manifest.
+2. **build**: one job per config, release and architecture. Container `debian:<release>` or `ubuntu:<release>`, runner `ubuntu-24.04` (amd64) or `ubuntu-24.04-arm` (arm64). `apt-get build-dep`, then `dpkg-buildpackage`. Tests are not run (`nocheck`).
+3. **publish**: place the built files in the Sync layout, upload, and remove old versions. Status and manifest go to `.sync/shard-build.json` and `.sync/manifest-shard-build.json`, next to the Sync shards.
+
+A failed build skips only its own release and architecture. Its old files stay.
 
 ### Sync (`.github/workflows/sync.yml`)
 
@@ -278,7 +341,12 @@ python3 -m extpkg run   [--only a,b] [--shard i/n] [--out output] [--cache dir]
                         [--dry-run | --dest user@host:/path --port n --known-hosts file]
 python3 -m extpkg upload --out output --dest user@host:/path [--dry-run]
 python3 -m extpkg depcheck --out output [--lists-cache dir] [--keyring file] [--strict]
+python3 -m extpkg build-matrix --plan plan.json [--previous manifest.json]
+python3 -m extpkg build --plan plan.json --config name --release r --arch a [--out built]
+python3 -m extpkg run --kind build --shard build --plan plan.json --built built ...
 ```
+
+`--kind`: `mirror` (default: `apt`, `github`, `url`) or `build`.
 
 Common options: `--packages`, `--keys`, `--build-dir`, `--jobs`, `--published`.
 `--strict` exits 1 when a download or check fails. "No package matched" is not a failure.
@@ -297,6 +365,8 @@ Common options: `--packages`, `--keys`, `--build-dir`, `--jobs`, `--published`.
 | `extpkg/published.py` | Versions in the published stable repository |
 | `extpkg/pipeline.py` | Plan, fetch, manifest, report |
 | `extpkg/upload.py` | rsync upload |
+| `extpkg/source.py` | Method build: resolve packaging, upstream and patches; version and identity |
+| `extpkg/builder.py` | Method build: build in a container of the release |
 | `tools/import-os.py` | One-time import of `armbian/os/external/*.conf` |
 
 ## Differences from the old pipeline
@@ -321,4 +391,4 @@ Keys added or replaced during the port, each checked against the signer of its r
 
 - `url` sources have no upstream hash, unless the config pins one.
 - Old versions are removed only for files that this tool uploaded. Files from the old pipeline need a one-time cleanup.
-- Package types `source-patch` and `build` are planned, not implemented.
+- Method build: `amd64` and `arm64` only.

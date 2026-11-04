@@ -85,16 +85,16 @@ class UrlName(unittest.TestCase):
                "package": "discord", "version": "0.0.1", "deb_arch": "amd64", "filename": "discord.deb",
                "source": URL, "upstream_id": "url:a"}
         f = self.fetcher(1)
-        f.previous[("discord", "noble", "amd64", URL, "url:a")] = old
+        f.previous[("discord", "noble", "amd64", URL, "url:a")] = [old]
         x = self.place(f, self.cand("url:a"))
         self.assertFalse(x.get("unchanged"))
         self.assertEqual(x["filename"], "discord_0.0.1_amd64.deb")
 
     def test_versioned_name_stays_unchanged(self):
         f = self.fetcher(1)
-        f.previous[("discord", "noble", "amd64", URL, "url:a")] = {
+        f.previous[("discord", "noble", "amd64", URL, "url:a")] = [{
             "config": "discord", "release": "noble", "arch": "amd64", "package": "discord",
-            "version": "0.0.1", "deb_arch": "amd64", "filename": "discord_0.0.1_amd64.deb"}
+            "version": "0.0.1", "deb_arch": "amd64", "filename": "discord_0.0.1_amd64.deb"}]
         x = self.place(f, self.cand("url:a"))
         self.assertTrue(x.get("unchanged"))
 

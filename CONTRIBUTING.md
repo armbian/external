@@ -92,6 +92,14 @@ Rules:
 
 All keys: [docs/technical.md](docs/technical.md#package-config).
 
+### Build from source
+
+When no built package fits, use `method: build`. See [docs/technical.md](docs/technical.md#builds).
+
+- Take the packaging from Debian or Ubuntu when it exists. Keep only the parts that differ in this repository.
+- Put patches in `packages/<name>/patches/` with a `series` file. Patches are optional.
+- Test with the Build workflow: run it by hand with `only: <name>` and `dry_run: true`.
+
 ## 4. Test
 
 ```sh
