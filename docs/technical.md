@@ -132,6 +132,29 @@ Set `ARMBIAN_BUILD_DIR` to a checkout. Without it, the tool uses a fixed list in
 
 `method: build` builds packages from source for the Armbian repository. It takes three parts. Only one of packaging and upstream is required.
 
+### Compared to a Launchpad PPA
+
+For developers who maintain a PPA:
+
+| | Launchpad PPA | Build here |
+|---|---|---|
+| Result | A separate archive per person or team | The Armbian repository: `<release>-<target>`, stable, beta or both |
+| Releases | Ubuntu | Debian and Ubuntu, from one config |
+| In git | The full `debian/` for each series | A reference to a Debian or Ubuntu source package, and our patches |
+| Upload | A signed source package. Launchpad builds it | Nothing by hand. GitHub runners build binary packages. The Armbian repository signs them when it publishes |
+| Architectures | All that Launchpad builds | `amd64`, `arm64` |
+| Trigger | Each upload | Daily. Only builds whose sources, patches or config changed |
+| Version | Set by hand or by a script | Automatic: `<upstream>-<revision>+armbian<n>~<release>` |
+| Build dependencies | Other PPAs or the archive | `build_depends`: built in the same run |
+| Review | None | Pull request, Check workflow, dry-run build |
+
+To move a package from a PPA:
+
+1. Find the newest Debian or Ubuntu source package of it. Use it as `packaging`. Do not copy its `debian/` into this repository.
+2. Set `upstream` when the PPA builds newer code than that package.
+3. Put each change to the packaging or the code in `build/<name>/patches/`. Put a change for one release in `patches/<release>/`.
+4. Run the Build workflow by hand with `only: <name>` and `dry_run: true`. Fix each release that fails, or leave it out with `skip`.
+
 | Part | Where | Use |
 |---|---|---|
 | Packaging | `packaging:` a Debian or Ubuntu source package, or `build/<name>/debian/` | `debian/` directory. The source package also gives the code when there is no `upstream`. |
