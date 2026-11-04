@@ -126,8 +126,8 @@ jobs:
 
   build:
     needs: [plan, deps]
-    # A failed dependency build fails only the builds that need it.
-    if: always() && needs.plan.result == 'success' && needs.plan.outputs.builds != '[]'
+    # A failed dependency build fails only the builds that need it. A cancelled run stops.
+    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.plan.outputs.builds != '[]' }}
     name: "${{ matrix.config }} ${{ matrix.release }}/${{ matrix.arch }}"
     runs-on: ${{ matrix.runner }}
     container: ${{ matrix.image }}
@@ -171,8 +171,8 @@ jobs:
 
   publish:
     needs: [plan, deps, build]
-    # A failed build skips only its own files. The others go out.
-    if: always() && needs.plan.result == 'success'
+    # A failed build skips only its own files. The others go out. A cancelled run publishes nothing.
+    if: ${{ !cancelled() && needs.plan.result == 'success' }}
     runs-on: ubuntu-latest
     env:
       ARMBIAN_BUILD_DIR: ${{ github.workspace }}/armbian-build
