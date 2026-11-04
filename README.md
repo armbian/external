@@ -2,7 +2,7 @@
 
 Third-party Debian packages for the Armbian apt repository: VS Code, Chromium, Firefox, ZFS, Raspberry Pi userspace, mesa, and more.
 
-Package list with versions per release and architecture: https://github.armbian.com/external/
+Package list with versions per release and architecture: https://external.armbian.com/
 
 This repository holds the package list, the upstream signing keys and the tool that downloads, builds, checks and sorts the packages.
 The Armbian repository update takes the result and publishes it.
