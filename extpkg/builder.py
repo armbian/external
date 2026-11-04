@@ -153,6 +153,8 @@ def build(plan_doc, pkgs, packages_dir, name, release, arch, out, jobs=None, dep
         raise BuildError(f"{name} {release}/{arch}: not in the plan ({entry and entry.get('skip')})")
     cand = entry["candidates"][0]
     b = cand["build"]
+    # apt takes only absolute file: paths (local repository of build_depends).
+    out, deps = os.path.abspath(out), deps and os.path.abspath(deps)
     dest = os.path.join(out, name, release, arch)
     work = os.path.join(out, ".work", name, release, arch)
     shutil.rmtree(work, ignore_errors=True)
