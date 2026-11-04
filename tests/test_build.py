@@ -219,7 +219,7 @@ class Matrix(unittest.TestCase):
             json.dump({"files": [{"config": n, "release": "resolute", "arch": "amd64", "source": n,
                                   "upstream_id": i, "filename": f"{n}.deb", "version": version}
                                  for n, i in previous_ids]}, f)
-        return subprocess.run(["python3", "-m", "extpkg", "build-matrix", "--packages", self.tmp, "--plan", self.plan,
+        return subprocess.run(["python3", "-m", "extpkg", "build-matrix", "--configs", self.tmp, "--plan", self.plan,
                                "--previous", prev], capture_output=True, text=True)
 
     def matrix(self, previous_ids):
@@ -244,7 +244,7 @@ class Matrix(unittest.TestCase):
         # mesa-1 is planned; mesa-0 with the same version "1" is uploaded.
         r = self.run_matrix([("libdrm", "libdrm-1"), ("mesa", "mesa-0")], version="1")
         self.assertEqual(r.returncode, 1)
-        self.assertIn("Increase revision in packages/mesa.yaml", r.stderr + r.stdout)
+        self.assertIn("Increase revision in build/mesa.yaml", r.stderr + r.stdout)
 
     def test_dependency_with_dependencies_is_rejected(self):
         with open(os.path.join(self.tmp, "libdrm.yaml")) as f:

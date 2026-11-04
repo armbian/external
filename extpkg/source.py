@@ -2,10 +2,10 @@
 
 A build takes:
   packaging  debian/ from a Debian or Ubuntu source package,
-             or packages/<name>/debian when the config has no packaging
+             or build/<name>/debian when the config has no packaging
   upstream   optional: code in place of the packaged code (a tag or a branch),
              optionally rebased onto another branch (a fork)
-  patches    optional: packages/<name>/patches/series
+  patches    optional: build/<name>/patches/series
 
 The plan resolves these and gives the build an identity. The build runs later,
 in a container of the release (extpkg/builder.py).
@@ -31,12 +31,12 @@ _lock = threading.Lock()
 
 
 def local_dir(pkg, packages_dir):
-    """packages/<name>/: patches/, and debian/ when the config has no packaging."""
+    """build/<name>/: patches/, and debian/ when the config has no packaging."""
     return os.path.join(packages_dir, pkg["name"])
 
 
 def local_hash(pkg, packages_dir):
-    """SHA256 of every file under packages/<name>/, or "" when there is none."""
+    """SHA256 of every file under build/<name>/, or "" when there is none."""
     root = local_dir(pkg, packages_dir)
     h = hashlib.sha256()
     found = False

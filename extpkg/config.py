@@ -1,4 +1,9 @@
-"""Load and validate packages/<name>.yaml."""
+"""Load and validate package configs.
+
+mirror/<name>.yaml   built packages to download (apt, github, url)
+build/<name>.yaml    packages to build from source (method build), with
+                     optional build/<name>/patches and build/<name>/debian
+"""
 
 import glob
 import os
@@ -81,7 +86,7 @@ def _check(pkg, path):
 
 
 def _check_build(pkg, path, need):
-    """method build: packaging and/or upstream; packages/<name>/debian without packaging."""
+    """method build: packaging and/or upstream; build/<name>/debian without packaging."""
     need("source" not in pkg, "method build uses packaging and upstream, not source")
     need(set(_list(pkg["architectures"])) <= set(BUILD_ARCHES),
          f"method build: architectures must be from {BUILD_ARCHES}")
@@ -135,12 +140,18 @@ def load_one(path):
 
 
 def load_all(directory, names=None):
+    """Configs of one directory. mirror/ takes apt, github, url; build/ takes build."""
+    kind = os.path.basename(os.path.normpath(directory))
+    allowed = {"mirror": MIRROR_METHODS, "build": BUILD_METHODS}.get(kind, METHODS)
     pkgs = []
     for path in sorted(glob.glob(os.path.join(directory, "*.yaml"))):
         name = os.path.basename(path)[:-5]
         if names and name not in names:
             continue
-        pkgs.append(load_one(path))
+        pkg = load_one(path)
+        if pkg["method"] not in allowed:
+            raise ConfigError(f"{path}: method {pkg['method']} does not belong in {kind}/")
+        pkgs.append(pkg)
     _check_build_depends(directory, pkgs)
     if names:
         missing = set(names) - {p["name"] for p in pkgs}

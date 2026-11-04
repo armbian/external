@@ -11,30 +11,29 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def _common(p):
-    p.add_argument("--packages", default=os.path.join(ROOT, "packages"), help="package configs")
+    p.add_argument("--configs", default=None,
+                   help="config directory: mirror/ (default) or build/ (build commands)")
     p.add_argument("--keys", default=os.path.join(ROOT, "keys"), help="upstream signing keys")
     p.add_argument("--only", default="", help="comma separated package names")
     p.add_argument("--build-dir", default=os.environ.get("ARMBIAN_BUILD_DIR"),
                    help="armbian/build checkout, for the list of supported releases")
     p.add_argument("--jobs", type=int, default=8)
-    p.add_argument("--kind", choices=["mirror", "build", "all"], default="mirror",
-                   help="mirror: apt, github, url (Sync). build: method build (Build).")
+
+
+def _configs(args):
+    return args.configs or os.path.join(ROOT, getattr(args, "default_configs", "mirror"))
 
 
 def _load(args):
     names = [n for n in args.only.split(",") if n]
-    pkgs = config.load_all(args.packages, names or None)
-    kind = getattr(args, "kind", "all")
-    if kind != "all":
-        methods = config.BUILD_METHODS if kind == "build" else config.MIRROR_METHODS
-        pkgs = [p for p in pkgs if p["method"] in methods]
+    pkgs = config.load_all(_configs(args), names or None)
     releases = config.supported_releases(args.build_dir)
     return pkgs, releases
 
 
 def _plan(args, pkgs, releases):
     return pipeline.plan(pkgs, releases, args.keys, args.jobs, _shard(getattr(args, "shard", "")),
-                         full=not args.only, packages_dir=args.packages)
+                         full=not args.only, packages_dir=_configs(args))
 
 
 def _failed(manifest):
@@ -61,8 +60,11 @@ def _shard(text):
 
 
 def cmd_validate(args):
-    pkgs, releases = _load(args)
-    print(f"{len(pkgs)} package configs valid; releases: {' '.join(releases)}")
+    """Both directories, or the one that --configs names."""
+    dirs = [args.configs] if args.configs else [os.path.join(ROOT, d) for d in ("mirror", "build")]
+    counts = [f"{len(config.load_all(d))} in {os.path.basename(os.path.normpath(d))}/" for d in dirs]
+    releases = config.supported_releases(args.build_dir)
+    print(f"package configs valid: {', '.join(counts)}; releases: {' '.join(releases)}")
     return 0
 
 
@@ -195,7 +197,7 @@ def cmd_build_matrix(args):
     for name, rel, arch in stale:
         net.error(f"{name} {rel}/{arch}: the build inputs changed, but version "
                   f"{entries[(name, rel, arch)]['candidates'][0]['build']['version']} is already uploaded. "
-                  f"Increase revision in packages/{name}.yaml.")
+                  f"Increase revision in build/{name}.yaml.")
     if stale:
         return 1
     for name, rel, arch in list(needed):
@@ -222,7 +224,7 @@ def cmd_build(args):
     pkgs, _ = _load(args)
     with open(args.plan) as f:
         doc = json.load(f)
-    builder.build(doc, pkgs, args.packages, args.config, args.release, args.arch, args.out, deps=args.deps)
+    builder.build(doc, pkgs, _configs(args), args.config, args.release, args.arch, args.out, deps=args.deps)
     return 0
 
 
@@ -248,7 +250,7 @@ def main(argv=None):
 
     p = sub.add_parser("validate", help="check package configs")
     _common(p)
-    p.set_defaults(fn=cmd_validate, kind="all")
+    p.set_defaults(fn=cmd_validate)
 
     p = sub.add_parser("plan", help="resolve versions and files; no .deb download")
     _common(p)
@@ -281,14 +283,14 @@ def main(argv=None):
             p.add_argument("--depcheck", action="store_true", help="check dependencies of new files (report only)")
             p.add_argument("--lists-cache", default=".cache/apt-lists", help="apt index lists for --depcheck")
             p.add_argument("--keyring", action="append", default=[], help="extra apt keyring for --depcheck")
-            p.add_argument("--built", default=None, help="build outputs (--kind build)")
-            p.add_argument("--plan", default="", help="use this plan, do not make a new one (--kind build)")
+            p.add_argument("--built", default=None, help="build outputs (--configs build)")
+            p.add_argument("--plan", default="", help="use this plan, do not make a new one (--configs build)")
 
     p = sub.add_parser("build-matrix", help="list the builds that a plan needs, as JSON")
     _common(p)
     p.add_argument("--plan", default="plan.json")
     p.add_argument("--previous", default="", help="manifest of the last successful upload")
-    p.set_defaults(fn=cmd_build_matrix, kind="build")
+    p.set_defaults(fn=cmd_build_matrix, default_configs="build")
 
     p = sub.add_parser("build", help="build one package for one release and architecture")
     _common(p)
@@ -298,7 +300,7 @@ def main(argv=None):
     p.add_argument("--arch", required=True)
     p.add_argument("--out", default="built")
     p.add_argument("--deps", default=None, help="build outputs of build_depends configs")
-    p.set_defaults(fn=cmd_build, kind="build")
+    p.set_defaults(fn=cmd_build, default_configs="build")
 
     p = sub.add_parser("depcheck", help="check dependencies of the new files in an output tree")
     _common(p)

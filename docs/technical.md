@@ -3,7 +3,7 @@
 ## Flow
 
 ```
-packages/*.yaml ──plan──► plan.json ──fetch──► output/ ──upload──► repository server
+mirror/*.yaml  ──plan──► plan.json ──fetch──► output/ ──upload──► repository server
                   (no download)      (download, check, sort)   (rsync over SSH)
 ```
 
@@ -57,7 +57,7 @@ Signature rules, as apt uses them:
 
 ## Package config
 
-`packages/<name>.yaml`. The file name is the config name.
+`mirror/<name>.yaml` for built packages to download (`apt`, `github`, `url`), `build/<name>.yaml` for packages to build from source (`method: build`). The file name is the config name. A config in the wrong directory fails validation.
 
 | Key | Required | Meaning |
 |---|---|---|
@@ -134,9 +134,9 @@ Set `ARMBIAN_BUILD_DIR` to a checkout. Without it, the tool uses a fixed list in
 
 | Part | Where | Use |
 |---|---|---|
-| Packaging | `packaging:` a Debian or Ubuntu source package, or `packages/<name>/debian/` | `debian/` directory. The source package also gives the code when there is no `upstream`. |
+| Packaging | `packaging:` a Debian or Ubuntu source package, or `build/<name>/debian/` | `debian/` directory. The source package also gives the code when there is no `upstream`. |
 | Upstream | `upstream:` a git tag or branch | Code in place of the packaged code. Its own `debian/` is replaced. |
-| Patches | `packages/<name>/patches/series`, then `patches/<release>/series` | Optional. Applied with `patch -p1` after packaging and upstream. For code that we do not control or fork. Release patches apply to that release only, for example `trixie/` for an older LLVM. |
+| Patches | `build/<name>/patches/series`, then `patches/<release>/series` | Optional. Applied with `patch -p1` after packaging and upstream. For code that we do not control or fork. Release patches apply to that release only, for example `trixie/` for an older LLVM. |
 
 ```yaml
 name: fastfetch
@@ -179,7 +179,7 @@ Version of the built packages:
 
 `~<release>` gives each release its own file name. One repository pool holds all releases.
 
-A build runs again only when its identity changes: the source package hash, the upstream commits, the files under `packages/<name>/`, the build keys of the config (`packaging`, `upstream`, `revision`, `build_depends`, `include_debug`), or the version.
+A build runs again only when its identity changes: the source package hash, the upstream commits, the files under `build/<name>/`, the build keys of the config (`packaging`, `upstream`, `revision`, `build_depends`, `include_debug`), or the version.
 Architecture-independent packages (`_all.deb`) come from the first architecture only.
 
 `build_depends`: the dependency builds first, in the same run. Its packages go into a local apt repository in the container, and they win over the release's own versions. A dependency always builds again with a config that needs it. When the dependency has no build for a release, the release's own version is used.
@@ -188,7 +188,7 @@ Architecture-independent packages (`_all.deb`) come from the first architecture 
 
 `extpkg build` runs as root in the container of the release:
 
-1. Packaging: download the source package and check its hashes against the signed `Sources` index. Unpack it with `dpkg-source -x`. Without `packaging`: take `packages/<name>/debian/`.
+1. Packaging: download the source package and check its hashes against the signed `Sources` index. Unpack it with `dpkg-source -x`. Without `packaging`: take `build/<name>/debian/`.
 2. Upstream: clone the tag or branch. With `rebase`: rebase onto the base branch. Then replace upstream's `debian/` with the packaging.
 3. Patches: `patches/series`, then `patches/<release>/series`, with `patch -p1`.
 4. Changelog: a new entry with the Armbian version.
@@ -226,21 +226,21 @@ build_depends: [libdrm, directx-headers, cbindgen]
 repositories: [beta]
 ```
 
-Local packaging, no Debian package (`cbindgen`): no `packaging` key. `packages/cbindgen/debian/` holds `control`, `rules` and `source/format`. The builder writes the changelog.
+Local packaging, no Debian package (`cbindgen`): no `packaging` key. `build/cbindgen/debian/` holds `control`, `rules` and `source/format`. The builder writes the changelog.
 
-A release with older tools: put a patch in `patches/<release>/`. Example: `packages/mesa/patches/trixie/llvm-19.patch`.
+A release with older tools: put a patch in `patches/<release>/`. Example: `build/mesa/patches/trixie/llvm-19.patch`.
 
 A build dependency that a release lacks: a build config for it, limited to that release with `releases`, and named in `build_depends`. Example: `libdrm` for trixie and resolute.
 
 ### Write a patch
 
 A patch applies to the tree after the packaging, the upstream code and the earlier patches. Paths start with `a/` and `b/`, for example `a/debian/rules`.
-A patch can change `debian/` or the code. To drop a patch of the source package, change `debian/patches/series` (example: `packages/mesa/patches/drop-lp2143073.patch`).
+A patch can change `debian/` or the code. To drop a patch of the source package, change `debian/patches/series` (example: `build/mesa/patches/drop-lp2143073.patch`).
 
 ### Test a build locally
 
 ```sh
-python3 -m extpkg plan --kind build --only mesa --out plan.json
+python3 -m extpkg plan --configs build --only mesa --out plan.json
 docker run --rm -v "$PWD:/src" -w /src debian:trixie sh -c '
   apt-get update && apt-get install -y python3 python3-yaml git ca-certificates dpkg-dev build-essential fakeroot patch xz-utils
   for c in libdrm directx-headers cbindgen; do python3 -m extpkg build --plan plan.json --config $c --release trixie --arch amd64 --out deps; done
@@ -266,7 +266,7 @@ Check uses no secrets.
 
 ### Build (`.github/workflows/build.yml`)
 
-Runs daily, by hand, and on pull requests that change `packages/`, `extpkg/` or the workflow. Manual inputs: `only` and `dry_run` (default true).
+Runs daily, by hand, and on pull requests that change `build/`, `extpkg/` or the workflow. Manual inputs: `only` and `dry_run` (default true).
 Pull requests are always dry runs. Scheduled runs are dry runs until the repository variable `BUILD_LIVE` is `true`.
 
 1. **plan**: resolve the sources. List the builds whose identity is not in the last manifest.
@@ -345,7 +345,7 @@ The run removes nothing when:
 - the path is still in use (an `_all.deb` for several architectures);
 - the config is not in this run (`--only`, another shard). Its entries stay in the state.
 
-The run does remove the files of a config that is disabled (`enabled: false`), and in a full run (no `--only`) the files of a config that was deleted from `packages/`.
+The run does remove the files of a config that is disabled (`enabled: false`), and in a full run (no `--only`) the files of a config that was deleted from `mirror/`.
 
 Shards share the server directories:
 
@@ -417,12 +417,12 @@ python3 -m extpkg upload --out output --dest user@host:/path [--dry-run]
 python3 -m extpkg depcheck --out output [--lists-cache dir] [--keyring file] [--strict]
 python3 -m extpkg build-matrix --plan plan.json [--previous manifest.json]
 python3 -m extpkg build --plan plan.json --config name --release r --arch a [--out built]
-python3 -m extpkg run --kind build --shard build --plan plan.json --built built ...
+python3 -m extpkg run --configs build --shard build --plan plan.json --built built ...
 ```
 
-`--kind`: `mirror` (default: `apt`, `github`, `url`) or `build`.
+`--configs`: the config directory. Default: `mirror/`; `build/` for `build-matrix` and `build`. `validate` checks both.
 
-Common options: `--packages`, `--keys`, `--build-dir`, `--jobs`, `--published`.
+Common options: `--configs`, `--keys`, `--build-dir`, `--jobs`, `--published`.
 `--strict` exits 1 when a download or check fails. "No package matched" is not a failure.
 
 ## Code

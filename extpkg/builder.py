@@ -4,10 +4,10 @@ Runs as root in a container of the release (debian:<release>, ubuntu:<release>),
 on a runner of the architecture. Steps:
 
 1. Packaging: unpack the source package (hashes checked against the signed
-   index), or take packages/<name>/debian.
+   index), or take build/<name>/debian.
 2. Upstream: clone the tag or branch, rebase it when the config asks, and put
    the packaging on top.
-3. Patches: packages/<name>/patches/series, then patches/<release>/series,
+3. Patches: build/<name>/patches/series, then patches/<release>/series,
    applied with patch -p1.
 4. Changelog entry with the Armbian version.
 5. build_depends: a local apt repository with the files that the Build
