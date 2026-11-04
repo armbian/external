@@ -39,7 +39,7 @@ def _check(pkg, path):
     allowed = {"name", "method", "source", "filter", "with_deps", "releases", "architectures",
                "target", "install", "verify", "repack", "assets", "exclude", "filename",
                "enabled", "notes", "keep", "include_debug", "skip", "depcheck",
-               "packaging", "upstream", "revision"}
+               "packaging", "upstream", "revision", "build_depends"}
     unknown = set(pkg) - allowed
     need(not unknown, f"unknown keys: {sorted(unknown)}")
     need(pkg.get("name") == os.path.basename(path)[:-5], "name must match the file name")
@@ -57,7 +57,8 @@ def _check(pkg, path):
     if pkg["method"] == "build":
         _check_build(pkg, path, need)
         return
-    need(not {"packaging", "upstream", "revision"} & set(pkg), "packaging, upstream and revision are for method build")
+    need(not {"packaging", "upstream", "revision", "build_depends"} & set(pkg),
+         "packaging, upstream, revision and build_depends are for method build")
     src = pkg.get("source") or {}
     need(isinstance(src, dict) and src.get("url"), "source.url is required")
     if pkg["method"] == "apt":
@@ -94,6 +95,8 @@ def _check_build(pkg, path, need):
              "upstream.rebase needs url and ref")
     rev = pkg.get("revision", 1)
     need(isinstance(rev, int) and rev >= 1, "revision must be a number >= 1")
+    deps = pkg.get("build_depends", [])
+    need(isinstance(deps, list) and all(isinstance(d, str) for d in deps), "build_depends must be a list of configs")
     for key in ("filter", "with_deps", "assets", "exclude", "filename", "repack"):
         need(key not in pkg, f"{key} is not for method build")
 
@@ -132,11 +135,24 @@ def load_all(directory, names=None):
         if names and name not in names:
             continue
         pkgs.append(load_one(path))
+    _check_build_depends(directory, pkgs)
     if names:
         missing = set(names) - {p["name"] for p in pkgs}
         if missing:
             raise ConfigError(f"unknown packages: {sorted(missing)}")
     return pkgs
+
+
+def _check_build_depends(directory, pkgs):
+    """build_depends: other build configs, one level deep (the Build workflow has two stages)."""
+    for pkg in pkgs:
+        for dep in pkg.get("build_depends", []):
+            path = os.path.join(directory, f"{dep}.yaml")
+            if not os.path.exists(path):
+                raise ConfigError(f"{pkg['name']}: build_depends: no config {dep}")
+            d = load_one(path)
+            if d["method"] != "build" or d.get("build_depends"):
+                raise ConfigError(f"{pkg['name']}: build_depends: {dep} must be a build config without build_depends")
 
 
 def supported_releases(build_dir):

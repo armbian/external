@@ -9,7 +9,9 @@ on a runner of the architecture. Steps:
    the packaging on top.
 3. Patches: packages/<name>/patches/series, applied with patch -p1.
 4. Changelog entry with the Armbian version.
-5. apt-get build-dep, dpkg-buildpackage.
+5. build_depends: a local apt repository with the files that the Build
+   workflow built for those configs in its first stage.
+6. apt-get build-dep, dpkg-buildpackage.
 
 Output: <out>/<config>/<release>/<arch>/*.deb and build.json.
 """
@@ -109,13 +111,41 @@ def _changelog(tree, b, release):
         f.write(entry + old)
 
 
+def _deps_repo(pkg, release, arch, deps, work):
+    """Local apt repository with the build outputs of build_depends. Its versions win."""
+    names = pkg.get("build_depends", [])
+    if not names:
+        return
+    repo = os.path.join(work, "deps")
+    os.makedirs(repo)
+    for name in names:
+        found = glob.glob(os.path.join(deps or "", name, release, arch, "*.deb"))
+        # _all.deb files come from the first architecture of that build.
+        found += [p for p in glob.glob(os.path.join(deps or "", name, release, "*", "*_all.deb"))
+                  if os.path.basename(p) not in {os.path.basename(f) for f in found}]
+        if not found:
+            net.log(f"build_depends {name}: no build for {release}/{arch}, the release has its own")
+            continue
+        for path in found:
+            shutil.copy2(path, repo)
+    if not os.listdir(repo):
+        return
+    with open(os.path.join(repo, "Packages"), "w") as f:
+        subprocess.run(["dpkg-scanpackages", "-m", "."], cwd=repo, stdout=f, check=True)
+    with open("/etc/apt/sources.list.d/extpkg-deps.list", "w") as f:
+        f.write(f"deb [trusted=yes] file:{repo} ./\n")
+    with open("/etc/apt/preferences.d/extpkg-deps", "w") as f:
+        f.write("Package: *\nPin: origin \"\"\nPin-Priority: 1001\n")
+    _run(["apt-get", "update", "-qq"])
+
+
 def _has_arch_any(tree):
     with open(os.path.join(tree, "debian", "control")) as f:
         archs = [line.split(":", 1)[1].split() for line in f if line.startswith("Architecture:")]
     return any(a != ["all"] for a in archs)
 
 
-def build(plan_doc, pkgs, packages_dir, name, release, arch, out, jobs=None):
+def build(plan_doc, pkgs, packages_dir, name, release, arch, out, jobs=None, deps=None):
     pkg = next((p for p in pkgs if p["name"] == name), None)
     entry = next((e for e in plan_doc["entries"]
                   if e["config"] == name and e["release"] == release and e["arch"] == arch), None)
@@ -151,6 +181,7 @@ def build(plan_doc, pkgs, packages_dir, name, release, arch, out, jobs=None):
         env = {"DEBIAN_FRONTEND": "noninteractive",
                "DEB_BUILD_OPTIONS": f"nocheck parallel={jobs or os.cpu_count()}"
                                     + ("" if pkg.get("include_debug") else " noautodbgsym noddebs")}
+        _deps_repo(pkg, release, arch, deps, work)
         _run(["apt-get", "-y", "--no-install-recommends", "build-dep", "./"] + (["--arch-only"] if mode == "-B" else []),
              cwd=tree, env=env)
         _run(["dpkg-buildpackage", mode, "-uc", "-us"], cwd=tree, env=env)

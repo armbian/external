@@ -1,0 +1,27 @@
+name: mesa
+method: build
+# Newest upstream mesa release on Debian packaging.
+# forky: no llvm-spirv-22 yet. trixie, noble, jammy, bookworm: LLVM 22, SPIR-V tools or meson too old.
+packaging:
+  url: https://deb.debian.org/debian
+  suite: sid
+  components: [main]
+  package: mesa
+upstream:
+  url: https://gitlab.freedesktop.org/mesa/mesa.git
+  tags: mesa-*
+build_depends:
+- libdrm
+releases:
+- sid
+- resolute
+architectures:
+- arm64
+- amd64
+target: main
+install:
+- libgl1-mesa-dri
+- libegl-mesa0
+- libglx-mesa0
+- libgbm1
+- mesa-vulkan-drivers

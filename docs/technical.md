@@ -156,10 +156,12 @@ install: [fastfetch]
 | Key | Meaning |
 |---|---|
 | `packaging.url`, `.suite`, `.components`, `.package` | apt repository and source package. Signature and hashes are checked, as for `apt`. |
-| `upstream.url`, `.ref` | git repository and tag or branch. `latest`: the latest GitHub release. |
+| `upstream.url`, `.ref` | git repository and tag or branch. `latest` (default): the latest GitHub release, or on other hosts the newest release tag. |
+| `upstream.tags` | Pattern for `latest`, for example `mesa-*`. Release candidates are left out. |
 | `upstream.version` | Needed for a branch: the next upstream release, for example `27.0.0`. |
 | `upstream.rebase.url`, `.ref` | A fork: rebase it onto this branch before the build. A conflict fails the build. |
 | `revision` | Armbian revision. Default 1. Increase it when only the patches change and the version must change. |
+| `build_depends` | Other build configs whose packages this build needs, for example `libdrm` for `mesa`. One level only. |
 
 Architectures: `amd64` and `arm64`, on native GitHub runners.
 
@@ -175,6 +177,8 @@ Version of the built packages:
 
 A build runs again only when its identity changes: the source package hash, the upstream commits, the files under `packages/<name>/`, or the version.
 Architecture-independent packages (`_all.deb`) come from the first architecture only.
+
+`build_depends`: the dependency builds first, in the same run. Its packages go into a local apt repository in the container, and they win over the release's own versions. A dependency always builds again with a config that needs it. When the dependency has no build for a release, the release's own version is used.
 
 ## Workflows
 
@@ -197,8 +201,9 @@ Runs daily, by hand, and on pull requests that change `packages/`, `extpkg/` or 
 Pull requests are always dry runs. Scheduled runs are dry runs until the repository variable `BUILD_LIVE` is `true`.
 
 1. **plan**: resolve the sources. List the builds whose identity is not in the last manifest.
-2. **build**: one job per config, release and architecture. Container `debian:<release>` or `ubuntu:<release>`, runner `ubuntu-24.04` (amd64) or `ubuntu-24.04-arm` (arm64). `apt-get build-dep`, then `dpkg-buildpackage`. Tests are not run (`nocheck`).
-3. **publish**: place the built files in the Sync layout, upload, and remove old versions. Status and manifest go to `.sync/shard-build.json` and `.sync/manifest-shard-build.json`, next to the Sync shards.
+2. **deps**: the configs that others name in `build_depends`.
+3. **build**: the other configs, with the deps outputs. Both stages: one job per config, release and architecture. Container `debian:<release>` or `ubuntu:<release>`, runner `ubuntu-24.04` (amd64) or `ubuntu-24.04-arm` (arm64). `apt-get build-dep`, then `dpkg-buildpackage`. Tests are not run (`nocheck`).
+4. **publish**: place the built files in the Sync layout, upload, and remove old versions. Status and manifest go to `.sync/shard-build.json` and `.sync/manifest-shard-build.json`, next to the Sync shards.
 
 A failed build skips only its own release and architecture. Its old files stay.
 

@@ -163,6 +163,71 @@ class Upstream(unittest.TestCase):
             source.upstream({"url": f"file://{self.fork}", "ref": "feature"})
 
 
+@unittest.skipUnless(shutil.which("git"), "needs git")
+class LatestTag(unittest.TestCase):
+    def test_newest_release(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = os.path.join(tmp, "r")
+            git(tmp, "init", "-q", "-b", "main", repo)
+            commit(repo, "a", "1")
+            for tag in ("mesa-26.2.5", "mesa-26.2.10", "mesa-26.3.0-rc3", "18.0-branchpoint", "other-99.0"):
+                git(repo, "tag", tag)
+            self.assertEqual(source.latest_tag(f"file://{repo}", "mesa-*"), "mesa-26.2.10")
+            self.assertEqual(source.latest_tag(f"file://{repo}"), "other-99.0")
+            with self.assertRaises(net.FetchError):
+                source.latest_tag(f"file://{repo}", "none-*")
+
+
+class Matrix(unittest.TestCase):
+    """build-matrix: dependencies build first, and together with what needs them."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tmp)
+        pk = {"url": "https://deb.debian.org/debian", "suite": "sid", "package": "x"}
+        for name, extra in (("libdrm", {}), ("mesa", {"build_depends": ["libdrm"]})):
+            with open(os.path.join(self.tmp, f"{name}.yaml"), "w") as f:
+                yaml.safe_dump({"name": name, "method": "build", "packaging": pk, "releases": ["resolute"],
+                                "architectures": ["amd64"], **extra}, f)
+        self.plan = os.path.join(self.tmp, "plan.json")
+        entries = [{"config": n, "release": "resolute", "arch": "amd64", "target": "main",
+                    "candidates": [{"url": n, "identity": f"{n}-1", "build": {"version": "1"}}]}
+                   for n in ("libdrm", "mesa")]
+        with open(self.plan, "w") as f:
+            json.dump({"entries": entries}, f)
+
+    def matrix(self, previous_ids):
+        prev = os.path.join(self.tmp, "prev.json")
+        with open(prev, "w") as f:
+            json.dump({"files": [{"config": n, "release": "resolute", "arch": "amd64", "source": n,
+                                  "upstream_id": f"{n}-1", "filename": f"{n}.deb"} for n in previous_ids]}, f)
+        out = subprocess.run(["python3", "-m", "extpkg", "build-matrix", "--packages", self.tmp, "--plan", self.plan,
+                              "--previous", prev], capture_output=True, text=True, check=True).stdout
+        doc = json.loads(out)
+        return [j["config"] for j in doc["deps"]], [j["config"] for j in doc["builds"]]
+
+    def test_both_new(self):
+        self.assertEqual(self.matrix([]), (["libdrm"], ["mesa"]))
+
+    def test_mesa_changed_builds_libdrm_too(self):
+        self.assertEqual(self.matrix(["libdrm"]), (["libdrm"], ["mesa"]))
+
+    def test_libdrm_changed_alone(self):
+        self.assertEqual(self.matrix(["mesa"]), (["libdrm"], []))
+
+    def test_nothing_changed(self):
+        self.assertEqual(self.matrix(["libdrm", "mesa"]), ([], []))
+
+    def test_dependency_with_dependencies_is_rejected(self):
+        with open(os.path.join(self.tmp, "libdrm.yaml")) as f:
+            doc = yaml.safe_load(f)
+        doc["build_depends"] = ["mesa"]
+        with open(os.path.join(self.tmp, "libdrm.yaml"), "w") as f:
+            yaml.safe_dump(doc, f)
+        with self.assertRaises(config.ConfigError):
+            config.load_all(self.tmp)
+
+
 class NoPublished:
     def version(self, *args):
         return None

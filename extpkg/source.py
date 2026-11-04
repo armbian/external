@@ -12,6 +12,7 @@ in a container of the release (extpkg/builder.py).
 """
 
 import datetime
+import fnmatch
 import hashlib
 import os
 import re
@@ -76,6 +77,27 @@ def _ref(url, ref):
     raise net.FetchError(f"{url}: no tag or branch {ref!r}")
 
 
+def latest_tag(url, pattern="*"):
+    """Newest release tag that matches pattern. Pre-releases (rc, alpha, beta) are left out."""
+    out = _git("ls-remote", "--tags", "--refs", url)
+    best = None
+    for line in out.splitlines():
+        tag = line.split("\t", 1)[1][len("refs/tags/"):]
+        if not fnmatch.fnmatchcase(tag, pattern):
+            continue
+        try:
+            ver = tag_version(tag)
+        except ValueError:
+            continue
+        if "~" in ver or re.search(r"(alpha|beta|rc|devel|branchpoint)", ver, re.I) or not re.match(r"^[0-9][0-9.]*$", ver):
+            continue
+        if best is None or debver.compare(ver, best[1]) > 0:
+            best = (tag, ver)
+    if not best:
+        raise net.FetchError(f"{url}: no release tag matches {pattern!r}")
+    return best[0]
+
+
 def _commit_time(url, commit):
     """Commit time, from a fetch of that one commit without file contents."""
     with tempfile.TemporaryDirectory() as tmp:
@@ -96,6 +118,9 @@ def _once(key, fn):
 def upstream(up):
     """{url, ref, commit, version, rebase} of the upstream code. Once per run.
 
+    ref latest: the latest GitHub release, or on other hosts the newest
+    release tag that matches upstream.tags (default *).
+
     A tag gives the version (v2.70.0 -> 2.70.0). A branch needs
     upstream.version, the next upstream release; the snapshot then sorts
     below it: <version>~git<YYYYMMDDHHMM>.<commit>.
@@ -103,7 +128,10 @@ def upstream(up):
     def go():
         ref = up.get("ref", "latest")
         if ref == "latest":
-            ref = github.release(up["url"])["tag_name"]
+            if "github.com/" in up["url"] and not up.get("tags"):
+                ref = github.release(up["url"])["tag_name"]
+            else:
+                ref = latest_tag(up["url"], up.get("tags", "*"))
         commit, kind = _ref(up["url"], ref)
         rebase = None
         if up.get("rebase"):
@@ -121,7 +149,7 @@ def upstream(up):
             ver = f"{up['version']}~git{stamp}.{commit[:10]}"
         return {"url": up["url"], "ref": ref, "commit": commit, "version": ver, "rebase": rebase}
 
-    key = (up["url"], up.get("ref", "latest"), up.get("version"), repr(up.get("rebase")))
+    key = (up["url"], up.get("ref", "latest"), up.get("tags"), up.get("version"), repr(up.get("rebase")))
     return _once(key, go)
 
 

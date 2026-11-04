@@ -168,26 +168,42 @@ def cmd_depcheck(args):
 
 
 def cmd_build_matrix(args):
-    """Builds that the plan needs: not in the previous manifest with the same identity."""
+    """Builds that the plan needs, as {"deps": [...], "builds": [...]}.
+
+    A build is needed when its identity is not in the previous manifest.
+    deps: the configs that other configs name in build_depends. They build
+    first, and always together with a config that needs them.
+    """
     pkgs, _ = _load(args)
     with open(args.plan) as f:
         doc = json.load(f)
     prev = pipeline.index_previous(_previous(args))
-    known = {p["name"] for p in pkgs}
-    jobs = []
+    by_name = {p["name"]: p for p in pkgs}
+    dep_names = {d for p in pkgs for d in p.get("build_depends", [])}
+    entries = {}
     for e in doc["entries"]:
-        if e.get("skip") or e["config"] not in known:
-            if e.get("skip"):
-                net.warn(f"{e['config']} {e['release']}/{e['arch']}: {e['skip']}")
-            continue
-        if pipeline.previous_of(prev, e, e["candidates"][0]):
-            continue
-        jobs.append({"config": e["config"], "release": e["release"], "arch": e["arch"],
-                     "version": e["candidates"][0]["build"]["version"],
-                     "runner": "ubuntu-24.04-arm" if e["arch"] == "arm64" else "ubuntu-24.04",
-                     "image": f"{depcheck.distro_of(e['release'], args.build_dir)}:{e['release']}"})
-    print(json.dumps(jobs))
-    net.log(f"build-matrix: {len(jobs)} builds")
+        if e.get("skip"):
+            net.warn(f"{e['config']} {e['release']}/{e['arch']}: {e['skip']}")
+        elif e["config"] in by_name:
+            entries[(e["config"], e["release"], e["arch"])] = e
+    needed = {k for k, e in entries.items() if not pipeline.previous_of(prev, e, e["candidates"][0])}
+    for name, rel, arch in list(needed):
+        for dep in by_name[name].get("build_depends", []):
+            if (dep, rel, arch) not in entries:
+                net.warn(f"{name} {rel}/{arch}: build_depends {dep} has no build for {rel}/{arch}")
+                continue
+            needed.add((dep, rel, arch))
+
+    def job(key):
+        e = entries[key]
+        return {"config": e["config"], "release": e["release"], "arch": e["arch"],
+                "version": e["candidates"][0]["build"]["version"],
+                "runner": "ubuntu-24.04-arm" if e["arch"] == "arm64" else "ubuntu-24.04",
+                "image": f"{depcheck.distro_of(e['release'], args.build_dir)}:{e['release']}"}
+    out = {"deps": [job(k) for k in sorted(needed) if k[0] in dep_names],
+           "builds": [job(k) for k in sorted(needed) if k[0] not in dep_names]}
+    print(json.dumps(out))
+    net.log(f"build-matrix: {len(out['deps'])} dependency builds, {len(out['builds'])} builds")
     return 0
 
 
@@ -195,7 +211,7 @@ def cmd_build(args):
     pkgs, _ = _load(args)
     with open(args.plan) as f:
         doc = json.load(f)
-    builder.build(doc, pkgs, args.packages, args.config, args.release, args.arch, args.out)
+    builder.build(doc, pkgs, args.packages, args.config, args.release, args.arch, args.out, deps=args.deps)
     return 0
 
 
@@ -270,6 +286,7 @@ def main(argv=None):
     p.add_argument("--release", required=True)
     p.add_argument("--arch", required=True)
     p.add_argument("--out", default="built")
+    p.add_argument("--deps", default=None, help="build outputs of build_depends configs")
     p.set_defaults(fn=cmd_build, kind="build")
 
     p = sub.add_parser("depcheck", help="check dependencies of the new files in an output tree")

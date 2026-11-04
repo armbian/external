@@ -1,0 +1,16 @@
+name: libdrm
+method: build
+# Debian packaging. Mesa needs libdrm 2.4.133 or newer (amdgpu); resolute has 2.4.131.
+packaging:
+  url: https://deb.debian.org/debian
+  suite: sid
+  components: [main]
+  package: libdrm
+releases:
+- resolute
+architectures:
+- arm64
+- amd64
+target: main
+install:
+- libdrm2
