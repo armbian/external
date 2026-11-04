@@ -429,7 +429,7 @@ A failing package that does not change upstream is not checked again. Fix its co
 
 ### Package site (`.github/workflows/pages.yml`)
 
-A GitHub Pages site lists every config and its state: https://github.armbian.com/external/
+A GitHub Pages site lists every config and its state: https://external.armbian.com/
 
 - Runs after each successful Sync or Build run on `main`, and after a config change.
 - Input: the configs and the manifests of the last live runs, from the `state-live-*` caches. Dry runs never show.
