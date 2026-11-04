@@ -101,6 +101,7 @@ class Fetcher:
         self.progress = None
         self.bytes = 0
         self.used = set()   # cache paths this run used
+        self._fresh = set() # cache paths this run downloaded
         self.previous = {}  # (config, release, arch, source, sha256) -> manifest entry
         self.unchanged = 0
         self.sink = None    # called with [(path, size)] after each upstream file
@@ -112,12 +113,20 @@ class Fetcher:
 
     def _download(self, cand):
         """Download once per URL into the cache. Verify size and SHA256."""
-        key = hashlib.sha256(cand["url"].encode()).hexdigest()[:24]
+        key_src = cand["url"]
+        ident = cand.get("sha256") or cand.get("identity")
+        if cand.get("fixed_url"):
+            # The URL stays the same for every version (discord). Key the cache
+            # on the content identity too, or a cached old file stays.
+            key_src += f"|{ident or ''}"
+        key = hashlib.sha256(key_src.encode()).hexdigest()[:24]
         d = os.path.join(self.cache, key)
         path = os.path.join(d, cand["filename"])
         with self._guard:
             self.used.add(path)
         with self._lock(key):
+            if cand.get("fixed_url") and not ident and os.path.exists(path) and path not in self._fresh:
+                os.unlink(path)   # nothing identifies the cached file: download again
             cand["_cached"] = os.path.exists(path)
             if not os.path.exists(path):
                 os.makedirs(d, exist_ok=True)
@@ -131,6 +140,7 @@ class Fetcher:
                     raise net.FetchError(f"{cand['filename']}: SHA256 does not match the source")
                 with self._guard:
                     self.bytes += size
+            self._fresh.add(path)
         return path
 
     def _place(self, src, repo, subdir, name):
@@ -174,6 +184,8 @@ class Fetcher:
             return []
         ident = cand.get("sha256") or cand.get("identity")
         prev = ident and self.previous.get((entry["config"], entry["release"], entry["arch"], cand["url"], ident))
+        if prev and _legacy_name(pkg, prev):
+            prev = None   # rename the file of the old pipeline
         if prev:
             # Uploaded by an earlier run, and the server keeps it.
             with self._guard:
@@ -210,6 +222,10 @@ class Fetcher:
             raise debfile.DebError(f"{cand['filename']}: Version {fields['Version']}, index says {cand['version']}")
 
         name, version = cand["filename"], fields["Version"]
+        if _versioned_name(pkg):
+            # A fixed name never changes: the upload and the repository update
+            # skip existing files, so the server keeps the first version.
+            name = url_name(fields["Package"], version, fields["Architecture"])
         rp = pkg.get("repack")
         if rp and fields["Package"] in rp["packages"]:
             new_version = debfile.repack_version(version, rp.get("epoch"), rp.get("suffix", ""))
@@ -219,7 +235,10 @@ class Fetcher:
                 path = debfile.repack(path, new_version, rdir)
             with self._guard:
                 self.used.add(path)
-            name, version = os.path.basename(path), new_version
+            # A url download keeps its own name rule (epoch as %3a): _legacy_name checks it.
+            name = url_name(fields["Package"], new_version, fields["Architecture"]) if _versioned_name(pkg) \
+                else os.path.basename(path)
+            version = new_version
 
         have = self.pub.version(entry["release"], entry["target"], entry["arch"], fields["Package"])
         newer = have is None or debver.compare(version, have) > 0
@@ -254,6 +273,29 @@ class Fetcher:
         with self._guard:
             self.files.append(rec)
         return rec, created
+
+
+def url_name(package, version, arch):
+    """File name of a url download. Keeps the epoch, as apt does (1%3a2.0):
+    a new epoch with the same upstream version must give a new file name."""
+    name = debfile.deb_name(package, version, arch)
+    epoch, _, _ = debver.split(version)
+    return name.replace(f"{package}_", f"{package}_{epoch}%3a", 1) if epoch else name
+
+
+def _versioned_name(pkg):
+    """A url download gets <package>_<version>_<arch>.deb, unless the config sets filename."""
+    return pkg["method"] == "url" and not pkg.get("filename")
+
+
+def _legacy_name(pkg, prev):
+    """True for a file that an earlier run placed under a fixed name."""
+    if not _versioned_name(pkg):
+        return False
+    try:
+        return prev["filename"] != url_name(prev["package"], prev["version"], prev["deb_arch"])
+    except (KeyError, debfile.DebError):
+        return True
 
 
 def removable_configs(plan_doc, pkgs, previous):

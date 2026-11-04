@@ -5,9 +5,8 @@ from . import net
 
 def resolve(pkg, release, arch, keyring=None):
     src = pkg["source"]
-    # The old pipeline saved direct downloads as <config>.deb. Keep that name
-    # unless the config sets one. A fixed name never changes, so a consumer
-    # that copies with --ignore-existing keeps the first file it got.
+    # Download name only. The fetch names the file after its control fields,
+    # because the version is known only after the download.
     filename = pkg.get("filename") or f"{pkg['name']}.deb"
     # No upstream hash: identify the file by what the server says about it.
     # The final URL often holds the version (Discord redirects to it).
@@ -31,4 +30,5 @@ def resolve(pkg, release, arch, keyring=None):
         "size": None,
         "signature": "none",
         "identity": identity,
+        "fixed_url": True,   # the URL does not change with the version
     }]

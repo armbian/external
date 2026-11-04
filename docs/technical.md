@@ -23,7 +23,7 @@ plan.json
 ```
 
 - `<dir>` is `extra/<release>-<target>`. For target `main`, `<dir>` is empty.
-- `<file>` is the upstream file name. A repacked file gets `<package>_<version>_<arch>.deb`. A `url` download is `<config>.deb`, unless the config sets `filename`.
+- `<file>` is the upstream file name. A repacked file gets `<package>_<version>_<arch>.deb`. A `url` download gets `<package>_<version>_<arch>.deb` from its control fields (an epoch stays, as `<epoch>%3a`), unless the config sets `filename`. A fixed name never updates: the upload does not overwrite.
 - The same file in several places is a hardlink. It uses disk space once.
 
 The layout is the same as `storage/incoming/external` of the old download workflow.
@@ -75,7 +75,7 @@ Signature rules, as apt uses them:
 | `install` | no | Main package names. For tests and documentation. |
 | `assets` | no | github: asset name patterns. Default: patterns for the architecture. |
 | `exclude` | no | github: asset name patterns to drop. |
-| `filename` | no | url: output file name. |
+| `filename` | no | url: fixed output file name. Avoid it: the server then keeps the first version. |
 | `repack` | no | `packages`, `epoch`, `suffix`: rebuild these packages with a new version. |
 | `verify` | no | `signature`, `checksums`. Both default to true. |
 | `include_debug` | no | Also mirror debug packages (`*-dbg`, `*-dbgsym`). Default: false. |
@@ -321,5 +321,4 @@ Keys added or replaced during the port, each checked against the signer of its r
 
 - `url` sources have no upstream hash, unless the config pins one.
 - Old versions are removed only for files that this tool uploaded. Files from the old pipeline need a one-time cleanup.
-- A `url` file has a fixed name (`discord.deb`). The upload does not overwrite, so the server keeps the first version. A name with the version needs a code change: the version is known only after the download.
 - Package types `source-patch` and `build` are planned, not implemented.
