@@ -213,14 +213,19 @@ class Matrix(unittest.TestCase):
         with open(self.plan, "w") as f:
             json.dump({"entries": entries}, f)
 
-    def matrix(self, previous_ids):
+    def run_matrix(self, previous_ids, version="0"):
         prev = os.path.join(self.tmp, "prev.json")
         with open(prev, "w") as f:
             json.dump({"files": [{"config": n, "release": "resolute", "arch": "amd64", "source": n,
-                                  "upstream_id": f"{n}-1", "filename": f"{n}.deb"} for n in previous_ids]}, f)
-        out = subprocess.run(["python3", "-m", "extpkg", "build-matrix", "--packages", self.tmp, "--plan", self.plan,
-                              "--previous", prev], capture_output=True, text=True, check=True).stdout
-        doc = json.loads(out)
+                                  "upstream_id": i, "filename": f"{n}.deb", "version": version}
+                                 for n, i in previous_ids]}, f)
+        return subprocess.run(["python3", "-m", "extpkg", "build-matrix", "--packages", self.tmp, "--plan", self.plan,
+                               "--previous", prev], capture_output=True, text=True)
+
+    def matrix(self, previous_ids):
+        r = self.run_matrix([(n, f"{n}-1") for n in previous_ids])
+        self.assertEqual(r.returncode, 0, r.stderr)
+        doc = json.loads(r.stdout)
         return [j["config"] for j in doc["deps"]], [j["config"] for j in doc["builds"]]
 
     def test_both_new(self):
@@ -234,6 +239,12 @@ class Matrix(unittest.TestCase):
 
     def test_nothing_changed(self):
         self.assertEqual(self.matrix(["libdrm", "mesa"]), ([], []))
+
+    def test_changed_inputs_need_a_new_version(self):
+        # mesa-1 is planned; mesa-0 with the same version "1" is uploaded.
+        r = self.run_matrix([("libdrm", "libdrm-1"), ("mesa", "mesa-0")], version="1")
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("Increase revision in packages/mesa.yaml", r.stderr + r.stdout)
 
     def test_dependency_with_dependencies_is_rejected(self):
         with open(os.path.join(self.tmp, "libdrm.yaml")) as f:

@@ -187,6 +187,17 @@ def cmd_build_matrix(args):
         elif e["config"] in by_name:
             entries[(e["config"], e["release"], e["arch"])] = e
     needed = {k for k, e in entries.items() if not pipeline.previous_of(prev, e, e["candidates"][0])}
+    # Same version, other inputs: same file names. The upload never replaces a
+    # file, so the server would keep the old build.
+    uploaded = {(x["config"], x["release"], x["arch"], x["version"])
+                for xs in prev.values() for x in xs}
+    stale = sorted(k for k in needed if (*k, entries[k]["candidates"][0]["build"]["version"]) in uploaded)
+    for name, rel, arch in stale:
+        net.error(f"{name} {rel}/{arch}: the build inputs changed, but version "
+                  f"{entries[(name, rel, arch)]['candidates'][0]['build']['version']} is already uploaded. "
+                  f"Increase revision in packages/{name}.yaml.")
+    if stale:
+        return 1
     for name, rel, arch in list(needed):
         for dep in by_name[name].get("build_depends", []):
             if (dep, rel, arch) not in entries:

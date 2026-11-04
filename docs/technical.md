@@ -164,7 +164,7 @@ install: [fastfetch]
 | `upstream.version_file` | For a branch: a file that holds that version, for example `VERSION` (`27.0.0-devel` gives `27.0.0`). Read from the rebase base when `rebase` is set. |
 | `upstream.rebase.url`, `.ref` | Optional, off by default. A fork: rebase it onto this branch before each build. A conflict fails the build, and the last good packages stay. |
 | `upstream.meson_subprojects` | Meson wraps to download before the build. Debian packaging builds with `--wrap-mode=nodownload`. |
-| `revision` | Armbian revision. Default 1. Increase it when only the patches change and the version must change. |
+| `revision` | Armbian revision. Default 1. Increase it when the patches or the build keys change, but the sources do not. The plan fails when changed inputs give a version that is already uploaded: the upload never replaces a file. |
 | `build_depends` | Other build configs whose packages this build needs, for example `libdrm` for `mesa`. One level only. |
 
 Architectures: `amd64` and `arm64`, on native GitHub runners.
@@ -183,6 +183,71 @@ A build runs again only when its identity changes: the source package hash, the 
 Architecture-independent packages (`_all.deb`) come from the first architecture only.
 
 `build_depends`: the dependency builds first, in the same run. Its packages go into a local apt repository in the container, and they win over the release's own versions. A dependency always builds again with a config that needs it. When the dependency has no build for a release, the release's own version is used.
+
+### Build steps
+
+`extpkg build` runs as root in the container of the release:
+
+1. Packaging: download the source package and check its hashes against the signed `Sources` index. Unpack it with `dpkg-source -x`. Without `packaging`: take `packages/<name>/debian/`.
+2. Upstream: clone the tag or branch. With `rebase`: rebase onto the base branch. Then replace upstream's `debian/` with the packaging.
+3. Patches: `patches/series`, then `patches/<release>/series`, with `patch -p1`.
+4. Changelog: a new entry with the Armbian version.
+5. `build_depends`: a local apt repository with their packages.
+6. `apt-get build-dep`, then `meson subprojects download` for `upstream.meson_subprojects`.
+7. `dpkg-buildpackage -b` (first architecture) or `-B` (others), with `nocheck`. Debug packages are left out unless `include_debug` is set.
+
+### Recipes
+
+Rebuild a Debian package for every release (packaging only):
+
+```yaml
+packaging: {url: https://deb.debian.org/debian, suite: sid, components: [main], package: libdrm}
+```
+
+Newer upstream release on Debian packaging, one patch for all releases (`fastfetch`):
+
+```yaml
+packaging: {url: https://deb.debian.org/debian, suite: sid, components: [main], package: fastfetch}
+upstream: {url: https://github.com/fastfetch-cli/fastfetch}     # ref: latest
+```
+
+Fork branch, version from a file, optional rebase onto the original branch (`mesa`):
+
+```yaml
+upstream:
+  url: https://gitlab.freedesktop.org/mojyack/mesa.git
+  ref: t210-develop
+  version_file: VERSION
+  meson_subprojects: [venus-protocol]
+  # rebase:                       # switch: uncomment to rebase before each build
+  #   url: https://gitlab.freedesktop.org/mesa/mesa.git
+  #   ref: main
+build_depends: [libdrm, directx-headers, cbindgen]
+repositories: [beta]
+```
+
+Local packaging, no Debian package (`cbindgen`): no `packaging` key. `packages/cbindgen/debian/` holds `control`, `rules` and `source/format`. The builder writes the changelog.
+
+A release with older tools: put a patch in `patches/<release>/`. Example: `packages/mesa/patches/trixie/llvm-19.patch`.
+
+A build dependency that a release lacks: a build config for it, limited to that release with `releases`, and named in `build_depends`. Example: `libdrm` for trixie and resolute.
+
+### Write a patch
+
+A patch applies to the tree after the packaging, the upstream code and the earlier patches. Paths start with `a/` and `b/`, for example `a/debian/rules`.
+A patch can change `debian/` or the code. To drop a patch of the source package, change `debian/patches/series` (example: `packages/mesa/patches/drop-lp2143073.patch`).
+
+### Test a build locally
+
+```sh
+python3 -m extpkg plan --kind build --only mesa --out plan.json
+docker run --rm -v "$PWD:/src" -w /src debian:trixie sh -c '
+  apt-get update && apt-get install -y python3 python3-yaml git ca-certificates dpkg-dev build-essential fakeroot patch xz-utils
+  for c in libdrm directx-headers cbindgen; do python3 -m extpkg build --plan plan.json --config $c --release trixie --arch amd64 --out deps; done
+  python3 -m extpkg build --plan plan.json --config mesa --release trixie --arch amd64 --out built --deps deps'
+```
+
+`_all.deb` files come from the first architecture in `architectures`. On an amd64 host, put `amd64` first for a local test.
 
 ## Workflows
 
@@ -400,4 +465,9 @@ Keys added or replaced during the port, each checked against the signer of its r
 
 - `url` sources have no upstream hash, unless the config pins one.
 - Old versions are removed only for files that this tool uploaded. Files from the old pipeline need a one-time cleanup.
-- Method build: `amd64` and `arm64` only.
+- Method build: `amd64` and `arm64` only, on native runners. No emulation.
+- Method build: one packaging source for all releases. Differences between releases go into `patches/<release>/`.
+- Method build: `build_depends` is one level deep. A dependency cannot have dependencies.
+- Method build: tests do not run (`nocheck`).
+- Method build: a cargo build in local packaging (`cbindgen`) downloads its crates at build time, pinned by `Cargo.lock`.
+- Method build: GitHub-hosted runners only. Self-hosted runners need runner labels, a cleanup of root-owned files, and no pull request builds.
