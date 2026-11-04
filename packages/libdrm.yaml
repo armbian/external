@@ -11,6 +11,6 @@ releases:
 architectures:
 - arm64
 - amd64
-target: main
+target: desktop
 install:
 - libdrm2
