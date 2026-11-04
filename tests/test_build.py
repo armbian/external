@@ -213,14 +213,14 @@ class Matrix(unittest.TestCase):
         with open(self.plan, "w") as f:
             json.dump({"entries": entries}, f)
 
-    def run_matrix(self, previous_ids, version="0"):
+    def run_matrix(self, previous_ids, version="0", live=True):
         prev = os.path.join(self.tmp, "prev.json")
         with open(prev, "w") as f:
             json.dump({"files": [{"config": n, "release": "resolute", "arch": "amd64", "source": n,
                                   "upstream_id": i, "filename": f"{n}.deb", "version": version}
                                  for n, i in previous_ids]}, f)
         return subprocess.run(["python3", "-m", "extpkg", "build-matrix", "--configs", self.tmp, "--plan", self.plan,
-                               "--previous", prev], capture_output=True, text=True)
+                               "--previous", prev] + (["--live"] if live else []), capture_output=True, text=True)
 
     def matrix(self, previous_ids):
         r = self.run_matrix([(n, f"{n}-1") for n in previous_ids])
@@ -245,6 +245,10 @@ class Matrix(unittest.TestCase):
         r = self.run_matrix([("libdrm", "libdrm-1"), ("mesa", "mesa-0")], version="1")
         self.assertEqual(r.returncode, 1)
         self.assertIn("Increase revision in build/mesa.yaml", r.stderr + r.stdout)
+        # A dry run warns and builds.
+        r = self.run_matrix([("libdrm", "libdrm-1"), ("mesa", "mesa-0")], version="1", live=False)
+        self.assertEqual(r.returncode, 0)
+        self.assertEqual(json.loads(r.stdout)["builds"][0]["config"], "mesa")
 
     def test_dependency_with_dependencies_is_rejected(self):
         with open(os.path.join(self.tmp, "libdrm.yaml")) as f:

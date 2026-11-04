@@ -77,6 +77,7 @@ jobs:
           [ -n "$ONLY" ] && args+=(--only "$ONLY")
           python3 -m extpkg plan "${args[@]}" --out plan.json
           prev=(); [ -f state/manifest.json ] && prev=(--previous state/manifest.json)
+          [ "$DRY_RUN" = "true" ] || prev+=(--live)
           python3 -m extpkg build-matrix "${args[@]}" --plan plan.json "${prev[@]}" > matrix.json
           echo "deps=$(jq -c .deps matrix.json)" >> "$GITHUB_OUTPUT"
           echo "builds=$(jq -c .builds matrix.json)" >> "$GITHUB_OUTPUT"

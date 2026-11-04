@@ -190,15 +190,17 @@ def cmd_build_matrix(args):
             entries[(e["config"], e["release"], e["arch"])] = e
     needed = {k for k, e in entries.items() if not pipeline.previous_of(prev, e, e["candidates"][0])}
     # Same version, other inputs: same file names. The upload never replaces a
-    # file, so the server would keep the old build.
+    # file, so the server would keep the old build. Live runs fail; a dry run
+    # uploaded nothing, so it only warns.
     uploaded = {(x["config"], x["release"], x["arch"], x["version"])
                 for xs in prev.values() for x in xs}
     stale = sorted(k for k in needed if (*k, entries[k]["candidates"][0]["build"]["version"]) in uploaded)
+    report = net.error if args.live else net.warn
     for name, rel, arch in stale:
-        net.error(f"{name} {rel}/{arch}: the build inputs changed, but version "
-                  f"{entries[(name, rel, arch)]['candidates'][0]['build']['version']} is already uploaded. "
-                  f"Increase revision in build/{name}.yaml.")
-    if stale:
+        report(f"{name} {rel}/{arch}: the build inputs changed, but version "
+               f"{entries[(name, rel, arch)]['candidates'][0]['build']['version']} is in the last manifest. "
+               f"Increase revision in build/{name}.yaml.")
+    if stale and args.live:
         return 1
     for name, rel, arch in list(needed):
         for dep in by_name[name].get("build_depends", []):
@@ -290,6 +292,8 @@ def main(argv=None):
     _common(p)
     p.add_argument("--plan", default="plan.json")
     p.add_argument("--previous", default="", help="manifest of the last successful upload")
+    p.add_argument("--live", action="store_true",
+                   help="fail when changed inputs reuse an uploaded version (else warn)")
     p.set_defaults(fn=cmd_build_matrix, default_configs="build")
 
     p = sub.add_parser("build", help="build one package for one release and architecture")
