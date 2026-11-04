@@ -46,17 +46,24 @@ class Site(unittest.TestCase):
         self.assertEqual(p["status"], "ready")
         self.assertEqual(p["description"], "from index")
 
+    def test_newest_version(self):
+        files = [entry("noble", "arm64", True, version=v) for v in ("1.9", "1.10")]
+        p = site.collect([PKG], self.manifest(files))["packages"][0]
+        self.assertEqual(p["releases"]["noble"]["arm64"]["version"], "1.10")
+
     def test_disabled_and_missing(self):
         data = site.collect([{**PKG, "enabled": False}, {**PKG, "name": "other"}], self.manifest([]))
         self.assertEqual([p["status"] for p in data["packages"]], ["missing", "disabled"])
 
     def test_write_escapes_script(self):
-        files = [entry("noble", "arm64", True, description="</script><b>")]
+        files = [entry("noble", "arm64", True, description="<!--<script></script><b> @GENERATED@")]
         data = site.collect([PKG], self.manifest(files))
         with tempfile.TemporaryDirectory() as d:
             site.write(data, d)
             page = open(os.path.join(d, "index.html")).read()
+            self.assertNotIn("<!--<script>", page)
             self.assertNotIn("</script><b>", page)
+            self.assertIn("\\u003cb> @GENERATED@", page)
             self.assertEqual(json.load(open(os.path.join(d, "packages.json")))["packages"][0]["name"], "tool")
 
 

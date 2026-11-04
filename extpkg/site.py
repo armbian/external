@@ -4,11 +4,12 @@ Output: index.html (one file, no external assets) and packages.json.
 """
 
 import datetime
+import functools
 import html
 import json
 import os
 
-from . import config
+from . import config, debver
 
 KINDS = {"apt": "apt repository", "github": "GitHub release", "url": "download", "build": "built from source"}
 # A missing build for one architecture is not an error (see cli._failed).
@@ -76,7 +77,8 @@ def collect(pkgs, manifests, describe=None):
             else:
                 state = "failed" if reason else "missing"
                 wanted += 1
-            versions = sorted({x["version"] for x in here if x["package"] == main})
+            versions = sorted({x["version"] for x in here if x["package"] == main},
+                              key=functools.cmp_to_key(debver.compare))
             cells.setdefault(rel, {})[arch] = {
                 "state": state,
                 "version": versions[-1] if versions else None,
@@ -115,10 +117,10 @@ def write(data, out_dir):
     os.makedirs(out_dir, exist_ok=True)
     with open(os.path.join(out_dir, "packages.json"), "w") as f:
         json.dump(data, f, indent=1, sort_keys=True)
-    # </ cannot close the script element.
-    blob = json.dumps(data, sort_keys=True).replace("</", "<\\/")
+    # No < in the script element: </script> or <!-- cannot end or hide it.
+    blob = json.dumps(data, sort_keys=True).replace("<", "\\u003c")
     with open(os.path.join(out_dir, "index.html"), "w") as f:
-        f.write(PAGE.replace("@DATA@", blob).replace("@GENERATED@", html.escape(data["generated"])))
+        f.write(PAGE.replace("@GENERATED@", html.escape(data["generated"])).replace("@DATA@", blob))
     with open(os.path.join(out_dir, ".nojekyll"), "w"):
         pass
 
