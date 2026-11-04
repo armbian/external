@@ -58,8 +58,7 @@ def repack(path, new_version, out_dir):
         r = subprocess.run(cmd, capture_output=True, text=True)
         if r.returncode != 0:
             raise DebError(f"repack of {os.path.basename(path)} failed: {r.stderr.strip()[-400:]}")
-        name = f"{fields['Package']}_{debver.without_epoch(new_version)}_{fields['Architecture']}.deb"
-        dest = os.path.join(out_dir, name)
+        dest = os.path.join(out_dir, deb_name(fields["Package"], new_version, fields["Architecture"]))
         shutil.move(tmp + "/out.deb", dest)
     got = control(dest)["Version"]
     if got != new_version:
@@ -68,3 +67,11 @@ def repack(path, new_version, out_dir):
 
 
 SAFE_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+~:-]*\.deb$")
+
+
+def deb_name(package, version, arch):
+    """Debian file name: <package>_<version without epoch>_<arch>.deb."""
+    name = f"{package}_{debver.without_epoch(version)}_{arch}.deb"
+    if not SAFE_NAME.match(name):
+        raise DebError(f"unsafe file name from control fields: {name!r}")
+    return name
