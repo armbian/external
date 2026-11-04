@@ -1,6 +1,6 @@
 ---
 name: add-external-package
-description: Add a third-party Debian package source to armbian/external - find the best source (signed apt repository, GitHub release, URL), check and add its signing key, write packages/<name>.yaml, test with a dry run, and open a pull request. Use when the user asks to add, mirror or include an external package.
+description: Add a third-party Debian package source to armbian/external - find the best source (signed apt repository, GitHub release, URL), check and add its signing key, write mirror/<name>.yaml, test with a dry run, and open a pull request. Use when the user asks to add, mirror or include an external package.
 ---
 
 # Add an external package
@@ -15,7 +15,7 @@ Ask for anything that is missing:
 - The Armbian releases (`all` or a list) and architectures.
 - Desktop application or tool (`target: desktop` or `utils`).
 
-Check that the package is not already there: `grep -l "<name>" packages/*.yaml`.
+Check that the package is not already there: `grep -l "<name>" mirror/*.yaml build/*.yaml`.
 
 ## 2. Find the source
 
@@ -27,7 +27,7 @@ Search the upstream install instructions. Prefer, in this order:
 2. A GitHub release with `.deb` assets for the needed architectures.
 3. A direct URL. Tell the user that this source cannot be checked, and ask before you continue.
 
-If upstream offers a different repository for each Ubuntu or Debian release, write one config for each (`<name>-<release>`), as `packages/firefox-noble.yaml` does.
+If upstream offers a different repository for each Ubuntu or Debian release, write one config for each (`<name>-<release>`), as `mirror/firefox-noble.yaml` does.
 
 ## 3. Signing key (apt)
 
@@ -47,10 +47,10 @@ If upstream offers a different repository for each Ubuntu or Debian release, wri
 
 ## 4. Write the config
 
-Create `packages/<name>.yaml`. Copy the closest existing config. The keys are in `docs/technical.md` (section "Package config").
+Create `mirror/<name>.yaml`. A build from source goes to `build/<name>.yaml` instead (see `docs/technical.md`, section "Builds"). Copy the closest existing config. The keys are in `docs/technical.md` (section "Package config").
 
 - apt: write a `filter` that takes only the needed packages. Use `Name (% <glob>)` and `|`. Debug packages (`*-dbg`, `*-dbgsym`) are left out by default; set `include_debug: true` only if the user asks.
-- github: add `exclude` for assets that the architecture patterns take by mistake (see `packages/fastfetch.yaml`).
+- github: add `exclude` for assets that the architecture patterns take by mistake (for example `exclude: ['*polyfilled*', '*armv6l.deb']`).
 - Do not set `verify.signature: false` or `verify.checksums: false`. If upstream needs it, stop and ask the user.
 
 ## 5. Test
@@ -73,7 +73,7 @@ If a check fails, fix the config and test again. Do not turn off a check.
 ## 6. Pull request
 
 1. `git checkout -b add-<name>`.
-2. Commit only `packages/<name>.yaml` and the new key file. Message:
+2. Commit only `mirror/<name>.yaml` and the new key file. Message:
    ```
    Add <name>: <one line: what it is>
 

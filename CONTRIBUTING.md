@@ -1,6 +1,9 @@
 # Add an external package
 
-One package source is one file: `packages/<name>.yaml`.
+One package source is one file:
+
+- `mirror/<name>.yaml`: a built package to download (apt repository, GitHub release, URL).
+- `build/<name>.yaml`: a package to build from source. See [Build from source](#build-from-source).
 Open a pull request. The Check workflow validates it and does a dry-run download.
 
 ## 1. Choose the source
@@ -91,6 +94,15 @@ Rules:
 - One version of each package stays on the server. Set `keep: 2` to keep the previous version too.
 
 All keys: [docs/technical.md](docs/technical.md#package-config).
+
+### Build from source
+
+When no built package fits, write `build/<name>.yaml` with `method: build`. See [docs/technical.md](docs/technical.md#builds).
+
+- Take the packaging from Debian or Ubuntu when it exists. Keep only the parts that differ in this repository.
+- Put patches in `build/<name>/patches/` with a `series` file. Patches are optional.
+- Put release patches in `build/<name>/patches/<release>/`.
+- Test with the Build workflow: run it by hand with `only: <name>` and `dry_run: true`.
 
 ## 4. Test
 

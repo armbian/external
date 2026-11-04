@@ -5,13 +5,14 @@ import json
 import os
 import sys
 
-from . import config, depcheck, net, pipeline, published, status, upload
+from . import builder, config, depcheck, net, pipeline, published, status, upload
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def _common(p):
-    p.add_argument("--packages", default=os.path.join(ROOT, "packages"), help="package configs")
+    p.add_argument("--configs", default=None,
+                   help="config directory: mirror/ (default) or build/ (build commands)")
     p.add_argument("--keys", default=os.path.join(ROOT, "keys"), help="upstream signing keys")
     p.add_argument("--only", default="", help="comma separated package names")
     p.add_argument("--build-dir", default=os.environ.get("ARMBIAN_BUILD_DIR"),
@@ -19,11 +20,20 @@ def _common(p):
     p.add_argument("--jobs", type=int, default=8)
 
 
+def _configs(args):
+    return args.configs or os.path.join(ROOT, getattr(args, "default_configs", "mirror"))
+
+
 def _load(args):
     names = [n for n in args.only.split(",") if n]
-    pkgs = config.load_all(args.packages, names or None)
+    pkgs = config.load_all(_configs(args), names or None)
     releases = config.supported_releases(args.build_dir)
     return pkgs, releases
+
+
+def _plan(args, pkgs, releases):
+    return pipeline.plan(pkgs, releases, args.keys, args.jobs, _shard(getattr(args, "shard", "")),
+                         full=not args.only, packages_dir=_configs(args))
 
 
 def _failed(manifest):
@@ -42,21 +52,25 @@ def _previous(args):
 
 
 def _shard(text):
-    if not text:
+    """i/n splits the configs. A plain name (build) only names the status file."""
+    if not text or "/" not in text:
         return None
     i, n = text.split("/")
     return int(i), int(n)
 
 
 def cmd_validate(args):
-    pkgs, releases = _load(args)
-    print(f"{len(pkgs)} package configs valid; releases: {' '.join(releases)}")
+    """Both directories, or the one that --configs names."""
+    dirs = [args.configs] if args.configs else [os.path.join(ROOT, d) for d in ("mirror", "build")]
+    counts = [f"{len(config.load_all(d))} in {os.path.basename(os.path.normpath(d))}/" for d in dirs]
+    releases = config.supported_releases(args.build_dir)
+    print(f"package configs valid: {', '.join(counts)}; releases: {' '.join(releases)}")
     return 0
 
 
 def cmd_plan(args):
     pkgs, releases = _load(args)
-    doc = pipeline.plan(pkgs, releases, args.keys, args.jobs, _shard(args.shard), full=not args.only)
+    doc = _plan(args, pkgs, releases)
     with open(args.out, "w") as f:
         json.dump(doc, f, indent=1)
     skipped = [e for e in doc["entries"] if e.get("skip")]
@@ -95,7 +109,12 @@ def cmd_run(args):
 
 
 def _run(args, pkgs, releases, st):
-    doc = pipeline.plan(pkgs, releases, args.keys, args.jobs, _shard(args.shard), full=not args.only)
+    if args.plan:
+        # The plan that the builds used: a new plan could name newer sources.
+        with open(args.plan) as f:
+            doc = json.load(f)
+    else:
+        doc = _plan(args, pkgs, releases)
     os.makedirs(args.out, exist_ok=True)
     with open(os.path.join(args.out, "plan.json"), "w") as f:
         json.dump(doc, f, indent=1)
@@ -111,7 +130,7 @@ def _run(args, pkgs, releases, st):
         others = status.other_paths(args.dest, args.shard, args.port, args.known_hosts)
     m = pipeline.fetch(doc, pkgs, args.out, args.cache, args.published, args.jobs, args.prune_cache,
                        _previous(args), sink=up.add if up else None, stop=up.failed if up else None,
-                       others=others)
+                       others=others, built=args.built)
     if args.depcheck:
         _depcheck(args, pkgs, m)
     rep = pipeline.report(m) + depcheck.report(m.get("depcheck", []))
@@ -148,6 +167,67 @@ def cmd_depcheck(args):
     net.summary(rep)
     print(rep)
     return 1 if args.strict and any(x["ok"] is False for x in m["depcheck"]) else 0
+
+
+def cmd_build_matrix(args):
+    """Builds that the plan needs, as {"deps": [...], "builds": [...]}.
+
+    A build is needed when its identity is not in the previous manifest.
+    deps: the configs that other configs name in build_depends. They build
+    first, and always together with a config that needs them.
+    """
+    pkgs, _ = _load(args)
+    with open(args.plan) as f:
+        doc = json.load(f)
+    prev = pipeline.index_previous(_previous(args))
+    by_name = {p["name"]: p for p in pkgs}
+    dep_names = {d for p in pkgs for d in p.get("build_depends", [])}
+    entries = {}
+    for e in doc["entries"]:
+        if e.get("skip"):
+            net.warn(f"{e['config']} {e['release']}/{e['arch']}: {e['skip']}")
+        elif e["config"] in by_name:
+            entries[(e["config"], e["release"], e["arch"])] = e
+    needed = {k for k, e in entries.items() if not pipeline.previous_of(prev, e, e["candidates"][0])}
+    # Same version, other inputs: same file names. The upload never replaces a
+    # file, so the server would keep the old build. Live runs fail; a dry run
+    # uploaded nothing, so it only warns.
+    uploaded = {(x["config"], x["release"], x["arch"], x["version"])
+                for xs in prev.values() for x in xs}
+    stale = sorted(k for k in needed if (*k, entries[k]["candidates"][0]["build"]["version"]) in uploaded)
+    report = net.error if args.live else net.warn
+    for name, rel, arch in stale:
+        report(f"{name} {rel}/{arch}: the build inputs changed, but version "
+               f"{entries[(name, rel, arch)]['candidates'][0]['build']['version']} is in the last manifest. "
+               f"Increase revision in build/{name}.yaml.")
+    if stale and args.live:
+        return 1
+    for name, rel, arch in list(needed):
+        for dep in by_name[name].get("build_depends", []):
+            if (dep, rel, arch) not in entries:
+                net.warn(f"{name} {rel}/{arch}: build_depends {dep} has no build for {rel}/{arch}")
+                continue
+            needed.add((dep, rel, arch))
+
+    def job(key):
+        e = entries[key]
+        return {"config": e["config"], "release": e["release"], "arch": e["arch"],
+                "version": e["candidates"][0]["build"]["version"],
+                "runner": "ubuntu-24.04-arm" if e["arch"] == "arm64" else "ubuntu-24.04",
+                "image": f"{depcheck.distro_of(e['release'], args.build_dir)}:{e['release']}"}
+    out = {"deps": [job(k) for k in sorted(needed) if k[0] in dep_names],
+           "builds": [job(k) for k in sorted(needed) if k[0] not in dep_names]}
+    print(json.dumps(out))
+    net.log(f"build-matrix: {len(out['deps'])} dependency builds, {len(out['builds'])} builds")
+    return 0
+
+
+def cmd_build(args):
+    pkgs, _ = _load(args)
+    with open(args.plan) as f:
+        doc = json.load(f)
+    builder.build(doc, pkgs, _configs(args), args.config, args.release, args.arch, args.out, deps=args.deps)
+    return 0
 
 
 def cmd_status(args):
@@ -205,6 +285,26 @@ def main(argv=None):
             p.add_argument("--depcheck", action="store_true", help="check dependencies of new files (report only)")
             p.add_argument("--lists-cache", default=".cache/apt-lists", help="apt index lists for --depcheck")
             p.add_argument("--keyring", action="append", default=[], help="extra apt keyring for --depcheck")
+            p.add_argument("--built", default=None, help="build outputs (--configs build)")
+            p.add_argument("--plan", default="", help="use this plan, do not make a new one (--configs build)")
+
+    p = sub.add_parser("build-matrix", help="list the builds that a plan needs, as JSON")
+    _common(p)
+    p.add_argument("--plan", default="plan.json")
+    p.add_argument("--previous", default="", help="manifest of the last successful upload")
+    p.add_argument("--live", action="store_true",
+                   help="fail when changed inputs reuse an uploaded version (else warn)")
+    p.set_defaults(fn=cmd_build_matrix, default_configs="build")
+
+    p = sub.add_parser("build", help="build one package for one release and architecture")
+    _common(p)
+    p.add_argument("--plan", default="plan.json")
+    p.add_argument("--config", required=True)
+    p.add_argument("--release", required=True)
+    p.add_argument("--arch", required=True)
+    p.add_argument("--out", default="built")
+    p.add_argument("--deps", default=None, help="build outputs of build_depends configs")
+    p.set_defaults(fn=cmd_build, default_configs="build")
 
     p = sub.add_parser("depcheck", help="check dependencies of the new files in an output tree")
     _common(p)

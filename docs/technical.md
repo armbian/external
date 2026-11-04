@@ -3,7 +3,7 @@
 ## Flow
 
 ```
-packages/*.yaml ──plan──► plan.json ──fetch──► output/ ──upload──► repository server
+mirror/*.yaml  ──plan──► plan.json ──fetch──► output/ ──upload──► repository server
                   (no download)      (download, check, sort)   (rsync over SSH)
 ```
 
@@ -23,7 +23,7 @@ plan.json
 ```
 
 - `<dir>` is `extra/<release>-<target>`. For target `main`, `<dir>` is empty.
-- `<file>` is the upstream file name. A repacked file gets `<package>_<version>_<arch>.deb`. A `url` download is `<config>.deb`, unless the config sets `filename`.
+- `<file>` is the upstream file name. A repacked file gets `<package>_<version>_<arch>.deb`. A `url` download gets `<package>_<version>_<arch>.deb` from its control fields (an epoch stays, as `<epoch>%3a`), unless the config sets `filename`. A fixed name never updates: the upload does not overwrite.
 - The same file in several places is a hardlink. It uses disk space once.
 
 The layout is the same as `storage/incoming/external` of the old download workflow.
@@ -32,6 +32,7 @@ The layout is the same as `storage/incoming/external` of the old download workfl
 
 - Beta gets every file.
 - Stable gets a file only when its version is newer than the version of the same binary package in the published stable repository.
+- `repositories: [beta]` or `[stable]` limits a config to one repository. A change takes effect on the next run: files that the config no longer allows are removed. Files for a newly allowed repository come with the next new version.
   The tool reads `dists/<release>/<component>/binary-<arch>/Packages.gz` from `https://fi.mirror.armbian.de/apt`.
   `<component>` is `main` for target `main`, else `<release>-<target>`.
 - Versions are compared as Debian versions, with epochs (`extpkg/debver.py`, a port of dpkg).
@@ -56,12 +57,12 @@ Signature rules, as apt uses them:
 
 ## Package config
 
-`packages/<name>.yaml`. The file name is the config name.
+`mirror/<name>.yaml` for built packages to download (`apt`, `github`, `url`), `build/<name>.yaml` for packages to build from source (`method: build`). The file name is the config name. A config in the wrong directory fails validation.
 
 | Key | Required | Meaning |
 |---|---|---|
 | `name` | yes | Same as the file name. |
-| `method` | yes | `apt`, `github` or `url`. |
+| `method` | yes | `apt`, `github` or `url`: take built packages. `build`: build from source, see [Builds](#builds). |
 | `source.url` | yes | Repository, GitHub project or file URL. An `http://` apt URL is tried as `https://` first. |
 | `source.suite` | apt | Suite (`noble`, `stable`) or a flat repository (`./`). |
 | `source.components` | no | apt components. Default: `main`. |
@@ -75,12 +76,13 @@ Signature rules, as apt uses them:
 | `install` | no | Main package names. For tests and documentation. |
 | `assets` | no | github: asset name patterns. Default: patterns for the architecture. |
 | `exclude` | no | github: asset name patterns to drop. |
-| `filename` | no | url: output file name. |
+| `filename` | no | url: fixed output file name. Avoid it: the server then keeps the first version. |
 | `repack` | no | `packages`, `epoch`, `suffix`: rebuild these packages with a new version. |
 | `verify` | no | `signature`, `checksums`. Both default to true. |
 | `include_debug` | no | Also mirror debug packages (`*-dbg`, `*-dbgsym`). Default: false. |
 | `skip` | no | `release/arch` pairs to leave out, for example `trixie/armhf`. Say why in `notes`. |
 | `depcheck` | no | false: leave the config out of the dependency check (it needs a source that the check does not have). Say why in `notes`. |
+| `repositories` | no | `stable`, `beta` or both. Default: both. Old configs: `REPOSITORY=S`, `B`, `BS`. |
 | `keep` | no | Versions of each package to keep on the server, per release and architecture. Default: 1. |
 | `enabled` | no | false skips the config. Default: true. |
 | `notes` | no | Free text. Say why an exception exists. |
@@ -126,6 +128,127 @@ Firefox needs epoch 9 to win over the Ubuntu snap transitional package.
 `releases: all` means the releases whose `config/distributions/<release>/support` in armbian/build is not `eos`.
 Set `ARMBIAN_BUILD_DIR` to a checkout. Without it, the tool uses a fixed list in `extpkg/config.py`.
 
+## Builds
+
+`method: build` builds packages from source for the Armbian repository. It takes three parts. Only one of packaging and upstream is required.
+
+| Part | Where | Use |
+|---|---|---|
+| Packaging | `packaging:` a Debian or Ubuntu source package, or `build/<name>/debian/` | `debian/` directory. The source package also gives the code when there is no `upstream`. |
+| Upstream | `upstream:` a git tag or branch | Code in place of the packaged code. Its own `debian/` is replaced. |
+| Patches | `build/<name>/patches/series`, then `patches/<release>/series` | Optional. Applied with `patch -p1` after packaging and upstream. For code that we do not control or fork. Release patches apply to that release only, for example `trixie/` for an older LLVM. |
+
+```yaml
+name: fastfetch
+method: build
+packaging:                 # newest source package in this suite
+  url: https://deb.debian.org/debian
+  suite: sid
+  components: [main]
+  package: fastfetch
+upstream:                  # optional
+  url: https://github.com/fastfetch-cli/fastfetch
+  ref: latest              # latest GitHub release (default), a tag or a branch
+releases: all
+architectures: [arm64, amd64]
+target: utils
+install: [fastfetch]
+```
+
+| Key | Meaning |
+|---|---|
+| `packaging.url`, `.suite`, `.components`, `.package` | apt repository and source package. Signature and hashes are checked, as for `apt`. |
+| `upstream.url`, `.ref` | git repository and tag or branch. `latest` (default): the latest GitHub release, or on other hosts the newest release tag. |
+| `upstream.tags` | Pattern for `latest`, for example `mesa-*`. Release candidates are left out. |
+| `upstream.version` | For a branch: the next upstream release, for example `27.0.0`. |
+| `upstream.version_file` | For a branch: a file that holds that version, for example `VERSION` (`27.0.0-devel` gives `27.0.0`). Read from the rebase base when `rebase` is set. |
+| `upstream.rebase.url`, `.ref` | Optional, off by default. A fork: rebase it onto this branch before each build. A conflict fails the build, and the last good packages stay. |
+| `upstream.meson_subprojects` | Meson wraps to download before the build: names or globs, for example `*-rs`. Debian packaging builds with `--wrap-mode=nodownload`. Meson uses a wrap only when the system has no copy. |
+| `revision` | Armbian revision. Default 1. Increase it when the patches or the build keys change, but the sources do not. A live run fails when changed inputs give a version that is already uploaded: the upload never replaces a file. A dry run warns. |
+| `build_depends` | Other build configs whose packages this build needs, for example `libdrm` for `mesa`. One level only. |
+
+Architectures: `amd64` and `arm64`, on native GitHub runners.
+
+Version of the built packages:
+
+| Build | Version |
+|---|---|
+| Packaging only | `<packaged version>+armbian<revision>~<release>` |
+| Upstream tag | `<tag version>-<packaged revision>+armbian<revision>~<release>` |
+| Upstream branch or rebase | `<upstream.version>~git<YYYYMMDDHHMM>.<commit>-<packaged revision>+armbian<revision>~<release>` |
+
+`~<release>` gives each release its own file name. One repository pool holds all releases.
+
+A build runs again only when its identity changes: the source package hash, the upstream commits, the files under `build/<name>/`, the build keys of the config (`packaging`, `upstream`, `revision`, `build_depends`, `include_debug`), or the version.
+Architecture-independent packages (`_all.deb`) come from the first architecture only.
+
+`build_depends`: the dependency builds first, in the same run. Its packages go into a local apt repository in the container, and they win over the release's own versions. A dependency always builds again with a config that needs it. When the dependency has no build for a release, the release's own version is used.
+
+### Build steps
+
+`extpkg build` runs as root in the container of the release:
+
+1. Packaging: download the source package and check its hashes against the signed `Sources` index. Unpack it with `dpkg-source -x`. Without `packaging`: take `build/<name>/debian/`.
+2. Upstream: clone the tag or branch. With `rebase`: rebase onto the base branch. Then replace upstream's `debian/` with the packaging.
+3. Patches: `patches/series`, then `patches/<release>/series`, with `patch -p1`.
+4. Changelog: a new entry with the Armbian version.
+5. `build_depends`: a local apt repository with their packages.
+6. `apt-get build-dep`, then `meson subprojects download` for `upstream.meson_subprojects`.
+7. `dpkg-buildpackage -b` (first architecture) or `-B` (others), with `nocheck`. Debug packages are left out unless `include_debug` is set.
+
+### Recipes
+
+Rebuild a Debian package for every release (packaging only):
+
+```yaml
+packaging: {url: https://deb.debian.org/debian, suite: sid, components: [main], package: libdrm}
+```
+
+Newer upstream release on Debian packaging, one patch for all releases (`fastfetch`):
+
+```yaml
+packaging: {url: https://deb.debian.org/debian, suite: sid, components: [main], package: fastfetch}
+upstream: {url: https://github.com/fastfetch-cli/fastfetch}     # ref: latest
+```
+
+Fork branch, version from a file, optional rebase onto the original branch (`mesa`):
+
+```yaml
+upstream:
+  url: https://gitlab.freedesktop.org/mojyack/mesa.git
+  ref: t210-develop
+  version_file: VERSION
+  meson_subprojects: [venus-protocol]
+  # rebase:                       # switch: uncomment to rebase before each build
+  #   url: https://gitlab.freedesktop.org/mesa/mesa.git
+  #   ref: main
+build_depends: [libdrm, directx-headers, cbindgen]
+repositories: [beta]
+```
+
+Local packaging, no Debian package (`cbindgen`): no `packaging` key. `build/cbindgen/debian/` holds `control`, `rules` and `source/format`. The builder writes the changelog.
+
+A release with older tools: put a patch in `patches/<release>/`. Example: `build/mesa/patches/trixie/llvm-19.patch`.
+
+A build dependency that a release lacks: a build config for it, limited to that release with `releases`, and named in `build_depends`. Example: `libdrm` for trixie and resolute.
+
+### Write a patch
+
+A patch applies to the tree after the packaging, the upstream code and the earlier patches. Paths start with `a/` and `b/`, for example `a/debian/rules`.
+A patch can change `debian/` or the code. To drop a patch of the source package, change `debian/patches/series` (example: `build/mesa/patches/drop-lp2143073.patch`).
+
+### Test a build locally
+
+```sh
+python3 -m extpkg plan --configs build --only mesa --out plan.json
+docker run --rm -v "$PWD:/src" -w /src debian:trixie sh -c '
+  apt-get update && apt-get install -y python3 python3-yaml git ca-certificates dpkg-dev build-essential fakeroot patch xz-utils
+  for c in libdrm directx-headers cbindgen; do python3 -m extpkg build --plan plan.json --config $c --release trixie --arch amd64 --out deps; done
+  python3 -m extpkg build --plan plan.json --config mesa --release trixie --arch amd64 --out built --deps deps'
+```
+
+`_all.deb` files come from the first architecture in `architectures`. On an amd64 host, put `amd64` first for a local test.
+
 ## Workflows
 
 ### Check (`.github/workflows/check.yml`)
@@ -137,7 +260,21 @@ Runs on pull requests and on pushes to `main`.
 3. Plan all configs.
 4. Dry-run download of the changed configs. When more than 8 configs change, this step is skipped: use Sync with a dry run.
 
+Method `build` configs are planned only. The Build workflow builds them.
+
 Check uses no secrets.
+
+### Build (`.github/workflows/build.yml`)
+
+Runs daily, by hand, and on pull requests that change `build/`, `extpkg/` or the workflow. Manual inputs: `only` and `dry_run` (default true).
+Pull requests are always dry runs. Scheduled runs are dry runs until the repository variable `BUILD_LIVE` is `true`.
+
+1. **plan**: resolve the sources. List the builds whose identity is not in the last manifest.
+2. **deps**: the configs that others name in `build_depends`.
+3. **build**: the other configs, with the deps outputs. Both stages: one job per config, release and architecture. Container `debian:<release>` or `ubuntu:<release>`, runner `ubuntu-24.04` (amd64) or `ubuntu-24.04-arm` (arm64). `apt-get build-dep`, then `dpkg-buildpackage`. Tests are not run (`nocheck`).
+4. **publish**: place the built files in the Sync layout, upload, and remove old versions. Status and manifest go to `.sync/shard-build.json` and `.sync/manifest-shard-build.json`, next to the Sync shards.
+
+A failed build skips only its own release and architecture. Its old files stay.
 
 ### Sync (`.github/workflows/sync.yml`)
 
@@ -208,7 +345,7 @@ The run removes nothing when:
 - the path is still in use (an `_all.deb` for several architectures);
 - the config is not in this run (`--only`, another shard). Its entries stay in the state.
 
-The run does remove the files of a config that is disabled (`enabled: false`), and in a full run (no `--only`) the files of a config that was deleted from `packages/`.
+The run does remove the files of a config that is disabled (`enabled: false`), and in a full run (no `--only`) the files of a config that was deleted from `mirror/`.
 
 Shards share the server directories:
 
@@ -278,9 +415,14 @@ python3 -m extpkg run   [--only a,b] [--shard i/n] [--out output] [--cache dir]
                         [--dry-run | --dest user@host:/path --port n --known-hosts file]
 python3 -m extpkg upload --out output --dest user@host:/path [--dry-run]
 python3 -m extpkg depcheck --out output [--lists-cache dir] [--keyring file] [--strict]
+python3 -m extpkg build-matrix --plan plan.json [--previous manifest.json]
+python3 -m extpkg build --plan plan.json --config name --release r --arch a [--out built]
+python3 -m extpkg run --configs build --shard build --plan plan.json --built built ...
 ```
 
-Common options: `--packages`, `--keys`, `--build-dir`, `--jobs`, `--published`.
+`--configs`: the config directory. Default: `mirror/`; `build/` for `build-matrix` and `build`. `validate` checks both.
+
+Common options: `--configs`, `--keys`, `--build-dir`, `--jobs`, `--published`.
 `--strict` exits 1 when a download or check fails. "No package matched" is not a failure.
 
 ## Code
@@ -297,6 +439,8 @@ Common options: `--packages`, `--keys`, `--build-dir`, `--jobs`, `--published`.
 | `extpkg/published.py` | Versions in the published stable repository |
 | `extpkg/pipeline.py` | Plan, fetch, manifest, report |
 | `extpkg/upload.py` | rsync upload |
+| `extpkg/source.py` | Method build: resolve packaging, upstream and patches; version and identity |
+| `extpkg/builder.py` | Method build: build in a container of the release |
 | `tools/import-os.py` | One-time import of `armbian/os/external/*.conf` |
 
 ## Differences from the old pipeline
@@ -321,5 +465,9 @@ Keys added or replaced during the port, each checked against the signer of its r
 
 - `url` sources have no upstream hash, unless the config pins one.
 - Old versions are removed only for files that this tool uploaded. Files from the old pipeline need a one-time cleanup.
-- A `url` file has a fixed name (`discord.deb`). The upload does not overwrite, so the server keeps the first version. A name with the version needs a code change: the version is known only after the download.
-- Package types `source-patch` and `build` are planned, not implemented.
+- Method build: `amd64` and `arm64` only, on native runners. No emulation.
+- Method build: one packaging source for all releases. Differences between releases go into `patches/<release>/`.
+- Method build: `build_depends` is one level deep. A dependency cannot have dependencies.
+- Method build: tests do not run (`nocheck`).
+- Method build: a cargo build in local packaging (`cbindgen`) downloads its crates at build time, pinned by `Cargo.lock`.
+- Method build: GitHub-hosted runners only. Self-hosted runners need runner labels, a cleanup of root-owned files, and no pull request builds.

@@ -1,0 +1,279 @@
+name: "Build packages"
+
+# Build the packages of method build (packaging, upstream code, optional
+# patches) and add them to the Armbian repository, next to the Sync files.
+#
+#   plan     resolve sources; list the builds whose identity changed
+#   deps     configs that others name in build_depends (libdrm for mesa)
+#   build    the other configs; build_depends come from the deps stage
+#            Both: one job per config, release and architecture, in a
+#            container of the release, on a native runner (amd64, arm64).
+#   publish  place the built files, upload, remove old versions
+#
+# Dry run is the default. Pull requests are always dry runs. Scheduled runs
+# upload only when the repository variable BUILD_LIVE is "true".
+
+on:
+  workflow_dispatch:
+    inputs:
+      only:
+        description: "Package configs, comma separated (empty: all)"
+        type: string
+        default: ""
+      dry_run:
+        description: "Dry run: build everything, upload nothing"
+        type: boolean
+        default: true
+  schedule:
+    - cron: "50 3 * * *"
+  pull_request:
+    paths:
+      - "build/**"
+      - "extpkg/**"
+      - ".github/workflows/build.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.event_name == 'pull_request' && github.ref || 'main' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && (inputs.dry_run && 'true' || 'false') || (github.event_name == 'schedule' && vars.BUILD_LIVE == 'true' && 'false' || 'true') }}
+  UPLOAD_PATH: ${{ vars.UPLOAD_PATH || 'storage/incoming/external-next' }}
+  ONLY: ${{ inputs.only }}
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      deps: ${{ steps.matrix.outputs.deps }}
+      builds: ${{ steps.matrix.outputs.builds }}
+    env:
+      ARMBIAN_BUILD_DIR: ${{ github.workspace }}/armbian-build
+      GITHUB_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Checkout armbian/build (supported releases only)
+        uses: actions/checkout@v7
+        with:
+          repository: armbian/build
+          path: armbian-build
+          sparse-checkout: config/distributions
+
+      - name: Restore state (last successful run)
+        uses: actions/cache/restore@v6
+        with:
+          path: state
+          key: state-${{ env.DRY_RUN == 'true' && 'dry' || 'live' }}-build-${{ github.run_id }}
+          restore-keys: state-${{ env.DRY_RUN == 'true' && 'dry' || 'live' }}-build-
+
+      - name: Plan
+        id: matrix
+        run: |
+          args=(--configs build)
+          [ -n "$ONLY" ] && args+=(--only "$ONLY")
+          python3 -m extpkg plan "${args[@]}" --out plan.json
+          prev=(); [ -f state/manifest.json ] && prev=(--previous state/manifest.json)
+          [ "$DRY_RUN" = "true" ] || prev+=(--live)
+          python3 -m extpkg build-matrix "${args[@]}" --plan plan.json "${prev[@]}" > matrix.json
+          echo "deps=$(jq -c .deps matrix.json)" >> "$GITHUB_OUTPUT"
+          echo "builds=$(jq -c .builds matrix.json)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: plan
+          path: plan.json
+          retention-days: 30
+
+  deps:
+    needs: plan
+    if: needs.plan.outputs.deps != '[]'
+    name: "${{ matrix.config }} ${{ matrix.release }}/${{ matrix.arch }}"
+    runs-on: ${{ matrix.runner }}
+    container: ${{ matrix.image }}
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.deps) }}
+    steps:
+      - name: Install build tools
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          apt-get update -qq
+          apt-get install -y -qq --no-install-recommends python3 python3-yaml git ca-certificates \
+            dpkg-dev build-essential fakeroot patch xz-utils
+
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: plan
+
+      - name: Build ${{ matrix.version }}
+        run: python3 -m extpkg build --plan plan.json --config "${{ matrix.config }}" --release "${{ matrix.release }}" --arch "${{ matrix.arch }}" --out built
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: built-${{ matrix.config }}-${{ matrix.release }}-${{ matrix.arch }}
+          path: built/
+          compression-level: 0
+          retention-days: 7
+
+  build:
+    needs: [plan, deps]
+    # A failed dependency build fails only the builds that need it.
+    if: always() && needs.plan.result == 'success' && needs.plan.outputs.builds != '[]'
+    name: "${{ matrix.config }} ${{ matrix.release }}/${{ matrix.arch }}"
+    runs-on: ${{ matrix.runner }}
+    container: ${{ matrix.image }}
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.builds) }}
+    steps:
+      - name: Install build tools
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          apt-get update -qq
+          apt-get install -y -qq --no-install-recommends python3 python3-yaml git ca-certificates \
+            dpkg-dev build-essential fakeroot patch xz-utils
+
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: plan
+
+      - name: Dependency builds
+        if: needs.deps.result != 'skipped'
+        uses: actions/download-artifact@v8
+        with:
+          pattern: built-*
+          path: deps
+          merge-multiple: true
+
+      - name: Build ${{ matrix.version }}
+        run: python3 -m extpkg build --plan plan.json --config "${{ matrix.config }}" --release "${{ matrix.release }}" --arch "${{ matrix.arch }}" --out built --deps deps
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: built-${{ matrix.config }}-${{ matrix.release }}-${{ matrix.arch }}
+          path: built/
+          compression-level: 0
+          retention-days: 7
+
+  publish:
+    needs: [plan, deps, build]
+    # A failed build skips only its own files. The others go out.
+    if: always() && needs.plan.result == 'success'
+    runs-on: ubuntu-latest
+    env:
+      ARMBIAN_BUILD_DIR: ${{ github.workspace }}/armbian-build
+      GITHUB_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Checkout armbian/build (supported releases only)
+        uses: actions/checkout@v7
+        with:
+          repository: armbian/build
+          path: armbian-build
+          sparse-checkout: config/distributions
+
+      - name: Install missing tools
+        run: |
+          need=()
+          for t in gpgv:gpgv dpkg-deb:dpkg rsync:rsync ssh:openssh-client; do
+            command -v "${t%%:*}" >/dev/null || need+=("${t##*:}")
+          done
+          if [ ${#need[@]} -gt 0 ]; then
+            sudo apt-get update -qq
+            sudo apt-get install -y --no-install-recommends "${need[@]}"
+          fi
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: plan
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: built-*
+          path: built
+          merge-multiple: true
+
+      - name: Restore state (last successful run)
+        uses: actions/cache/restore@v6
+        with:
+          path: state
+          key: state-${{ env.DRY_RUN == 'true' && 'dry' || 'live' }}-build-${{ github.run_id }}
+          restore-keys: state-${{ env.DRY_RUN == 'true' && 'dry' || 'live' }}-build-
+
+      - name: Upload credentials
+        id: creds
+        env:
+          KEY: ${{ secrets.KEY_UPLOAD }}
+          KNOWN_HOSTS: ${{ secrets.KNOWN_HOSTS_ARMBIAN_UPLOAD }}
+          HOST: ${{ secrets.HOST_UPLOAD }}
+          USER: ${{ secrets.HOST_UPLOAD_USER }}
+          PORT: ${{ secrets.HOST_UPLOAD_PORT }}
+        run: |
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "dest=" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          if [ -z "$KEY" ] || [ -z "$KNOWN_HOSTS" ] || [ -z "$HOST" ] || [ -z "$USER" ]; then
+            echo "::error::Upload requested, but the upload secrets are not available"
+            exit 1
+          fi
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$KEY" > ~/.ssh/id_upload && chmod 600 ~/.ssh/id_upload
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts_upload
+          printf 'Host %s\n  IdentityFile ~/.ssh/id_upload\n  IdentitiesOnly yes\n' "$HOST" > ~/.ssh/config
+          echo "dest=${USER}@${HOST}:${UPLOAD_PATH}" >> "$GITHUB_OUTPUT"
+          echo "port=${PORT:-22}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish
+        # The plan job's plan.json: the build outputs carry its identities.
+        run: |
+          args=(--configs build --shard build --plan plan.json --built built --out output --cache "${RUNNER_TEMP}/cache")
+          [ -f state/manifest.json ] && args+=(--previous state/manifest.json)
+          [ -n "$ONLY" ] && args+=(--only "$ONLY")
+          if [ -n "${{ steps.creds.outputs.dest }}" ]; then
+            args+=(--dest "${{ steps.creds.outputs.dest }}" --port "${{ steps.creds.outputs.port }}"
+                   --known-hosts ~/.ssh/known_hosts_upload)
+          else
+            args+=(--dry-run)
+          fi
+          python3 -m extpkg run "${args[@]}"
+
+      - name: Mark the build status failed
+        if: (failure() || cancelled()) && steps.creds.outputs.dest != ''
+        run: |
+          python3 -m extpkg status --dest "${{ steps.creds.outputs.dest }}" --port "${{ steps.creds.outputs.port }}" \
+            --known-hosts ~/.ssh/known_hosts_upload --shard build --state failed --reason "job ${{ job.status }}" || true
+
+      - name: Save state
+        if: success()
+        run: mkdir -p state && cp output/manifest.json state/manifest.json
+
+      - name: Store state
+        if: success()
+        uses: actions/cache/save@v6
+        with:
+          path: state
+          key: state-${{ env.DRY_RUN == 'true' && 'dry' || 'live' }}-build-${{ github.run_id }}
+
+      - name: Keep manifest
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: manifest-build
+          path: output/manifest.json
+          if-no-files-found: ignore
+          retention-days: 30
