@@ -23,7 +23,7 @@ plan.json
 ```
 
 - `<dir>` is `extra/<release>-<target>`. For target `main`, `<dir>` is empty.
-- `<file>` is the upstream file name. A repacked file gets `<package>_<version>_<arch>.deb`. A `url` download gets `<package>_<version>_<arch>.deb` from its control fields, unless the config sets `filename`. A fixed name never updates: the upload does not overwrite.
+- `<file>` is the upstream file name. A repacked file gets `<package>_<version>_<arch>.deb`. A `url` download gets `<package>_<version>_<arch>.deb` from its control fields (an epoch stays, as `<epoch>%3a`), unless the config sets `filename`. A fixed name never updates: the upload does not overwrite.
 - The same file in several places is a hardlink. It uses disk space once.
 
 The layout is the same as `storage/incoming/external` of the old download workflow.
