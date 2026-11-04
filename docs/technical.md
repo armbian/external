@@ -433,7 +433,7 @@ A GitHub Pages site lists every config and its state: https://external.armbian.c
 
 - Runs after each successful Sync or Build run on `main`, and after a config change.
 - Input: the configs and the manifests of the last live runs, from the `state-live-*` caches. Dry runs never show.
-- Output: `index.html` (one file, search and filters) and `packages.json` (the same data).
+- Output: `index.html` (one file, search and filters) and `packages.json` (the same data, plus the binary package names of each config).
 - Description: the `Description` field of the main package. Older manifest entries lack it: the site then reads the Armbian stable and beta indexes.
 
 | State | Meaning |

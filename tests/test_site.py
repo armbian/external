@@ -45,6 +45,7 @@ class Site(unittest.TestCase):
         p = site.collect([PKG], self.manifest(files), lambda *k: "from index")["packages"][0]
         self.assertEqual(p["status"], "ready")
         self.assertEqual(p["description"], "from index")
+        self.assertEqual(p["binaries"], ["tool"])
 
     def test_newest_version(self):
         files = [entry("noble", "arm64", True, version=v) for v in ("1.9", "1.10")]

@@ -99,6 +99,7 @@ def collect(pkgs, manifests, describe=None):
             "homepage": homepage,
             "description": description,
             "package": main,
+            "binaries": sorted({x["package"] for x in mine}),
             "target": pkg.get("target", "main"),
             "repositories": pkg.get("repositories", list(config.REPOSITORIES)),
             "install": pkg.get("install", []),
