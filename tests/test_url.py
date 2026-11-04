@@ -57,6 +57,12 @@ class UrlName(unittest.TestCase):
         self.assertEqual(x["filename"], "discord_0.0.1_amd64.deb")
         self.assertEqual(x["beta"], "debs-beta/extra/noble-desktop/discord_0.0.1_amd64.deb")
 
+    def test_epoch_gives_a_new_name(self):
+        self.assertEqual(pipeline.url_name("discord", "0.0.1", "amd64"), "discord_0.0.1_amd64.deb")
+        self.assertEqual(pipeline.url_name("discord", "2:0.0.1", "amd64"), "discord_2%3a0.0.1_amd64.deb")
+        self.assertNotEqual(pipeline.url_name("discord", "1:0.0.1", "amd64"),
+                            pipeline.url_name("discord", "2:0.0.1", "amd64"))
+
     def test_new_identity_downloads_again(self):
         self.place(self.fetcher(1), self.cand("url:a"))
         x = self.place(self.fetcher(2), self.cand("url:b"))

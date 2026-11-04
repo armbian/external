@@ -225,7 +225,7 @@ class Fetcher:
         if _versioned_name(pkg):
             # A fixed name never changes: the upload and the repository update
             # skip existing files, so the server keeps the first version.
-            name = debfile.deb_name(fields["Package"], version, fields["Architecture"])
+            name = url_name(fields["Package"], version, fields["Architecture"])
         rp = pkg.get("repack")
         if rp and fields["Package"] in rp["packages"]:
             new_version = debfile.repack_version(version, rp.get("epoch"), rp.get("suffix", ""))
@@ -272,6 +272,14 @@ class Fetcher:
         return rec, created
 
 
+def url_name(package, version, arch):
+    """File name of a url download. Keeps the epoch, as apt does (1%3a2.0):
+    a new epoch with the same upstream version must give a new file name."""
+    name = debfile.deb_name(package, version, arch)
+    epoch, _, _ = debver.split(version)
+    return name.replace(f"{package}_", f"{package}_{epoch}%3a", 1) if epoch else name
+
+
 def _versioned_name(pkg):
     """A url download gets <package>_<version>_<arch>.deb, unless the config sets filename."""
     return pkg["method"] == "url" and not pkg.get("filename")
@@ -282,7 +290,7 @@ def _legacy_name(pkg, prev):
     if not _versioned_name(pkg):
         return False
     try:
-        return prev["filename"] != debfile.deb_name(prev["package"], prev["version"], prev["deb_arch"])
+        return prev["filename"] != url_name(prev["package"], prev["version"], prev["deb_arch"])
     except (KeyError, debfile.DebError):
         return True
 
