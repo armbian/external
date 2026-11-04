@@ -1,0 +1,73 @@
+name: "Package site"
+
+# Package list on GitHub Pages: configs joined with the manifests of the last
+# live Sync (4 shards) and Build runs. Dry runs never show.
+
+on:
+  workflow_run:
+    workflows: ["Sync external packages", "Build packages"]
+    types: [completed]
+    branches: [main]
+  push:
+    branches: [main]
+    paths: ["mirror/**", "build/*.yaml", "extpkg/site.py", ".github/workflows/pages.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  site:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install missing tools
+        run: python3 -c 'import yaml' 2>/dev/null || { sudo apt-get update -qq && sudo apt-get install -y python3-yaml; }
+
+      # The caches hold the manifest of the last successful live run of each shard.
+      # The key never exists: restore-keys takes the newest match.
+      - uses: actions/cache/restore@v6
+        with: { path: state, key: none, restore-keys: state-live-shard-0- }
+      - run: mkdir -p live && mv state live/shard-0 || true
+      - uses: actions/cache/restore@v6
+        with: { path: state, key: none, restore-keys: state-live-shard-1- }
+      - run: mkdir -p live && mv state live/shard-1 || true
+      - uses: actions/cache/restore@v6
+        with: { path: state, key: none, restore-keys: state-live-shard-2- }
+      - run: mkdir -p live && mv state live/shard-2 || true
+      - uses: actions/cache/restore@v6
+        with: { path: state, key: none, restore-keys: state-live-shard-3- }
+      - run: mkdir -p live && mv state live/shard-3 || true
+      - uses: actions/cache/restore@v6
+        with: { path: state, key: none, restore-keys: state-live-build- }
+      - run: mkdir -p live && mv state live/build || true
+
+      - name: Generate
+        run: |
+          python3 -m extpkg site --out site \
+            --manifest live/shard-0/manifest.json --manifest live/shard-1/manifest.json \
+            --manifest live/shard-2/manifest.json --manifest live/shard-3/manifest.json \
+            --manifest live/build/manifest.json
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
+  deploy:
+    needs: site
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

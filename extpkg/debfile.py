@@ -14,13 +14,15 @@ class DebError(RuntimeError):
 
 
 def control(path):
-    """Return Package, Version and Architecture of a .deb."""
-    r = subprocess.run(["dpkg-deb", "-f", path, "Package", "Version", "Architecture"],
+    """Return Package, Version, Architecture and, when set, Description (first line) and Homepage."""
+    r = subprocess.run(["dpkg-deb", "-f", path, "Package", "Version", "Architecture", "Description", "Homepage"],
                        capture_output=True, text=True)
     if r.returncode != 0:
         raise DebError(f"{os.path.basename(path)} is not a valid .deb: {r.stderr.strip()}")
     fields = {}
     for line in r.stdout.splitlines():
+        if line[:1] in (" ", "\t"):
+            continue      # long description
         k, _, v = line.partition(":")
         fields[k.strip()] = v.strip()
     if not all(fields.get(k) for k in ("Package", "Version", "Architecture")):

@@ -5,9 +5,10 @@ import json
 import os
 import sys
 
-from . import builder, config, depcheck, net, pipeline, published, status, upload
+from . import builder, config, depcheck, net, pipeline, published, site, status, upload
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+BETA_URL = "https://fi.mirror.armbian.de/beta"
 
 
 def _common(p):
@@ -240,6 +241,26 @@ def cmd_status(args):
     return 0
 
 
+def cmd_site(args):
+    pkgs = config.load_all(os.path.join(ROOT, "mirror")) + config.load_all(os.path.join(ROOT, "build"))
+    manifests = {}
+    for path in args.manifest:
+        if os.path.exists(path):
+            with open(path) as f:
+                manifests[os.path.basename(os.path.dirname(os.path.abspath(path)))] = json.load(f)
+        else:
+            net.warn(f"{path}: not found")
+    repos = [published.Published(u) for u in args.published or [published.DEFAULT_URL, BETA_URL]]
+
+    def describe(*key):
+        return next((d for d in (r.description(*key) for r in repos) if d), None)
+
+    data = site.collect(pkgs, manifests, describe if args.published != [""] else None)
+    site.write(data, args.out)
+    print(f"site: {len(data['packages'])} packages, {len(manifests)} manifests -> {args.out}")
+    return 0
+
+
 def cmd_upload(args):
     n = upload.upload(args.out, args.dest, args.port, args.known_hosts, dry_run=args.dry_run)
     print(f"{'would upload' if args.dry_run else 'uploaded'} {n} files")
@@ -322,6 +343,15 @@ def main(argv=None):
     p.add_argument("--port", type=int, default=22)
     p.add_argument("--known-hosts", default=None)
     p.set_defaults(fn=cmd_status)
+
+    p = sub.add_parser("site", help="write the package list web page")
+    p.add_argument("--manifest", action="append", default=[],
+                   help="manifest of a live run; its directory names it (repeat)")
+    p.add_argument("--out", default="site")
+    p.add_argument("--published", action="append", default=[],
+                   help="Armbian repository for descriptions of older manifest entries "
+                        "(repeat; default: stable and beta; '' for none)")
+    p.set_defaults(fn=cmd_site)
 
     p = sub.add_parser("upload", help="upload an output tree")
     p.add_argument("--out", default="output")

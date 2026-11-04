@@ -427,6 +427,24 @@ Where it runs:
 
 A failing package that does not change upstream is not checked again. Fix its config, then close the issue.
 
+### Package site (`.github/workflows/pages.yml`)
+
+A GitHub Pages site lists every config and its state: https://github.armbian.com/external/
+
+- Runs after each successful Sync or Build run on `main`, and after a config change.
+- Input: the configs and the manifests of the last live runs, from the `state-live-*` caches. Dry runs never show.
+- Output: `index.html` (one file, search and filters) and `packages.json` (the same data).
+- Description: the `Description` field of the main package. Older manifest entries lack it: the site then reads the Armbian stable and beta indexes.
+
+| State | Meaning |
+|---|---|
+| Ready | files for every release and architecture that upstream builds |
+| Partial | some files missing or failed |
+| Missing | no files |
+| Disabled | `enabled: false` |
+
+Per release and architecture: "stable" when the stable repository has the version or gets it from this run, else "beta".
+
 ## Command line
 
 ```
@@ -441,6 +459,7 @@ python3 -m extpkg depcheck --out output [--lists-cache dir] [--keyring file] [--
 python3 -m extpkg build-matrix --plan plan.json [--previous manifest.json]
 python3 -m extpkg build --plan plan.json --config name --release r --arch a [--out built]
 python3 -m extpkg run --configs build --shard build --plan plan.json --built built ...
+python3 -m extpkg site --manifest dir/manifest.json ... [--out site] [--published url ...]
 ```
 
 `--configs`: the config directory. Default: `mirror/`; `build/` for `build-matrix` and `build`. `validate` checks both.
@@ -464,6 +483,7 @@ Common options: `--configs`, `--keys`, `--build-dir`, `--jobs`, `--published`.
 | `extpkg/upload.py` | rsync upload |
 | `extpkg/source.py` | Method build: resolve packaging, upstream and patches; version and identity |
 | `extpkg/builder.py` | Method build: build in a container of the release |
+| `extpkg/site.py` | Package site: configs and manifests to `index.html` and `packages.json` |
 | `tools/import-os.py` | One-time import of `armbian/os/external/*.conf` |
 
 ## Differences from the old pipeline
