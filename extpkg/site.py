@@ -18,7 +18,8 @@ NOT_UPSTREAM = "no package matched"
 
 def _source(pkg):
     if pkg["method"] == "build":
-        return (pkg.get("upstream") or pkg.get("packaging") or {}).get("url")
+        up = pkg.get("upstream") or pkg.get("packaging") or {}
+        return up.get("url") or up.get("version_url")
     return (pkg.get("source") or {}).get("url")
 
 
