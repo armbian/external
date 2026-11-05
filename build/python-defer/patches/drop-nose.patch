@@ -1,0 +1,15 @@
+Drop the test-only python3-nose. Debian has it only in bookworm.
+
+diff --git a/debian/control b/debian/control
+index 7f0d958..1da06d9 100644
+--- a/debian/control
++++ b/debian/control
+@@ -4,7 +4,7 @@ Priority: extra
+ Maintainer: Ubuntu Developers <ubuntu-devel-discuss@lists.ubuntu.com>
+ XSBC-Original-Maintainer: Sebastian Heinlein (devel) <devel@glatzor.de>
+ Uploaders: Michael Vogt <mvo@debian.org>
+-Build-Depends: debhelper (>= 7.3), dh-python, python3-nose,
++Build-Depends: debhelper (>= 7.3), dh-python,
+                python3-setuptools,
+                python3-all,
+ Standards-Version: 3.9.2

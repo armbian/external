@@ -1,0 +1,91 @@
+Build on Debian.
+Drop dh-translations and the test-only python3-nose.
+Use importlib.metadata in place of pkg_resources. Debian testing has no
+python3-pkg-resources.
+
+diff --git a/aptdaemon/worker/__init__.py b/aptdaemon/worker/__init__.py
+index a8f5fc8..28186b9 100644
+--- a/aptdaemon/worker/__init__.py
++++ b/aptdaemon/worker/__init__.py
+@@ -22,9 +22,8 @@ __author__ = "Sebastian Heinlein <devel@glatzor.de>"
+ __all__ = ("BaseWorker", "DummyWorker")
+ 
+ import logging
+-import os
+-import pkg_resources
+ import time
++from importlib.metadata import entry_points
+ import traceback
+ 
+ from gi.repository import GObject, GLib
+@@ -185,22 +184,18 @@ class BaseWorker(GObject.GObject):
+         return False
+ 
+     def _load_plugins(self, plugins, entry_point="aptdaemon.plugins"):
+-        """Load the plugins from setuptools' entry points."""
+-        plugin_dirs = [os.path.join(os.path.dirname(__file__), "plugins")]
+-        env = pkg_resources.Environment(plugin_dirs)
+-        dists, errors = pkg_resources.working_set.find_plugins(env)
+-        for dist in dists:
+-            pkg_resources.working_set.add(dist)
++        """Load the plugins from the entry points."""
++        # Armbian: importlib.metadata replaces pkg_resources. Debian
++        # testing has no python3-pkg-resources.
+         for name in plugins:
+-            for ept in pkg_resources.iter_entry_points(entry_point,
+-                                                       name):
++            for ept in entry_points(group=entry_point, name=name):
+                 try:
+                     self.plugins.setdefault(name, []).append(ept.load())
+                 except:
+                     log.critical("Failed to load %s plugin: "
+-                                 "%s" % (name, ept.dist))
++                                 "%s" % (name, ept.value))
+                 else:
+-                    log.debug("Loaded %s plugin: %s", name, ept.dist)
++                    log.debug("Loaded %s plugin: %s", name, ept.value)
+ 
+     def _simulate_transaction(self, trans):
+         """This method needs to be implemented by the backends."""
+diff --git a/debian/control b/debian/control
+index 23b9816..334997f 100644
+--- a/debian/control
++++ b/debian/control
+@@ -7,7 +7,6 @@ Build-Depends: dbus,
+                debconf-i18n,
+                debhelper-compat (= 13),
+                dh-python,
+-               dh-translations,
+                gir1.2-glib-2.0,
+                gir1.2-gtk-3.0,
+                gir1.2-packagekitglib-1.0 (>= 0.8.9),
+@@ -22,8 +21,6 @@ Build-Depends: dbus,
+                python3-distutils-extra,
+                python3-gi,
+                python3-mock,
+-               python3-nose,
+-               python3-pkg-resources,
+                python3-setuptools,
+                xauth,
+                xvfb
+@@ -74,7 +71,6 @@ Depends: aptdaemon,
+          python3-dbus,
+          python3-defer (>= 1.0.6),
+          python3-gi,
+-         python3-pkg-resources,
+          ${misc:Depends},
+          ${python3:Depends}
+ Description: Python 3 module for the server and client of aptdaemon
+diff --git a/debian/rules b/debian/rules
+index cb3a6ba..558d3e7 100755
+--- a/debian/rules
++++ b/debian/rules
+@@ -5,7 +5,7 @@
+ PYTHON3=$(shell py3versions -vr)
+ 
+ %:
+-	dh $@ --with=python3,translations --buildsystem=pybuild
++	dh $@ --with=python3 --buildsystem=pybuild
+ 
+ override_dh_auto_install:
+ 	dh_auto_install

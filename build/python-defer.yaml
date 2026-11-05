@@ -1,0 +1,21 @@
+name: python-defer
+method: build
+# python3-defer for aptdaemon on Debian. Debian dropped it after bullseye.
+packaging:
+  url: http://archive.ubuntu.com/ubuntu
+  suite: resolute
+  components: [main]
+  package: python-defer
+releases:
+- bookworm
+- trixie
+- forky
+- sid
+architectures:
+- amd64
+- arm64
+target: desktop
+repositories:
+- beta
+install:
+- python3-defer
