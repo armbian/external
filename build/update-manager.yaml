@@ -3,6 +3,7 @@ method: build
 # Software Updater for Armbian, from Ubuntu's resolute packaging, on all releases.
 # Debian has no update-manager.
 # Patches: no Ubuntu Pro, Livepatch, OEM, HWE or snap. Release upgrades with armbian-config.
+# armbian-update-notifier: a notification for updates and a pending restart.
 # Debian changelogs and security updates. Debian needs python3-distupgrade (ubuntu-release-upgrader).
 packaging:
   url: http://archive.ubuntu.com/ubuntu
