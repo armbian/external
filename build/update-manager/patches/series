@@ -1,4 +1,5 @@
-drop-ubuntu-pro-livepatch-oem-hwe-optional-snap.patch
+drop-ubuntu-pro-livepatch-oem-hwe.patch
+drop-snap.patch
 debian-changelogs-and-security-origin-armbian-base.patch
 release-upgrade-with-armbian-config.patch
 drop-ubuntu-only-dependencies.patch

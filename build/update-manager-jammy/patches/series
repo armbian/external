@@ -1,5 +1,0 @@
-drop-ubuntu-pro-livepatch-oem-hwe-optional-snap.patch
-armbian-base-group.patch
-release-upgrade-with-armbian-config.patch
-drop-ubuntu-only-dependencies.patch
-optional-update-notifier.patch

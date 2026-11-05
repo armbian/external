@@ -1,5 +1,4 @@
 Drop Ubuntu Pro, Livepatch, OEM metapackages and HWE checks.
-Use snap only when snapd and its GObject bindings exist.
 
 diff --git a/UpdateManager/Dialogs.py b/UpdateManager/Dialogs.py
 index 304609c..c5cd075 100644
@@ -100,40 +99,3 @@ index 9f94059..fa98f96 100644
          if apt_news:
              self.news.get_buffer().set_text(apt_news)
              self.expander_news.set_visible(True)
-diff --git a/UpdateManager/backend/__init__.py b/UpdateManager/backend/__init__.py
-index 72a6031..5e5d4ec 100644
---- a/UpdateManager/backend/__init__.py
-+++ b/UpdateManager/backend/__init__.py
-@@ -7,8 +7,14 @@
- import gi
- 
- gi.require_version("Gtk", "3.0")
--gi.require_version("Snapd", "2")
--from gi.repository import GLib, Gtk, Snapd
-+from gi.repository import GLib, Gtk
-+
-+# Armbian: snap support only when snapd and its GObject bindings exist.
-+try:
-+    gi.require_version("Snapd", "2")
-+    from gi.repository import Snapd
-+except (ImportError, ValueError):
-+    Snapd = None
- 
- from apt import Cache
- import json
-@@ -388,6 +394,7 @@ class InstallBackend(Dialog):
-         elif action == self.ACTION_INSTALL:
-             if (
-                 success
-+                and Snapd is not None
-                 and os.path.exists("/usr/bin/snap")
-                 and hasattr(self, "pane_update_progress")
-             ):
-@@ -407,6 +414,7 @@ class InstallBackend(Dialog):
-                 self.window_main.start_error(True, error_string, error_desc)
-             elif (
-                 success
-+                and Snapd is not None
-                 and os.path.exists("/usr/bin/snap")
-                 and hasattr(self, "pane_update_progress")
-             ):

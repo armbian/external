@@ -23,10 +23,10 @@ index 994be91..cca8072 100644
              "--non-interactive",
              "--parent-window-id",
 diff --git a/UpdateManager/backend/__init__.py b/UpdateManager/backend/__init__.py
-index 5e5d4ec..e721c34 100644
+index 4ea5f63..183b45b 100644
 --- a/UpdateManager/backend/__init__.py
 +++ b/UpdateManager/backend/__init__.py
-@@ -435,9 +435,16 @@ if (
+@@ -153,9 +153,16 @@ if (
          from .InstallBackendAptdaemon import InstallBackendAptdaemon
      except ImportError:
          logging.exception("importing aptdaemon")
@@ -44,7 +44,7 @@ index 5e5d4ec..e721c34 100644
      and "UPDATE_MANAGER_FORCE_BACKEND_APTDAEMON" not in os.environ
  ):
      try:
-@@ -460,7 +467,7 @@ def get_backend(*args, **kwargs):
+@@ -178,7 +185,7 @@ def get_backend(*args, **kwargs):
              logging.exception("using aptdaemon failed")
      # try synaptic
      if (
