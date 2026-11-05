@@ -116,7 +116,7 @@ index 0000000..fc55410
 +NoDisplay=true
 +X-GNOME-Autostart-Delay=60
 diff --git a/debian/control b/debian/control
-index 7832ce9..52c7041 100644
+index 972dd34..4e0ce5b 100644
 --- a/debian/control
 +++ b/debian/control
 @@ -55,6 +55,7 @@ Description: Python 3.x module for update-manager
