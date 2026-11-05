@@ -1,0 +1,139 @@
+Show a notification when updates are available or a restart is required.
+The notification opens Software Updater.
+Do nothing when Ubuntu update-notifier is installed.
+
+diff --git a/armbian/armbian-update-notifier b/armbian/armbian-update-notifier
+new file mode 100755
+index 0000000..44c5325
+--- /dev/null
++++ b/armbian/armbian-update-notifier
+@@ -0,0 +1,93 @@
++#!/usr/bin/python3
++# Armbian: show a notification when updates are available or a restart is
++# required. The apt timers refresh the package lists. This script only reads
++# them. The notification opens Software Updater.
++
++import os
++import subprocess
++
++import apt_pkg
++import gi
++
++gi.require_version("Notify", "0.7")
++from gi.repository import GLib, Notify
++
++FIRST_CHECK_SECONDS = 5 * 60
++CHECK_SECONDS = 6 * 60 * 60
++REBOOT_REQUIRED = "/run/reboot-required"
++UPDATE_NOTIFIER = "/usr/bin/update-notifier"
++
++
++def count_updates():
++    """Count the packages that a full upgrade installs or upgrades."""
++    apt_pkg.init()
++    cache = apt_pkg.Cache(None)
++    depcache = apt_pkg.DepCache(cache)
++    depcache.read_pinfile()
++    depcache.init()
++    if depcache.broken_count:
++        return 0
++    depcache.upgrade(True)
++    return sum(
++        1
++        for pkg in cache.packages
++        if depcache.marked_install(pkg) or depcache.marked_upgrade(pkg)
++    )
++
++
++def open_updater(notification, action):
++    subprocess.Popen(["update-manager"])
++    notification.close()
++
++
++class Notifier:
++    def __init__(self):
++        self.updates_shown = 0
++        self.reboot_shown = False
++        self.updates = Notify.Notification.new(
++            "", "", "system-software-update"
++        )
++        self.updates.add_action("default", "Open", open_updater)
++        self.updates.add_action("open", "Open Software Updater", open_updater)
++        self.reboot = Notify.Notification.new(
++            "Restart required",
++            "Restart the computer to finish the updates.",
++            "system-reboot",
++        )
++
++    def check(self):
++        try:
++            count = count_updates()
++        except SystemError:
++            # dpkg or apt holds the lock. Try again at the next check.
++            count = 0
++        if count > self.updates_shown:
++            self.updates.update(
++                "Software updates available",
++                "%d updates are available." % count,
++                "system-software-update",
++            )
++            self.updates.show()
++        self.updates_shown = count
++        if os.path.exists(REBOOT_REQUIRED) and not self.reboot_shown:
++            self.reboot.show()
++            self.reboot_shown = True
++
++
++def main():
++    # Ubuntu's update-notifier shows the same information.
++    if os.path.exists(UPDATE_NOTIFIER):
++        return
++    if not Notify.init("Software Updater"):
++        return
++    notifier = Notifier()
++    # A timeout runs again while its callback returns True.
++    GLib.timeout_add_seconds(
++        FIRST_CHECK_SECONDS, lambda: notifier.check() or False
++    )
++    GLib.timeout_add_seconds(CHECK_SECONDS, lambda: notifier.check() or True)
++    GLib.MainLoop().run()
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/armbian/armbian-update-notifier.desktop b/armbian/armbian-update-notifier.desktop
+new file mode 100644
+index 0000000..fc55410
+--- /dev/null
++++ b/armbian/armbian-update-notifier.desktop
+@@ -0,0 +1,8 @@
++[Desktop Entry]
++Type=Application
++Name=Software Updates Notifier
++Comment=Show a notification when software updates are available
++Exec=/usr/libexec/armbian-update-notifier
++Icon=system-software-update
++NoDisplay=true
++X-GNOME-Autostart-Delay=60
+diff --git a/debian/control b/debian/control
+index 7832ce9..52c7041 100644
+--- a/debian/control
++++ b/debian/control
+@@ -55,6 +55,7 @@ Description: Python 3.x module for update-manager
+ Package: update-manager
+ Architecture: all
+ Depends: gir1.2-gtk-3.0,
++         gir1.2-notify-0.7,
+          gnome-shell | policykit-1-gnome | polkit-kde-agent-1 | lxpolkit | lxqt-policykit | mate-polkit | polkit-1-auth-agent,
+          libgtk3-perl,
+          pkexec,
+diff --git a/debian/update-manager.install b/debian/update-manager.install
+index 0302322..57de3ca 100644
+--- a/debian/update-manager.install
++++ b/debian/update-manager.install
+@@ -11,3 +11,5 @@ debian/tmp/usr/share/glib-2.0/schemas
+ debian/tmp/usr/share/help
+ debian/tmp/usr/share/metainfo/update-manager.appdata.xml
+ debian/tmp/usr/share/update-manager/gtkbuilder
++armbian/armbian-update-notifier usr/libexec
++armbian/armbian-update-notifier.desktop etc/xdg/autostart
