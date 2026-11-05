@@ -43,16 +43,21 @@ diff --git a/UpdateManager/Core/UpdateList.py b/UpdateManager/Core/UpdateList.py
 index 82cbcbb..066ed54 100644
 --- a/UpdateManager/Core/UpdateList.py
 +++ b/UpdateManager/Core/UpdateList.py
-@@ -373,7 +373,7 @@ class UpdateList:
+@@ -373,7 +373,11 @@ class UpdateList:
              for (verFileIter, index) in ver.file_list:
                  if (
-                     verFileIter.archive == "%s-security" % self.dist
+-                    verFileIter.archive == "%s-security" % self.dist
++                    # Armbian: Debian keeps <dist>-security in Codename.
++                    (
++                        verFileIter.archive == "%s-security" % self.dist
++                        or verFileIter.codename == "%s-security" % self.dist
++                    )
 -                    and verFileIter.origin == "Ubuntu"
 +                    and verFileIter.origin in ("Ubuntu", "Debian")
                  ):
                      indexfile = pkg._pcache._list.find_index(verFileIter)
                      if indexfile:  # and indexfile.IsTrusted:
-@@ -471,6 +471,11 @@ class UpdateList:
+@@ -471,6 +475,11 @@ class UpdateList:
                  "linux-base.*",
                  "linux-crashdump.*",
                  "linux-doc.*",
