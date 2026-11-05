@@ -1,0 +1,130 @@
+Build only python3-distupgrade. update-manager needs it.
+Debian has no ubuntu-release-upgrader.
+Drop the +armbian suffix from the Python version (PEP 440).
+Build with the python3-apt of bookworm. Only the tests need 2.7.5.
+
+diff --git a/debian/control b/debian/control
+index 090a31b..8a9c847 100644
+--- a/debian/control
++++ b/debian/control
+@@ -2,34 +2,17 @@ Source: ubuntu-release-upgrader
+ Section: admin
+ Priority: optional
+ Maintainer: Ubuntu Developers <ubuntu-devel-discuss@lists.ubuntu.com>
+-Build-Depends: apt-clone (>= 0.2.3~ubuntu2),
+-               debhelper-compat (= 13),
++Build-Depends: debhelper-compat (= 13),
+                dh-python,
+                lsb-release,
+                python3-all,
+-               python3-apt (>= 2.7.5),
++               python3-apt,
+                python3-distutils-extra,
+                python3-update-manager (>= 1:19.04.5),
+ Build-Depends-Indep: intltool, libxml-parser-perl
+ Standards-Version: 4.7.0
+ Vcs-Git: https://git.launchpad.net/ubuntu-release-upgrader -b ubuntu/main
+ 
+-Package: ubuntu-release-upgrader-core
+-Architecture: all
+-Pre-Depends: ${misc:Pre-Depends}
+-Depends: ca-certificates,
+-         python3-distupgrade (= ${source:Version}),
+-         ${misc:Depends},
+-         ${python3:Depends},
+-         screen
+-Recommends: libpam-modules (>= 1.0.1-9ubuntu3)
+-Replaces: update-manager (<< 1:0.165), update-manager-core (<< 1:0.165)
+-Breaks: software-properties (<< 0.9.27),
+-        update-manager (<< 1:0.165),
+-        update-manager-core (<< 1:0.165)
+-Description: manage release upgrades
+- This is the core of the Ubuntu Release Upgrader
+-
+ Package: python3-distupgrade
+ Architecture: all
+ Section: python
+@@ -48,34 +31,3 @@ Replaces: python3-update-manager (<< 1:0.165)
+ Breaks: python3-update-manager (<< 1:0.165)
+ Description: manage release upgrades
+  This is the DistUpgrade Python 3 module
+-
+-Package: ubuntu-release-upgrader-gtk
+-Architecture: all
+-Pre-Depends: ${misc:Pre-Depends}
+-Depends: gir1.2-gtk-3.0,
+-         gir1.2-vte-2.91,
+-         gir1.2-webkit2-4.1,
+-         python3-dbus,
+-         python3-distupgrade (= ${source:Version}),
+-         python3-gi (>= 3.8),
+-         ubuntu-release-upgrader-core (= ${source:Version}),
+-         update-manager,
+-         ${misc:Depends},
+-         ${python3:Depends}
+-Description: manage release upgrades
+- This is the GTK+ frontend of the Ubuntu Release Upgrader
+-
+-Package: ubuntu-release-upgrader-qt
+-Architecture: all
+-Pre-Depends: ${misc:Pre-Depends}
+-Depends: psmisc,
+-         pyqt6-dev-tools,
+-         python3-pyqt6,
+-         python3-pyqt6.qtquick,
+-         ubuntu-release-upgrader-core (= ${source:Version}),
+-         ${misc:Depends}
+-Recommends: qttranslations5-l10n
+-Replaces: update-manager-kde (<< 1:0.165)
+-Breaks: update-manager-kde (<< 1:0.165)
+-Description: manage release upgrades
+- This is the Qt frontend of the Ubuntu Release Upgrader
+diff --git a/debian/rules b/debian/rules
+index e17bc42..8e89565 100755
+--- a/debian/rules
++++ b/debian/rules
+@@ -33,28 +33,6 @@ override_dh_auto_install:
+ 	# Remove .egg-info files
+ 	find debian/tmp -name '*.egg-info' -exec rm -rf {} +
+ 
+-override_dh_python3-indep:
+-	mkdir -p debian/ubuntu-release-upgrader-gtk/usr/bin
+-	cp ./debian/ubuntu-release-upgrader-gtk/usr/lib/ubuntu-release-upgrader/check-new-release-gtk debian/ubuntu-release-upgrader-gtk/usr/bin
+-	dh_python3 -i
+-	rm ./debian/ubuntu-release-upgrader-gtk/usr/bin/check-new-release-gtk
+-	rmdir debian/ubuntu-release-upgrader-gtk/usr/bin
+-
+ override_dh_missing:
+-	dh_missing --exclude='*.egg-info' --fail-missing
+-
+-binary: binary-arch binary-indep
+-
+-binary-indep:
+-	dh $@ $(DH_ARGS)
+-	# Special tarball for dist-upgrader
+-	(cd DistUpgrade/ && \
+-	   ./build-tarball.sh && \
+-	   mkdir -p $(DEBVER) && \
+-	   cp $(DIST).tar.gz ./*ReleaseAnnouncement* $(DEBVER) && \
+-	   tar czvf ../../$(TARNAME) \
+-	       $(DEBVER)/*ReleaseAnnouncement* \
+-	       $(DEBVER)/$(DIST).tar.gz )
+-	dpkg-distaddfile $(TARNAME) raw-dist-upgrader -
+-
+-.PHONY: binary binary-indep
++	# Armbian: only python3-distupgrade is built.
++	dh_missing --exclude='*.egg-info' --list-missing
+diff --git a/setup.py b/setup.py
+index 852babb..9917c45 100755
+--- a/setup.py
++++ b/setup.py
+@@ -14,7 +14,8 @@ for line in check_output('dpkg-parsechangelog --format rfc822'.split(),
+     if header == 'version':
+         # PEP 440 uses '!' for the epoch separator:
+         #   https://peps.python.org/pep-0440/#version-epochs
+-        version = value.strip().replace(':','!')
++        # Armbian: drop the +armbian<n>~<release> suffix. It is not PEP 440.
++        version = value.strip().split('+armbian')[0].replace(':','!')
+         break
+ else:
+     raise RuntimeError('No version found in debian/changelog')

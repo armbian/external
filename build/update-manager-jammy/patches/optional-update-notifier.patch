@@ -1,0 +1,25 @@
+Use the update-notifier settings only when update-notifier is installed.
+
+diff --git a/UpdateManager/UpdatesAvailable.py b/UpdateManager/UpdatesAvailable.py
+index a0415d7..6646219 100644
+--- a/UpdateManager/UpdatesAvailable.py
++++ b/UpdateManager/UpdatesAvailable.py
+@@ -354,10 +354,14 @@ class UpdatesAvailable(InternalDialog):
+                                       self.activate_details)
+ 
+         # If auto-updates are on, change cancel label
+-        self.notifier_settings = Gio.Settings.new("com.ubuntu.update-notifier")
+-        self.notifier_settings.connect(
+-            "changed::auto-launch",
+-            lambda s, p: self.update_close_button())
++        # Armbian: update-notifier is optional. It owns this schema.
++        source = Gio.SettingsSchemaSource.get_default()
++        if source.lookup("com.ubuntu.update-notifier", True):
++            self.notifier_settings = Gio.Settings.new(
++                "com.ubuntu.update-notifier")
++            self.notifier_settings.connect(
++                "changed::auto-launch",
++                lambda s, p: self.update_close_button())
+         self.update_close_button()
+ 
+         # Alert watcher

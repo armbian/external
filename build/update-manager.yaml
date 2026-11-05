@@ -1,0 +1,25 @@
+name: update-manager
+method: build
+# Software Updater for Armbian, from Ubuntu's resolute packaging.
+# Debian has no update-manager. noble and jammy: update-manager-noble, update-manager-jammy.
+# Patches: no Ubuntu Pro, Livepatch, OEM or HWE. Release upgrades with armbian-config.
+# Debian changelogs and security updates. Debian needs python3-distupgrade (ubuntu-release-upgrader).
+packaging:
+  url: http://archive.ubuntu.com/ubuntu
+  suite: resolute
+  components: [main]
+  package: update-manager
+releases:
+- resolute
+- bookworm
+- trixie
+- forky
+- sid
+architectures:
+- amd64
+- arm64
+target: desktop
+repositories:
+- beta
+install:
+- update-manager

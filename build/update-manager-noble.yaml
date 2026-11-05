@@ -1,0 +1,19 @@
+name: update-manager-noble
+method: build
+# Software Updater for Armbian on noble, from noble's own packaging.
+# Same changes as update-manager. noble keeps its python3-distupgrade.
+packaging:
+  url: http://archive.ubuntu.com/ubuntu
+  suite: noble-updates
+  components: [main]
+  package: update-manager
+releases:
+- noble
+architectures:
+- amd64
+- arm64
+target: desktop
+repositories:
+- beta
+install:
+- update-manager
