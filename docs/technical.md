@@ -292,7 +292,7 @@ Check uses no secrets.
 Runs daily, by hand, and on pull requests that change `build/`, `extpkg/` or the workflow. Manual inputs: `only` and `dry_run` (default true).
 Pull requests are always dry runs. Scheduled runs are dry runs until the repository variable `BUILD_LIVE` is `true`.
 
-1. **plan**: resolve the sources. List the builds whose identity is not in the last manifest.
+1. **plan**: resolve the sources. List the builds whose identity is not in the manifest of the last live run. Dry runs and pull requests also use that manifest.
 2. **deps**: the configs that others name in `build_depends`.
 3. **build**: the other configs, with the deps outputs. Both stages: one job per config, release and architecture. Container `debian:<release>` or `ubuntu:<release>`, runner `ubuntu-24.04` (amd64) or `ubuntu-24.04-arm` (arm64). `apt-get build-dep`, then `dpkg-buildpackage`. Tests are not run (`nocheck`).
 4. **publish**: place the built files in the Sync layout, upload, and remove old versions. Status and manifest go to `.sync/shard-build.json` and `.sync/manifest-shard-build.json`, next to the Sync shards.
