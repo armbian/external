@@ -1,0 +1,29 @@
+#!/usr/bin/make -f
+# Repack the vendor binary of this version. The vendor publishes no
+# checksum file: the MD5 that the storage server sends must match.
+include /usr/share/dpkg/pkg-info.mk
+include /usr/share/dpkg/architecture.mk
+
+PKG = debian/grok-cli
+PLATFORM_amd64 = linux-x86_64
+PLATFORM_arm64 = linux-aarch64
+URL = https://storage.googleapis.com/grok-build-public-artifacts/cli/grok-$(DEB_VERSION_UPSTREAM)-$(PLATFORM_$(DEB_HOST_ARCH))
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	curl -fsSL --retry 3 -D debian/headers -o debian/grok $(URL)
+	md5=$$(tr -d '\r' < debian/headers | sed -n 's/^x-goog-hash: md5=//Ip' | base64 -d | od -An -tx1 | tr -d ' \n'); \
+		test -n "$$md5" && echo "$$md5  debian/grok" | md5sum -c -
+
+override_dh_auto_install:
+	install -D -m755 debian/grok $(PKG)/usr/bin/grok
+
+override_dh_auto_configure override_dh_auto_test:
+
+# Upstream binary: keep it as released.
+override_dh_strip override_dh_dwz:
+
+override_dh_auto_clean:
+	rm -f debian/grok debian/headers

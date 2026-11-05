@@ -1,0 +1,15 @@
+name: grok-cli
+method: build
+# xAI Grok Build CLI, used by the armbian-hyprland-shell agents panel.
+# Repacks the vendor binary of the stable channel. The package is not named
+# grok: Debian and Ubuntu have an unrelated grok package with a higher
+# version. Local packaging in build/grok-cli/debian/.
+upstream:
+  version_url: https://x.ai/cli/stable
+releases: all
+architectures:
+- amd64
+- arm64
+target: utils
+install:
+- grok-cli

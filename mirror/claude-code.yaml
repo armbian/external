@@ -1,0 +1,17 @@
+name: claude-code
+method: apt
+# Claude Code CLI, used by the armbian-hyprland-shell agents panel.
+# Stable channel: about one week behind latest, without known regressions.
+source:
+  url: https://downloads.claude.ai/claude-code/apt/stable
+  suite: stable
+  components:
+  - main
+releases: all
+architectures:
+- arm64
+- amd64
+target: utils
+install:
+- claude-code
+filter: Name (= claude-code)

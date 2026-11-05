@@ -1,0 +1,15 @@
+Source: grok-cli
+Section: devel
+Priority: optional
+Maintainer: Armbian <info@armbian.com>
+Build-Depends: debhelper-compat (= 13), curl, ca-certificates
+Standards-Version: 4.7.0
+Homepage: https://x.ai/cli
+
+Package: grok-cli
+Architecture: amd64 arm64
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Conflicts: grok
+Description: xAI Grok coding agent for the terminal
+ Grok Build reads, changes and runs code in a project, on request.
+ Repack of the vendor binary of the stable channel. The command is grok.

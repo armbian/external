@@ -1,0 +1,43 @@
+#!/usr/bin/make -f
+# Repack the upstream release that matches the tag. Its SHA256 must match
+# codex-package_SHA256SUMS of the same release.
+include /usr/share/dpkg/pkg-info.mk
+include /usr/share/dpkg/architecture.mk
+
+PKG = debian/codex
+TRIPLE_amd64 = x86_64-unknown-linux-musl
+TRIPLE_arm64 = aarch64-unknown-linux-musl
+ASSET = codex-package-$(TRIPLE_$(DEB_HOST_ARCH)).tar.gz
+RELEASE = https://github.com/openai/codex/releases/download/rust-v$(DEB_VERSION_UPSTREAM)
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	curl -fsSL --retry 3 -o debian/$(ASSET) $(RELEASE)/$(ASSET)
+	curl -fsSL --retry 3 -o debian/SHA256SUMS $(RELEASE)/codex-package_SHA256SUMS
+	cd debian && grep "  $(ASSET)$$" SHA256SUMS | sha256sum -c -
+	mkdir -p debian/package
+	tar -xzf debian/$(ASSET) -C debian/package --no-same-owner
+
+override_dh_auto_install:
+	mkdir -p $(PKG)/usr/lib/codex $(PKG)/usr/bin
+	cp -a debian/package/. $(PKG)/usr/lib/codex/
+	ln -s ../lib/codex/bin/codex $(PKG)/usr/bin/codex
+	install -D -m644 LICENSE $(PKG)/usr/share/doc/codex/LICENSE
+	install -D -m644 NOTICE $(PKG)/usr/share/doc/codex/NOTICE
+
+override_dh_auto_configure override_dh_auto_test:
+
+# Upstream binaries: keep them as released. The voice host uses its own
+# bundled libraries.
+override_dh_strip override_dh_dwz:
+
+override_dh_shlibdeps:
+	dh_shlibdeps -Xusr/lib/codex
+
+override_dh_makeshlibs:
+	dh_makeshlibs -Xusr/lib/codex
+
+override_dh_auto_clean:
+	rm -rf debian/package debian/*.tar.gz debian/SHA256SUMS
