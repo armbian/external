@@ -1,0 +1,79 @@
+Read Debian changelogs from metadata.ftp-master.debian.org.
+Treat Debian -security as security updates.
+Show kernel, boot loader and board packages in the "Armbian base" group.
+
+diff --git a/UpdateManager/Core/MyCache.py b/UpdateManager/Core/MyCache.py
+index 766a661..5407f12 100644
+--- a/UpdateManager/Core/MyCache.py
++++ b/UpdateManager/Core/MyCache.py
+@@ -27,6 +27,7 @@ import apt
+ import apt_pkg
+ import logging
+ import os
++import platform
+ 
+ from urllib.error import HTTPError
+ from urllib.request import urlopen
+@@ -46,6 +47,15 @@ except ImportError:
+ SYNAPTIC_PINFILE = "/var/lib/synaptic/preferences"
+ CHANGELOGS_POOL = "https://changelogs.ubuntu.com/changelogs/pool/"
+ CHANGELOGS_URI = CHANGELOGS_POOL + "%s/%s/%s/%s_%s/%s"
++CHANGELOG_ORIGIN = "Ubuntu"
++
++# Armbian: Debian keeps changelogs on its metadata server.
++if platform.freedesktop_os_release().get("ID") == "debian":
++    CHANGELOGS_URI = (
++        "https://metadata.ftp-master.debian.org/changelogs/"
++        "%s/%s/%s/%s_%s_%s"
++    )
++    CHANGELOG_ORIGIN = "Debian"
+ 
+ 
+ class HttpsChangelogsUnsupportedError(Exception):
+@@ -59,7 +69,7 @@ class HttpsChangelogsUnsupportedError(Exception):
+ 
+ class MyCache(DistUpgrade.DistUpgradeCache.MyCache):
+ 
+-    CHANGELOG_ORIGIN = "Ubuntu"
++    CHANGELOG_ORIGIN = CHANGELOG_ORIGIN
+ 
+     def __init__(self, progress, rootdir=None):
+         apt.Cache.__init__(self, progress, rootdir)
+diff --git a/UpdateManager/Core/UpdateList.py b/UpdateManager/Core/UpdateList.py
+index 82cbcbb..066ed54 100644
+--- a/UpdateManager/Core/UpdateList.py
++++ b/UpdateManager/Core/UpdateList.py
+@@ -373,7 +373,7 @@ class UpdateList:
+             for (verFileIter, index) in ver.file_list:
+                 if (
+                     verFileIter.archive == "%s-security" % self.dist
+-                    and verFileIter.origin == "Ubuntu"
++                    and verFileIter.origin in ("Ubuntu", "Debian")
+                 ):
+                     indexfile = pkg._pcache._list.find_index(verFileIter)
+                     if indexfile:  # and indexfile.IsTrusted:
+@@ -471,6 +471,11 @@ class UpdateList:
+                 "linux-base.*",
+                 "linux-crashdump.*",
+                 "linux-doc.*",
++                # Armbian kernel, device tree, boot loader and board support
++                "linux-image-.*",
++                "linux-dtb-.*",
++                "linux-u-boot-.*",
++                "armbian-.*",
+             )
+             linux_regexp = re.compile(
+                 "(" + "|".join(["^" + n for n in linux_names]) + ")"
+diff --git a/UpdateManager/Core/utils.py b/UpdateManager/Core/utils.py
+index da640ef..5c04867 100644
+--- a/UpdateManager/Core/utils.py
++++ b/UpdateManager/Core/utils.py
+@@ -450,6 +450,8 @@ def get_ubuntu_flavor_package(cache=None):
+ 
+ def get_ubuntu_flavor_name(cache=None):
+     """try to guess the flavor name based on the running desktop"""
++    # Armbian: one name for all desktops and both distributions.
++    return "Armbian"
+     pkg = get_ubuntu_flavor_package(cache=cache)
+     lookup = {"ubuntustudio-desktop": "Ubuntu Studio"}
+     if pkg in lookup:

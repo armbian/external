@@ -1,0 +1,175 @@
+Offer the next supported release from /etc/armbian-distribution-status.
+Run "armbian-config --api release_upgrade stable" in a terminal.
+Run "apt-get full-upgrade" in a terminal for a partial upgrade.
+
+diff --git a/UpdateManager/Core/ArmbianRelease.py b/UpdateManager/Core/ArmbianRelease.py
+new file mode 100644
+index 0000000..5cd405d
+--- /dev/null
++++ b/UpdateManager/Core/ArmbianRelease.py
+@@ -0,0 +1,75 @@
++# ArmbianRelease.py
++#
++# Armbian: find the next supported release in /etc/armbian-distribution-status.
++# The Armbian build writes one line per release:
++#   <release>=<support>;upgrade=<release>,<release>,...
++# <support> is supported, csc or eos. The rules follow
++# "armbian-config --api release_upgrade stable".
++
++import os
++
++from .utils import get_dist
++
++STATUS_FILE = "/etc/armbian-distribution-status"
++ARMBIAN_CONFIG = "/usr/bin/armbian-config"
++
++
++class ArmbianNextRelease:
++    def __init__(self, codename):
++        self.version = codename
++        self.upgrade_broken = False
++
++
++def read_status(path=STATUS_FILE):
++    """Return {release: (support, [upgrade targets])}, in file order."""
++    status = {}
++    try:
++        with open(path) as f:
++            for line in f:
++                line = line.strip()
++                if "=" not in line:
++                    continue
++                head, _, tail = line.partition(";")
++                release, _, support = head.partition("=")
++                targets = []
++                if tail.startswith("upgrade="):
++                    targets = [
++                        t for t in tail[len("upgrade="):].split(",") if t
++                    ]
++                status[release.strip()] = (support.strip(), targets)
++    except OSError:
++        pass
++    return status
++
++
++def next_release(current, status):
++    """The last supported release in the upgrade list of current."""
++    if current not in status:
++        return None
++    targets = status[current][1]
++    found = None
++    for release, (support, _) in status.items():
++        if release != current and support == "supported" and release in targets:
++            found = release
++    return found
++
++
++class ArmbianRelease:
++    """Answers the questions that UpdateManager asks MetaRelease."""
++
++    def __init__(self, path=STATUS_FILE):
++        self.downloading = False
++        self.flavor_name = "Armbian"
++        self.current_dist_version = get_dist()
++        status = read_status(path)
++        support = status.get(self.current_dist_version, ("", []))[0]
++        target = None
++        if os.path.exists(ARMBIAN_CONFIG):
++            target = next_release(self.current_dist_version, status)
++        self.upgradable_to = ArmbianNextRelease(target) if target else None
++        self.new_dist = self.upgradable_to is not None
++        self.no_longer_supported = support == "eos" and self.new_dist
++
++    def connect(self, *args):
++        # MetaRelease is a GObject. This class never downloads.
++        return 0
+diff --git a/UpdateManager/Dialogs.py b/UpdateManager/Dialogs.py
+index c5cd075..4a39d75 100644
+--- a/UpdateManager/Dialogs.py
++++ b/UpdateManager/Dialogs.py
+@@ -45,6 +45,18 @@ from gettext import gettext as _
+ from gettext import ngettext
+ 
+ 
++def run_in_terminal(command):
++    """Armbian: run a root command in a terminal, then wait for Enter."""
++    script = (
++        "sudo %s; echo; read -p '%s' answer"
++        % (command, _("Press Enter to close this window."))
++    )
++    os.execvp(
++        "x-terminal-emulator",
++        ["x-terminal-emulator", "-e", "sh", "-c", script],
++    )
++
++
+ class Dialog(object):
+     def __init__(self, window_main):
+         self.window_main = window_main
+@@ -262,20 +274,8 @@ class DistUpgradeDialog(InternalDialog):
+         )
+ 
+     def upgrade(self):
+-        # Pass on several arguments
+-        extra_args = ""
+-        if self.window_main and self.window_main.options:
+-            if self.window_main.options.devel_release:
+-                extra_args = extra_args + " -d"
+-            if self.window_main.options.use_proposed:
+-                extra_args = extra_args + " -p"
+-        os.execl(
+-            "/bin/sh",
+-            "/bin/sh",
+-            "-c",
+-            "/usr/bin/do-release-upgrade "
+-            "--frontend=DistUpgradeViewGtk3%s" % extra_args,
+-        )
++        # Armbian: armbian-config does the release upgrade.
++        run_in_terminal("armbian-config --api release_upgrade stable")
+ 
+ 
+ class HWEUpgradeDialog(InternalDialog):
+@@ -361,13 +361,8 @@ Run a partial upgrade, to install as many updates as possible.
+         self.focus_button = self.add_button(_("_Continue"), Gtk.main_quit)
+ 
+     def upgrade(self):
+-        os.execl(
+-            "/bin/sh",
+-            "/bin/sh",
+-            "-c",
+-            "/usr/lib/ubuntu-release-upgrader/do-partial-upgrade "
+-            "--frontend=DistUpgradeViewGtk3",
+-        )
++        # Armbian: no do-partial-upgrade. apt does the full upgrade.
++        run_in_terminal("apt-get full-upgrade")
+ 
+     def start(self):
+         Dialog.start(self)
+diff --git a/UpdateManager/UpdateManager.py b/UpdateManager/UpdateManager.py
+index 9835523..92cccb8 100644
+--- a/UpdateManager/UpdateManager.py
++++ b/UpdateManager/UpdateManager.py
+@@ -61,7 +61,7 @@ from .Dialogs import (
+     UnsupportedDialog,
+     UpdateErrorDialog,
+ )
+-from .MetaReleaseGObject import MetaRelease
++from .Core.ArmbianRelease import ArmbianRelease
+ from .UpdatesAvailable import UpdatesAvailable
+ from .Core.AlertWatcher import AlertWatcher
+ from .Core.MyCache import MyCache
+@@ -123,12 +123,8 @@ class UpdateManager(Gtk.Window):
+                 "focus-in-event", self.on_initial_focus_in
+             )
+ 
+-        # Look for a new release in a thread
+-        self.meta_release = MetaRelease(
+-            self.options and self.options.devel_release,
+-            self.options and self.options.use_proposed,
+-            self.options and self.options.debug,
+-        )
++        # Armbian: the next release comes from the Armbian distribution status
++        self.meta_release = ArmbianRelease()
+ 
+     def begin_user_resizable(self, stored_width=0, stored_height=0):
+         self.set_resizable(True)

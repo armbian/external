@@ -1,0 +1,24 @@
+name: ubuntu-release-upgrader
+method: build
+# python3-distupgrade only, for update-manager on Debian. Debian has no ubuntu-release-upgrader.
+# Ubuntu releases use their own package. The build copies UpdateManager files: build_depends.
+packaging:
+  url: http://archive.ubuntu.com/ubuntu
+  suite: resolute
+  components: [main]
+  package: ubuntu-release-upgrader
+build_depends:
+- update-manager
+releases:
+- bookworm
+- trixie
+- forky
+- sid
+architectures:
+- amd64
+- arm64
+target: desktop
+repositories:
+- beta
+install:
+- python3-distupgrade

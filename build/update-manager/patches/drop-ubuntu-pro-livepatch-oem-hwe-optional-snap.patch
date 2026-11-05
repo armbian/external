@@ -1,0 +1,139 @@
+Drop Ubuntu Pro, Livepatch, OEM metapackages and HWE checks.
+Use snap only when snapd and its GObject bindings exist.
+
+diff --git a/UpdateManager/Dialogs.py b/UpdateManager/Dialogs.py
+index 304609c..c5cd075 100644
+--- a/UpdateManager/Dialogs.py
++++ b/UpdateManager/Dialogs.py
+@@ -39,7 +39,6 @@ import distro_info
+ import os
+ 
+ import HweSupportStatus.consts
+-from .Core.LivePatchSocket import LivePatchSocket
+ from .Core.utils import get_dist
+ 
+ from gettext import gettext as _
+@@ -210,8 +209,8 @@ class InternalDialog(BuilderDialog):
+             self.lp_socket.get_status(self.on_livepatch_status_ready)
+ 
+     def check_livepatch_status(self):
+-        self.lp_socket = LivePatchSocket()
+-        self.lp_socket.get_status(self.on_livepatch_status_ready)
++        # Armbian: no Livepatch.
++        return
+ 
+ 
+ class StoppedUpdatesDialog(InternalDialog):
+diff --git a/UpdateManager/UpdateManager.py b/UpdateManager/UpdateManager.py
+index 84c1a0d..9835523 100644
+--- a/UpdateManager/UpdateManager.py
++++ b/UpdateManager/UpdateManager.py
+@@ -25,8 +25,6 @@ from gi.repository import Gdk, GdkX11
+ from gi.repository import Gio
+ from gi.repository import GLib
+ from gi.repository import GObject
+-import uaclient.api.u.pro.packages.updates.v1 as ua
+-import UbuntuDrivers.detect
+ 
+ GdkX11  # pyflakes
+ 
+@@ -254,8 +252,6 @@ class UpdateManager(Gtk.Window):
+                 ))
+                 return
+ 
+-            self._check_oem_metapackages()
+-
+             self._get_ua_security_status()
+ 
+             for pkgname in self.oem_metapackages:
+@@ -363,6 +359,8 @@ class UpdateManager(Gtk.Window):
+             self._start_pane(pane)
+ 
+     def _check_oem_metapackages(self):
++        # Armbian: no Ubuntu OEM metapackages.
++        return None
+         di = distro_info.UbuntuDistroInfo()
+         codename = get_dist()
+         lts = di.is_lts(codename)
+@@ -393,11 +391,8 @@ class UpdateManager(Gtk.Window):
+                 self.oem_metapackages.add(pkg.name)
+ 
+     def _fetch_ua_updates(self, cb=None):
+-        try:
+-            self.ua_updates = ua.updates().updates
+-        except Exception as e:
+-            print("Error running updates end-point: ", e)
+-            self.ua_updates = []
++        # Armbian: no Ubuntu Pro.
++        self.ua_updates = []
+         if cb:
+             cb()
+ 
+@@ -435,7 +430,6 @@ class UpdateManager(Gtk.Window):
+         cancelled_update=False,
+         error_occurred=False,
+     ):
+-        self._check_hwe_support_status()
+         if install_count != 0:
+             header = None
+             desc = None
+diff --git a/UpdateManager/UpdatesAvailable.py b/UpdateManager/UpdatesAvailable.py
+index 9f94059..fa98f96 100644
+--- a/UpdateManager/UpdatesAvailable.py
++++ b/UpdateManager/UpdatesAvailable.py
+@@ -386,16 +386,8 @@ class UpdatesAvailable(InternalDialog):
+             "network-3g-alert", self._on_network_3g_alert
+         )
+ 
+-        try:
+-            from uaclient.api.u.apt_news.current_news.v1 import current_news
+-            apt_news = current_news().current_news
+-        except ImportError:
+-            apt_news = self._get_apt_news(
+-                "/var/lib/ubuntu-advantage/messages/apt-news"
+-            )
+-        except Exception as e:
+-            print("Error running current_news end-point: ", e)
+-            apt_news = ""
++        # Armbian: no Ubuntu Pro apt news.
++        apt_news = ""
+         if apt_news:
+             self.news.get_buffer().set_text(apt_news)
+             self.expander_news.set_visible(True)
+diff --git a/UpdateManager/backend/__init__.py b/UpdateManager/backend/__init__.py
+index 72a6031..5e5d4ec 100644
+--- a/UpdateManager/backend/__init__.py
++++ b/UpdateManager/backend/__init__.py
+@@ -7,8 +7,14 @@
+ import gi
+ 
+ gi.require_version("Gtk", "3.0")
+-gi.require_version("Snapd", "2")
+-from gi.repository import GLib, Gtk, Snapd
++from gi.repository import GLib, Gtk
++
++# Armbian: snap support only when snapd and its GObject bindings exist.
++try:
++    gi.require_version("Snapd", "2")
++    from gi.repository import Snapd
++except (ImportError, ValueError):
++    Snapd = None
+ 
+ from apt import Cache
+ import json
+@@ -388,6 +394,7 @@ class InstallBackend(Dialog):
+         elif action == self.ACTION_INSTALL:
+             if (
+                 success
++                and Snapd is not None
+                 and os.path.exists("/usr/bin/snap")
+                 and hasattr(self, "pane_update_progress")
+             ):
+@@ -407,6 +414,7 @@ class InstallBackend(Dialog):
+                 self.window_main.start_error(True, error_string, error_desc)
+             elif (
+                 success
++                and Snapd is not None
+                 and os.path.exists("/usr/bin/snap")
+                 and hasattr(self, "pane_update_progress")
+             ):
