@@ -84,7 +84,7 @@ index 0000000..5cd405d
 +        # MetaRelease is a GObject. This class never downloads.
 +        return 0
 diff --git a/UpdateManager/Dialogs.py b/UpdateManager/Dialogs.py
-index 2763962..2c11a10 100644
+index 2763962..69bdbd1 100644
 --- a/UpdateManager/Dialogs.py
 +++ b/UpdateManager/Dialogs.py
 @@ -44,6 +44,18 @@ from gettext import gettext as _
@@ -94,7 +94,7 @@ index 2763962..2c11a10 100644
 +def run_in_terminal(command):
 +    """Armbian: run a root command in a terminal, then wait for Enter."""
 +    script = (
-+        "sudo %s; echo; read -p '%s' answer"
++        "sudo %s; echo; printf '%s '; read answer"
 +        % (command, _("Press Enter to close this window."))
 +    )
 +    os.execvp(
