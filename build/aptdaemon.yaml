@@ -1,0 +1,24 @@
+name: aptdaemon
+method: build
+# aptdaemon on Debian, so update-manager installs updates the same way on all releases.
+# Debian dropped aptdaemon after jessie. Ubuntu releases use their own package.
+packaging:
+  url: http://archive.ubuntu.com/ubuntu
+  suite: resolute
+  components: [main]
+  package: aptdaemon
+build_depends:
+- python-defer
+releases:
+- bookworm
+- trixie
+- forky
+- sid
+architectures:
+- amd64
+- arm64
+target: desktop
+repositories:
+- beta
+install:
+- python3-aptdaemon.gtk3widgets
