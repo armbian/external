@@ -4,5 +4,4 @@ debian-changelogs-and-security-origin-armbian-base.patch
 release-upgrade-with-armbian-config.patch
 drop-ubuntu-only-dependencies.patch
 optional-update-notifier.patch
-synaptic-in-usr-bin.patch
 armbian-update-notifier.patch

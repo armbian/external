@@ -2,10 +2,12 @@ Drop dependencies that Debian does not have or that Armbian does not use.
 Move python3-distupgrade to update-manager-core: the python3-distupgrade build
 needs python3-update-manager.
 Make libhandy optional: forky and sid do not have it.
+Install updates with aptdaemon only. Synaptic 0.92 (forky, sid) lacks the
+options that the Synaptic backend uses.
 Skip the tests with nocheck.
 
 diff --git a/debian/control b/debian/control
-index 931ff32..7832ce9 100644
+index 931ff32..972dd34 100644
 --- a/debian/control
 +++ b/debian/control
 @@ -9,7 +9,6 @@ Build-Depends: debhelper (>= 9),
@@ -35,7 +37,7 @@ index 931ff32..7832ce9 100644
           ${misc:Depends},
           ${python3:Depends},
  Suggests: python3-launchpadlib,
-@@ -58,7 +55,6 @@ Description: Python 3.x module for update-manager
+@@ -58,24 +55,23 @@ Description: Python 3.x module for update-manager
  Package: update-manager
  Architecture: all
  Depends: gir1.2-gtk-3.0,
@@ -43,7 +45,9 @@ index 931ff32..7832ce9 100644
           gnome-shell | policykit-1-gnome | polkit-kde-agent-1 | lxpolkit | lxqt-policykit | mate-polkit | polkit-1-auth-agent,
           libgtk3-perl,
           pkexec,
-@@ -67,15 +63,15 @@ Depends: gir1.2-gtk-3.0,
+          polkitd,
+-         python3-aptdaemon.gtk3widgets (>= 1.1.1+bzr982-0ubuntu13) | synaptic,
++         python3-aptdaemon.gtk3widgets (>= 1.1.1+bzr982-0ubuntu13),
           python3-dbus,
           python3-gi (>= 3.8),
           python3-yaml,
