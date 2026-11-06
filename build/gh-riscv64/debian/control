@@ -8,7 +8,7 @@ Homepage: https://github.com/cli/cli
 
 Package: gh
 Architecture: riscv64
-Depends: git, ${misc:Depends}
+Depends: git, ca-certificates, ${misc:Depends}
 Description: GitHub CLI
  gh brings pull requests, issues, releases and other GitHub
  concepts to the terminal.

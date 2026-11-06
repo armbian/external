@@ -50,7 +50,9 @@ def collect(pkgs, manifests, describe=None):
     releases, release_arches, files, skipped = set(), {}, {}, {}
     for doc in manifests.values():
         releases.update(doc.get("releases", []))
-        release_arches.update(doc.get("release_arches", {}))
+        # Union: an older manifest must not hide an arch that a newer one has.
+        for rel, arches in doc.get("release_arches", {}).items():
+            release_arches.setdefault(rel, set()).update(arches)
         for x in doc.get("files", []):
             if not x.get("carried"):       # old versions and removed configs
                 files.setdefault(x["config"], []).append(x)
@@ -58,7 +60,8 @@ def collect(pkgs, manifests, describe=None):
             skipped[(s["config"], s["release"], s["arch"])] = s["reason"]
     releases = sorted(releases) or list(config.DEFAULT_RELEASES)
     if release_arches:
-        releases = {r: release_arches.get(r, config.ARCHES) for r in releases}
+        releases = {r: tuple(a for a in config.ARCHES if a in release_arches[r])
+                    if r in release_arches else config.ARCHES for r in releases}
 
     out = []
     for pkg in sorted(pkgs, key=lambda p: p["name"]):
