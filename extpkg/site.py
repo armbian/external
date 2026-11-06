@@ -47,15 +47,18 @@ def _describe(pkg, files, main, describe):
 
 def collect(pkgs, manifests, describe=None):
     """Return the site data. manifests: {name: manifest}. describe(release, target, arch, package)."""
-    releases, files, skipped = set(), {}, {}
+    releases, release_arches, files, skipped = set(), {}, {}, {}
     for doc in manifests.values():
         releases.update(doc.get("releases", []))
+        release_arches.update(doc.get("release_arches", {}))
         for x in doc.get("files", []):
             if not x.get("carried"):       # old versions and removed configs
                 files.setdefault(x["config"], []).append(x)
         for s in doc.get("skipped", []):
             skipped[(s["config"], s["release"], s["arch"])] = s["reason"]
     releases = sorted(releases) or list(config.DEFAULT_RELEASES)
+    if release_arches:
+        releases = {r: release_arches.get(r, config.ARCHES) for r in releases}
 
     out = []
     for pkg in sorted(pkgs, key=lambda p: p["name"]):
@@ -114,7 +117,7 @@ def collect(pkgs, manifests, describe=None):
     return {
         "generated": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "manifests": {n: d.get("generated") for n, d in sorted(manifests.items())},
-        "releases": releases,
+        "releases": sorted(releases),
         "packages": out,
     }
 

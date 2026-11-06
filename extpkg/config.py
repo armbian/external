@@ -22,8 +22,10 @@ TARGETS = ("main", "utils", "desktop")
 # Old configs: REPOSITORY=B (beta), S (stable), BS (both).
 REPOSITORIES = ("stable", "beta")
 ARCHES = ("amd64", "arm64", "armhf", "riscv64", "loong64", "i386")
-# Used when the armbian/build checkout is not available.
-DEFAULT_RELEASES = ["bookworm", "trixie", "forky", "jammy", "noble", "resolute"]
+# Used when the armbian/build checkout is not available: release -> architectures.
+_ALL = ("arm64", "armhf", "riscv64", "amd64")
+DEFAULT_RELEASES = {"bookworm": ("arm64", "armhf", "amd64"), "trixie": _ALL, "forky": _ALL,
+                    "jammy": _ALL, "noble": _ALL, "resolute": _ALL}
 
 
 class ConfigError(ValueError):
@@ -177,25 +179,36 @@ def _check_build_depends(directory, pkgs):
 
 
 def supported_releases(build_dir):
-    """Releases whose config/distributions/<rel>/support is not 'eos'."""
+    """{release: architectures} of the releases whose config/distributions/<rel>/support
+    is not 'eos'. The architectures come from config/distributions/<rel>/architectures."""
     if not build_dir:
-        return list(DEFAULT_RELEASES)
-    out = []
+        return dict(DEFAULT_RELEASES)
+    out = {}
     for support in sorted(glob.glob(os.path.join(build_dir, "config/distributions/*/support"))):
         with open(support) as f:
-            if f.read().strip() != "eos":
-                out.append(os.path.basename(os.path.dirname(support)))
+            if f.read().strip() == "eos":
+                continue
+        rel_dir = os.path.dirname(support)
+        with open(os.path.join(rel_dir, "architectures")) as f:
+            out[os.path.basename(rel_dir)] = tuple(a.strip() for a in f.read().split(",") if a.strip())
     if not out:
         raise ConfigError(f"no supported releases found under {build_dir}")
     return out
 
 
 def expand(pkg, releases_all):
-    """Yield (release, arch) for one package."""
-    releases = releases_all if pkg["releases"] == "all" else pkg["releases"]
+    """Yield (release, arch) for one package.
+
+    releases_all: a list of releases, or {release: architectures}. With the
+    mapping, an architecture that Armbian does not build for a release is
+    left out (bookworm has no riscv64)."""
+    releases = list(releases_all) if pkg["releases"] == "all" else pkg["releases"]
+    arches = releases_all if isinstance(releases_all, dict) else {}
     skip = set(pkg.get("skip", []))
     for arch in pkg["architectures"]:
         for rel in releases:
+            if rel in arches and arch not in arches[rel]:
+                continue
             if f"{rel}/{arch}" not in skip:
                 yield rel, arch
 
