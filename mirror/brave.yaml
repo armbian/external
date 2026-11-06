@@ -1,0 +1,19 @@
+name: brave
+method: apt
+# Brave and Brave Origin browsers, offered in the armbian-hyprland-shell
+# Install menu. Both depend on brave-keyring. brave.com/signing-keys lists
+# the key that signs the repository (keys/brave-browser-archive-keyring.gpg).
+source:
+  url: https://brave-browser-apt-release.s3.brave.com
+  suite: stable
+  components:
+  - main
+releases: all
+architectures:
+- amd64
+- arm64
+target: desktop
+install:
+- brave-browser
+- brave-origin
+filter: Name (= brave-browser) | Name (= brave-origin) | Name (= brave-keyring)
