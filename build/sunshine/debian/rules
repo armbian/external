@@ -1,0 +1,64 @@
+#!/usr/bin/make -f
+# Upstream Sunshine built with CMake, after the upstream Arch PKGBUILD
+# (omacom/omarchy-pkgs, pkgbuilds/sunshine). The submodules come from
+# upstream.submodules in build/sunshine.yaml. CUDA is off: it needs the
+# proprietary toolkit.
+include /usr/share/dpkg/pkg-info.mk
+include /usr/share/dpkg/architecture.mk
+PKG = debian/sunshine
+
+# Sunshine links the patched static FFmpeg of LizardByte/build-deps.
+# Use the release that the third-party/build-deps submodule pins. Update
+# the tag and the SHA256 (GitHub release asset digest) with each upstream tag.
+FFMPEG_TAG = v2026.910.121303
+FFMPEG_ARCH_amd64 = x86_64
+FFMPEG_ARCH_arm64 = aarch64
+FFMPEG_SHA256_amd64 = 496d2bbb674d01e6033e31b9dfc15cbc9dc1494e882a4505f6ab1e03f75b385c
+FFMPEG_SHA256_arm64 = 21f99409e1aba09191f9df28688fb7f9d44f98e65378a651324c632c19823aa0
+FFMPEG_ASSET = Linux-$(FFMPEG_ARCH_$(DEB_HOST_ARCH))-ffmpeg.tar.gz
+FFMPEG_DIR = $(CURDIR)/debian/ffmpeg
+
+export BRANCH = master
+export BUILD_VERSION = $(DEB_VERSION_UPSTREAM)
+export npm_config_cache = $(CURDIR)/debian/npm-cache
+export npm_config_update_notifier = false
+
+%:
+	dh $@ --buildsystem=cmake
+
+override_dh_auto_configure:
+	curl -fsSL --retry 3 -o debian/$(FFMPEG_ASSET) \
+		https://github.com/LizardByte/build-deps/releases/download/$(FFMPEG_TAG)/$(FFMPEG_ASSET)
+	echo "$(FFMPEG_SHA256_$(DEB_HOST_ARCH))  debian/$(FFMPEG_ASSET)" | sha256sum -c -
+	mkdir -p $(FFMPEG_DIR)
+	tar -xzf debian/$(FFMPEG_ASSET) -C $(FFMPEG_DIR) --no-same-owner
+	dh_auto_configure -- -Wno-dev \
+		-DBUILD_DOCS=OFF -DBUILD_TESTS=OFF \
+		-DSUNSHINE_EXECUTABLE_PATH=/usr/bin/sunshine \
+		-DSUNSHINE_ASSETS_DIR=share/sunshine \
+		-DSUNSHINE_PUBLISHER_NAME=Armbian \
+		-DSUNSHINE_PUBLISHER_WEBSITE=https://www.armbian.com \
+		-DSUNSHINE_PUBLISHER_ISSUE_URL=https://github.com/armbian/external/issues \
+		-DSUNSHINE_ENABLE_CUDA=OFF -DCUDA_FAIL_ON_MISSING=OFF \
+		-DSUNSHINE_SYSTEM_VULKAN_HEADERS=ON \
+		-DSUNSHINE_SYSTEM_WAYLAND_PROTOCOLS=ON \
+		-DBOOST_USE_STATIC=OFF \
+		-DGLAD_SKIP_PIP_INSTALL=ON \
+		-DFFMPEG_PREPARED_BINARIES=$(FFMPEG_DIR)/ffmpeg
+
+override_dh_auto_install:
+	dh_auto_install
+	# Omarchy runs "systemctl --user enable --now sunshine". The unit
+	# file has Alias=sunshine.service: the alias name must also resolve.
+	ln -s app-dev.lizardbyte.app.Sunshine.service $(PKG)/usr/lib/systemd/user/sunshine.service
+	# Load uinput too, as the Arch package does.
+	echo uinput >> $(PKG)/usr/lib/modules-load.d/60-sunshine.conf
+
+override_dh_auto_test:
+
+# The user enables the service. Do not start it for all users.
+override_dh_installsystemduser:
+
+override_dh_auto_clean:
+	dh_auto_clean
+	rm -rf debian/ffmpeg debian/npm-cache debian/$(FFMPEG_ASSET) node_modules
