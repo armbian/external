@@ -270,3 +270,5 @@ python-gpgme python3-gpg
 python-protobuf python3-protobuf
 visual-studio-code-bin code
 words wamerican
+brave-bin brave-browser
+brave-origin-bin brave-origin
