@@ -40,6 +40,12 @@ class Site(unittest.TestCase):
         self.assertEqual(p["releases"]["trixie"]["arm64"]["state"], "missing")
         self.assertEqual(p["status"], "partial")
 
+    def test_arch_all_covers_every_arch(self):
+        files = [entry(r, "amd64", False, deb_arch="all") for r in ("noble", "trixie")]
+        p = site.collect([PKG], self.manifest(files))["packages"][0]
+        self.assertEqual(p["releases"]["noble"]["arm64"]["state"], "beta")
+        self.assertEqual(p["status"], "ready")
+
     def test_ready_and_describe(self):
         files = [entry(r, a, True) for r in ("noble", "trixie") for a in ("arm64", "amd64")]
         p = site.collect([PKG], self.manifest(files), lambda *k: "from index")["packages"][0]

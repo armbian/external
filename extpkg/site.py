@@ -66,6 +66,11 @@ def collect(pkgs, manifests, describe=None):
         cells, wanted, ready = {}, 0, 0
         for rel, arch in config.expand(pkg, releases):
             here = [x for x in mine if x["release"] == rel and x["arch"] == arch]
+            # A build of only Architecture: all packages is kept once, under one
+            # arch. The repository serves it to every arch of the release.
+            in_rel = [x for x in mine if x["release"] == rel]
+            if not here and in_rel and all(x.get("deb_arch") == "all" for x in in_rel):
+                here = in_rel
             reason = skipped.get((pkg["name"], rel, arch))
             if here:
                 # published: the stable repository has this version or a newer one.
