@@ -1,0 +1,22 @@
+Source: zed-editor
+Section: editors
+Priority: optional
+Maintainer: Armbian <info@armbian.com>
+Build-Depends: debhelper-compat (= 13), curl, ca-certificates,
+ libasound2-dev, libglib2.0-dev, libx11-xcb-dev, libxcb1-dev,
+ libxkbcommon-dev, libxkbcommon-x11-dev
+Standards-Version: 4.7.0
+Homepage: https://zed.dev
+
+Package: zed
+Architecture: amd64 arm64
+Depends: ${shlibs:Depends}, ${misc:Depends},
+ libvulkan1, mesa-vulkan-drivers | vulkan-icd, libwayland-client0
+Suggests: netcat-openbsd, clang, cmake, gnome-keyring
+Description: high-performance multiplayer code editor
+ Zed is a code editor from the creators of Atom and Tree-sitter. It
+ renders with the GPU through Vulkan.
+ .
+ Repack of the upstream release from GitHub. It uses the system libraries.
+ The editor does not update itself: apt installs the updates. The commands
+ are zed and zeditor.

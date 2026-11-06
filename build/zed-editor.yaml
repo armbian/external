@@ -1,0 +1,19 @@
+name: zed-editor
+method: build
+# Zed code editor (GPL-3.0-or-later, AGPL-3.0-or-later, Apache-2.0).
+# Repacks the upstream release tarball, after the upstream Arch PKGBUILD
+# (omacom/omarchy-pkgs, pkgbuilds/zed). The binary package is zed. The
+# source is zed-editor: Debian has an unrelated source package zed (OCaml,
+# binaries libzed-ocaml*). Local packaging in build/zed-editor/debian/.
+upstream:
+  url: https://github.com/zed-industries/zed
+  ref: v1.27.0
+releases: all
+architectures:
+- amd64
+- arm64
+target: desktop
+repositories:
+- beta
+install:
+- zed

@@ -1,0 +1,53 @@
+#!/usr/bin/make -f
+# Repack the upstream release of the tag. Install steps follow the upstream
+# Arch PKGBUILD (omacom/omarchy-pkgs, pkgbuilds/zed). The SHA256 values are
+# the GitHub release asset digests of that tag: update them with the tag.
+include /usr/share/dpkg/pkg-info.mk
+include /usr/share/dpkg/architecture.mk
+
+PKG = debian/zed
+ARCH_amd64 = x86_64
+ARCH_arm64 = aarch64
+SHA256_1.27.0_amd64 = 719f6bf649ea8d87961adbf728e178561bac3f598d72d7949558d1150cfc43dd
+SHA256_1.27.0_arm64 = 9e4f8b182f41d4cd434cbbc6d1562329a33ef048d65a39bae0665465d0a638bb
+ASSET = zed-linux-$(ARCH_$(DEB_HOST_ARCH)).tar.gz
+SHA256 = $(SHA256_$(DEB_VERSION_UPSTREAM)_$(DEB_HOST_ARCH))
+URL = https://github.com/zed-industries/zed/releases/download/v$(DEB_VERSION_UPSTREAM)/$(ASSET)
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	test -n "$(SHA256)" || { echo "No SHA256 for $(DEB_VERSION_UPSTREAM) $(DEB_HOST_ARCH)"; exit 1; }
+	curl -fsSL --retry 3 -o debian/$(ASSET) $(URL)
+	echo "$(SHA256)  debian/$(ASSET)" | sha256sum -c -
+	mkdir -p debian/release
+	tar -xzf debian/$(ASSET) -C debian/release --no-same-owner
+
+# The bundled lib/ is not installed: the package uses the system libraries.
+# The -dev packages in Build-Depends let dh_shlibdeps find them.
+override_dh_auto_install:
+	cd debian/release/zed.app && \
+		install -D -m755 bin/zed $(CURDIR)/$(PKG)/usr/bin/zed.real && \
+		install -D -m755 libexec/zed-editor $(CURDIR)/$(PKG)/usr/lib/zed/zed-editor && \
+		install -D -m644 share/applications/dev.zed.Zed.desktop \
+			$(CURDIR)/$(PKG)/usr/share/applications/dev.zed.Zed.desktop && \
+		for s in 512x512 1024x1024; do \
+			install -D -m644 share/icons/hicolor/$$s/apps/zed.png \
+				$(CURDIR)/$(PKG)/usr/share/icons/hicolor/$$s/apps/zed.png || exit 1; \
+		done && \
+		install -D -m644 licenses.md $(CURDIR)/$(PKG)/usr/share/doc/zed/licenses.md
+	# ZED_UPDATE_EXPLANATION stops the self-update of the editor.
+	printf '%s\n' '#!/bin/sh' \
+		"export ZED_UPDATE_EXPLANATION='Updates are handled by your package manager'" \
+		'exec /usr/bin/zed.real "$$@"' > $(PKG)/usr/bin/zed
+	chmod 755 $(PKG)/usr/bin/zed
+	ln -s zed $(PKG)/usr/bin/zeditor
+
+override_dh_auto_configure override_dh_auto_test:
+
+# Upstream binaries: keep them as released.
+override_dh_strip override_dh_dwz:
+
+override_dh_auto_clean:
+	rm -rf debian/release debian/*.tar.gz
