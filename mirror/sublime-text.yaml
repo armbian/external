@@ -4,8 +4,8 @@ method: apt
 # repository; it also holds Sublime Merge. keys/sublimehq.gpg holds the
 # vendor key file; the primary 1EDDE2CD...8A8F901A matches the vendor docs.
 source:
-  url: https://download.sublimetext.com/apt/stable/
-  suite: ./
+  url: https://download.sublimetext.com
+  suite: apt/stable/
 releases: all
 architectures:
 - amd64
