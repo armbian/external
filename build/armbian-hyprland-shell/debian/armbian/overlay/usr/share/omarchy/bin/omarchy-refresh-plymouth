@@ -1,0 +1,11 @@
+#!/bin/bash
+
+# omarchy:summary=Set the Armbian default Plymouth boot theme and rebuild the initramfs.
+# omarchy:requires-sudo=true
+
+# Armbian: Plymouth. The boot theme is armbian (armbian-plymouth-theme).
+# Upstream publishes its own omarchy theme, which Armbian does not ship.
+
+set -euo pipefail
+
+sudo plymouth-set-default-theme -R armbian
