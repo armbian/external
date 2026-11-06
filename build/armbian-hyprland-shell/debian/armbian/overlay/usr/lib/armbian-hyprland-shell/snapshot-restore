@@ -1,0 +1,47 @@
+#!/bin/bash
+# Armbian: make a snapper snapshot the root again, as limine-snapper-restore
+# does on Arch. Without a number, restore the snapshot that is booted.
+# The current root stays as <subvolume>.old-<date>.
+set -euo pipefail
+
+n="${1:-}"
+[[ -n $n ]] || n="$(sed -n 's/.*armbian\.snapshot=\([0-9]*\).*/\1/p' /proc/cmdline)"
+if [[ ! $n =~ ^[0-9]+$ ]]; then
+	echo "Usage: omarchy-snapshot restore [number]" >&2
+	echo "Boot a snapshot from the GRUB menu, or give its number:" >&2
+	snapper -c root list >&2 || true
+	exit 1
+fi
+
+uuid="$(sed -n 's/.*root=UUID=\([^ ]*\).*/\1/p' /proc/cmdline)"
+subvol="$(sed -n 's/.*rootflags=subvol=\([^ ,]*\).*/\1/p' /proc/cmdline)"
+base="${subvol%%/*}"
+if [[ -z $uuid || -z $base ]]; then
+	echo "The root is not a btrfs subvolume on root=UUID=: cannot restore." >&2
+	exit 1
+fi
+
+top="$(mktemp -d)"
+trap 'umount "$top" 2> /dev/null || true; rmdir "$top"' EXIT
+mount -o subvolid=5 "$(blkid -U "$uuid")" "$top"
+
+src="$top/$base/.snapshots/$n/snapshot"
+if [[ ! -d $src ]]; then
+	echo "Snapshot $n does not exist." >&2
+	exit 1
+fi
+
+stamp="$(date +%Y%m%d-%H%M%S)"
+if [[ -t 0 ]]; then
+	read -r -p "Make snapshot $n the root? The current root stays as $base.old-$stamp. [y/N] " answer
+	[[ $answer == [yY]* ]] || exit 1
+fi
+
+btrfs subvolume snapshot "$src" "$top/$base.new-$stamp" > /dev/null
+rmdir "$top/$base.new-$stamp/.snapshots" 2> /dev/null || true
+mv "$top/$base" "$top/$base.old-$stamp"
+mv "$top/$base.new-$stamp" "$top/$base"
+mv "$top/$base.old-$stamp/.snapshots" "$top/$base/.snapshots"
+
+echo "Snapshot $n is the root now. Reboot to use it."
+echo "Remove the old root when you no longer need it: btrfs subvolume delete <top>/$base.old-$stamp"

@@ -1,0 +1,10 @@
+#!/bin/sh
+# Armbian: tell the user that the system runs from a snapshot (GRUB snapshot
+# entry, armbian.snapshot=<number>). Changes are lost at reboot.
+n="$(sed -n 's/.*armbian\.snapshot=\([0-9]*\).*/\1/p' /proc/cmdline)"
+[ -n "$n" ] || exit 0
+text="This system runs from snapshot $n. Changes are lost at reboot. To keep this state, run: omarchy-snapshot restore"
+case "$1" in
+--notify) notify-send -u critical -a Armbian "Snapshot $n" "$text" ;;
+*) printf '\033[0;91m %s\033[0m\n' "$text" ;;
+esac

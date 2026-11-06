@@ -1,0 +1,30 @@
+#!/bin/sh
+# Armbian: boot a snapper snapshot of the root with a writable RAM overlay.
+# The GRUB snapshot entries (/etc/grub.d/42_armbian-snapshots) set
+# armbian.snapshot=<number>.
+PREREQ=""
+prereqs() { echo "$PREREQ"; }
+case "$1" in
+prereqs)
+	prereqs
+	exit 0
+	;;
+esac
+
+grep -q 'armbian\.snapshot=' /proc/cmdline || exit 0
+. /scripts/functions
+
+d=/run/armbian-snapshot
+if ! modprobe overlay; then
+	log_failure_msg "armbian-snapshot: no overlay module, the snapshot stays read-only"
+	exit 0
+fi
+mkdir -p "$d/lower" "$d/rw"
+mount -n -o move "${rootmnt}" "$d/lower"
+mount -n -t tmpfs -o mode=0755 tmpfs "$d/rw"
+mkdir -p "$d/rw/upper" "$d/rw/work"
+if ! mount -n -t overlay -o "lowerdir=$d/lower,upperdir=$d/rw/upper,workdir=$d/rw/work" overlay "${rootmnt}"; then
+	log_failure_msg "armbian-snapshot: overlay failed, the snapshot stays read-only"
+	mount -n -o move "$d/lower" "${rootmnt}"
+fi
+exit 0

@@ -1,0 +1,3 @@
+#!/bin/sh
+# Armbian: warn on the console when the system runs from a snapshot.
+exec /usr/lib/armbian-hyprland-shell/snapshot-notice

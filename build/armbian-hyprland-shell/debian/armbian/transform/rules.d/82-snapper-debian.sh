@@ -3,8 +3,9 @@
 # Debian has no limine-snapper-sync: enable the cleanup timer alone.
 # Armbian images can have an ext4 root. There snapper has nothing to
 # snapshot: return 127 like a missing snapper, so omarchy-update stays quiet.
-# Armbian has no snapshot boot entries yet (limine on Arch). The root
-# mounts subvol=@, so snapper rollback has no effect either. Say so.
+# Boot entries: GRUB (etc/grub.d/42_armbian-snapshots) instead of limine.
+# Boards without GRUB have no boot menu: say so. Restore: snapshot-restore
+# instead of limine-snapper-restore.
 . "$TRANSFORM_LIB"
 
 replace install/config/snapper.sh 'SNAPPER_CONF_PATH="${OMARCHY_SNAPPER_CONF_PATH:-/etc/conf.d/snapper}"' 'SNAPPER_CONF_PATH="${OMARCHY_SNAPPER_CONF_PATH:-/etc/default/snapper}"' 1
@@ -17,4 +18,9 @@ replace bin/omarchy-snapshot 'if omarchy-cmd-missing snapper; then
 fi' 'if omarchy-cmd-missing snapper || [[ $(findmnt -n -o FSTYPE /) != btrfs ]]; then
   exit 127 # omarchy-update can use this to just ignore if snapper is not available
 fi' 1
-replace bin/omarchy-snapshot '  echo "Snapshots can be selected during boot."' '  echo "Snapshots are in /.snapshots. Selecting them during boot is not available on Armbian yet."' 1
+replace bin/omarchy-snapshot '  echo "Snapshots can be selected during boot."' '  if [[ -x /etc/grub.d/42_armbian-snapshots && -d /boot/grub ]]; then
+    echo "Snapshots can be selected during boot."
+  else
+    echo "Snapshots are in /.snapshots. Selecting them during boot needs GRUB."
+  fi' 1
+replace bin/omarchy-snapshot '  sudo limine-snapper-restore' '  sudo /usr/lib/armbian-hyprland-shell/snapshot-restore "${@:2}"' 1

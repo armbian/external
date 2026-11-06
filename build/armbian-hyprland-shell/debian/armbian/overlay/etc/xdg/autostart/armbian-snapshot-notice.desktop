@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Armbian snapshot notice
+Comment=Tell the user that the system runs from a snapshot
+Exec=/usr/lib/armbian-hyprland-shell/snapshot-notice --notify
+NoDisplay=true
+OnlyShowIn=Hyprland;
