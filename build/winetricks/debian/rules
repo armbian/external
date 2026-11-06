@@ -1,0 +1,12 @@
+#!/usr/bin/make -f
+# Upstream "make install" installs the script, man page, desktop file,
+# metainfo, icon and bash completion.
+
+%:
+	dh $@
+
+override_dh_auto_install:
+	$(MAKE) install DESTDIR=$(CURDIR)/debian/winetricks PREFIX=/usr
+
+# The upstream tests download files and need Wine.
+override_dh_auto_test:

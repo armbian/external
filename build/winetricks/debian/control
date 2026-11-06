@@ -1,0 +1,27 @@
+Source: winetricks
+Section: otherosfs
+Priority: optional
+Maintainer: Armbian <info@armbian.com>
+Build-Depends: debhelper-compat (= 13)
+Standards-Version: 4.7.0
+Homepage: https://github.com/Winetricks/winetricks
+
+Package: winetricks
+Architecture: all
+Multi-Arch: foreign
+Depends: ${misc:Depends},
+ 7zip | p7zip-full,
+ aria2 | wget | curl,
+ binutils,
+ cabextract,
+ unzip
+Recommends: winehq-staging | wine,
+ xdg-utils,
+ xz-utils,
+ zenity | kdialog | x11-utils
+Suggests: unrar-free | unrar
+Description: Simple tool to work around common problems in Wine
+ Winetricks installs DLLs, fonts and runtimes into a Wine prefix,
+ and changes Wine settings. It has a GUI and a command line.
+ .
+ Upstream: https://github.com/Winetricks/winetricks (LGPL-2.1).

@@ -1,0 +1,17 @@
+name: winetricks
+method: build
+# Helper scripts for Wine (LGPL-2.1). Debian forky has no winetricks:
+# it depended on Debian wine, which forky lacks. Wine comes from WineHQ
+# (winehq-staging provides wine). Latest upstream release. Local
+# packaging in build/winetricks/debian/.
+upstream:
+  url: https://github.com/Winetricks/winetricks
+releases: all
+architectures:
+- amd64
+- arm64
+target: utils
+repositories:
+- beta
+install:
+- winetricks
