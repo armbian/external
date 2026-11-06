@@ -2,12 +2,20 @@
 # Armbian: make a snapper snapshot the root again, as limine-snapper-restore
 # does on Arch. Without a number, restore the snapshot that is booted.
 # The current root stays as <subvolume>.old-<date>.
+# Upstream keeps /home on its own subvolume (@home), so a restore does not
+# touch it. Armbian images keep /home in the root: copy the current /home
+# into the restored root. --with-home restores /home from the snapshot too.
 set -euo pipefail
 
+with_home=no
+if [[ ${1:-} == --with-home ]]; then
+	with_home=yes
+	shift
+fi
 n="${1:-}"
 [[ -n $n ]] || n="$(sed -n 's/.*armbian\.snapshot=\([0-9]*\).*/\1/p' /proc/cmdline)"
 if [[ ! $n =~ ^[0-9]+$ ]]; then
-	echo "Usage: omarchy-snapshot restore [number]" >&2
+	echo "Usage: omarchy-snapshot restore [--with-home] [number]" >&2
 	echo "Boot a snapshot from the GRUB menu, or give its number:" >&2
 	snapper -c root list >&2 || true
 	exit 1
@@ -33,12 +41,19 @@ fi
 
 stamp="$(date +%Y%m%d-%H%M%S)"
 if [[ -t 0 ]]; then
-	read -r -p "Make snapshot $n the root? The current root stays as $base.old-$stamp. [y/N] " answer
+	if [[ $with_home == yes ]]; then keep="/home also comes from the snapshot"; else keep="/home stays as it is now"; fi
+	read -r -p "Make snapshot $n the root ($keep)? The current root stays as $base.old-$stamp. [y/N] " answer
 	[[ $answer == [yY]* ]] || exit 1
 fi
 
 btrfs subvolume snapshot "$src" "$top/$base.new-$stamp" > /dev/null
 rmdir "$top/$base.new-$stamp/.snapshots" 2> /dev/null || true
+# /home in the root subvolume (no own subvolume): take the current one.
+# The reflink copy shares the data blocks, so it is fast and takes no space.
+if [[ $with_home == no && -d $top/$base/home && $(stat -c %i "$top/$base/home") != 256 ]]; then
+	rm -rf "$top/$base.new-$stamp/home"
+	cp -a --reflink=always "$top/$base/home" "$top/$base.new-$stamp/home"
+fi
 mv "$top/$base" "$top/$base.old-$stamp"
 mv "$top/$base.new-$stamp" "$top/$base"
 mv "$top/$base.old-$stamp/.snapshots" "$top/$base/.snapshots"
