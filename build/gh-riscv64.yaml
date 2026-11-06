@@ -6,11 +6,11 @@ method: build
 # Local packaging in build/gh-riscv64/debian/.
 # No jammy: the riscv64 runner's node24 needs glibc 2.38.
 # Jammy has gh in Ubuntu universe.
+# No resolute: its riscv64 userland needs RVA23. The runner CPUs lack it.
 upstream:
   url: https://github.com/cli/cli
 releases:
 - noble
-- resolute
 - trixie
 - forky
 - sid
