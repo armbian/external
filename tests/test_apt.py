@@ -49,6 +49,7 @@ class Flat(unittest.TestCase):
         self.assertEqual(r._base(), "https://download.sublimetext.com/apt/stable")
         self.assertEqual(r.pool_url("files/a.deb"), "https://download.sublimetext.com/files/a.deb")
 
+
 def _gpg(home, *args, data=None):
     return subprocess.run(["gpg", "--homedir", home, "--batch", "--quiet", *args],
                           input=data, capture_output=True, check=True).stdout
