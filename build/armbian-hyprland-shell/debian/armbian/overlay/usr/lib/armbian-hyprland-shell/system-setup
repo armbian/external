@@ -1,6 +1,7 @@
 #!/bin/sh
 # Armbian: system setup that upstream does at install time
-# (install/config/firewall.sh, install/config/enable-services.sh). Each part
+# (install/config/firewall.sh, install/config/snapper.sh,
+# install/config/enable-services.sh). Each part
 # runs once. armbian-hyprland-shell-setup.service starts it at boot.
 set -e
 state=/var/lib/armbian-hyprland-shell
@@ -24,4 +25,14 @@ if [ ! -e "$state/docker-done" ] && [ -e /usr/lib/systemd/system/docker.socket ]
 	systemctl disable docker.service
 	systemctl enable docker.socket
 	touch "$state/docker-done"
+fi
+
+# Snapshots, as upstream: a snapper config for a btrfs root. omarchy-update
+# takes a snapshot before it updates. Upstream runs this on a new install
+# only: keep a root config that an admin made before.
+if [ ! -e "$state/snapper-done" ] && command -v snapper >/dev/null && [ "$(findmnt -n -o FSTYPE /)" = btrfs ]; then
+	if [ ! -e /etc/snapper/configs/root ]; then
+		bash -e /usr/share/omarchy/install/config/snapper.sh
+	fi
+	touch "$state/snapper-done"
 fi

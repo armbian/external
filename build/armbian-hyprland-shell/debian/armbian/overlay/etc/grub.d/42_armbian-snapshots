@@ -1,0 +1,64 @@
+#! /bin/sh
+# Armbian: GRUB entries for the snapper snapshots of the root, as upstream
+# Omarchy gets from limine-snapper-sync. An entry boots the snapshot with a
+# writable RAM overlay (initramfs script armbian-snapshot-overlay). Changes
+# made there are lost at reboot. omarchy-snapshot restore makes it permanent.
+set -e
+
+prefix="/usr"
+exec_prefix="/usr"
+datarootdir="/usr/share"
+
+. "$pkgdatadir/grub-mkconfig_lib"
+
+snapdir=/.snapshots
+limit=10
+
+# Only for a btrfs root. A snapshot boot has an overlay root: list nothing.
+[ "$(stat -f -c %T /)" = btrfs ] || exit 0
+[ -d "$snapdir" ] || exit 0
+
+# Snapshot path relative to the top level: @/.snapshots, or .snapshots when
+# the root is the top level itself.
+rootsubvol="$(make_system_path_relative_to_its_root /)"
+rootsubvol="${rootsubvol#/}"
+snappath="${rootsubvol:+$rootsubvol/}.snapshots"
+
+# Services that must not run on a snapshot: they change the real disk
+# (first-boot re-key), take a snapshot of the overlay, or remount it with
+# btrfs options.
+masks="systemd.mask=systemd-remount-fs.service systemd.mask=snapper-boot.service systemd.mask=armbian-luks-rekey.service"
+
+# Newest kernel that is in /boot and has its modules in the snapshot.
+snapshot_kernel() {
+	for v in $(ls -1 "$1/usr/lib/modules" 2> /dev/null | sort -V -r); do
+		if [ -f "/boot/vmlinuz-$v" ] && [ -f "/boot/initrd.img-$v" ]; then
+			echo "$v"
+			return
+		fi
+	done
+}
+
+xml() { sed -n "s:.*<$1>\(.*\)</$1>.*:\1:p" "$2" | tr -d "'"; }
+
+entries=""
+for n in $(ls -1 "$snapdir" 2> /dev/null | grep -E '^[0-9]+$' | sort -n -r | head -n "$limit"); do
+	info="$snapdir/$n/info.xml"
+	[ -f "$info" ] && [ -d "$snapdir/$n/snapshot" ] || continue
+	v="$(snapshot_kernel "$snapdir/$n/snapshot")"
+	[ -n "$v" ] || continue
+	# snapper writes the date in UTC.
+	when="$(date -d "$(xml date "$info") UTC" "+%F %R" 2> /dev/null || xml date "$info")"
+	title="Snapshot $n: ${when} $(xml description "$info")"
+	echo "Found snapshot: $n" >&2
+	entries="${entries}
+	menuentry '${title}' --class armbian --class gnu-linux --class os {
+$(prepare_grub_to_access_device "${GRUB_DEVICE_BOOT}" | grub_add_tab | grub_add_tab)
+		linux	$(make_system_path_relative_to_its_root "/boot/vmlinuz-$v") root=UUID=${GRUB_DEVICE_UUID} ro rootflags=subvol=${snappath}/${n}/snapshot armbian.snapshot=${n} ${masks} ${GRUB_CMDLINE_LINUX} ${GRUB_CMDLINE_LINUX_DEFAULT}
+		initrd	$(make_system_path_relative_to_its_root "/boot/initrd.img-$v")
+	}"
+done
+
+[ -n "$entries" ] || exit 0
+printf "%s\n" "submenu '${GRUB_DISTRIBUTOR:-Armbian} snapshots' --class armbian {${entries}
+}"

@@ -1,0 +1,11 @@
+#!/bin/sh
+# Armbian: refresh the GRUB snapshot entries when snapper creates or deletes
+# a snapshot of the root, as limine-snapper-sync does on Arch.
+case "$1" in
+create-snapshot-post | delete-snapshot-post) ;;
+*) exit 0 ;;
+esac
+[ "$2" = / ] || exit 0
+[ -x /etc/grub.d/42_armbian-snapshots ] && command -v update-grub > /dev/null || exit 0
+update-grub > /dev/null 2>&1 || logger -t armbian-snapshots "update-grub failed"
+exit 0
