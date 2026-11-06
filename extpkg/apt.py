@@ -86,9 +86,14 @@ class Keyring:
             dpath = os.path.join(tmp, "data")
             with open(dpath, "wb") as f:
                 f.write(data)
-            cmd = ["gpgv", "--status-fd", "1"]
-            for k in self.files:
-                cmd += ["--keyring", k]
+            # gpgv reads at most 40 keyring files and ignores the rest without
+            # an error. Pass one keyring: the binary key files concatenated.
+            kpath = os.path.join(tmp, "keyring.gpg")
+            with open(kpath, "wb") as out:
+                for k in self.files:
+                    with open(k, "rb") as f:
+                        out.write(f.read())
+            cmd = ["gpgv", "--status-fd", "1", "--keyring", kpath]
             if signature is not None:
                 spath = os.path.join(tmp, "sig")
                 with open(spath, "wb") as f:
@@ -96,7 +101,9 @@ class Keyring:
                 cmd += [spath, dpath]
             else:
                 cmd += [dpath]
-            r = subprocess.run(cmd, capture_output=True, text=True, env={**os.environ, "LC_ALL": "C"})
+            # NOTATION_DATA lines carry raw signature bytes: not always UTF-8.
+            r = subprocess.run(cmd, capture_output=True, text=True, errors="replace",
+                               env={**os.environ, "LC_ALL": "C"})
             return [line.split()[1:] for line in r.stdout.splitlines() if line.startswith("[GNUPG:] ")]
 
     def verify(self, data, signature=None):
@@ -126,7 +133,8 @@ class Repo:
     def __init__(self, url, suite, components, keyring, verify_signature=True):
         self.url = url.rstrip("/")
         self.suite = suite
-        self.flat = suite in FLAT_SUITES
+        # As apt: a suite that ends in "/" is a flat repository below the URL.
+        self.flat = suite in FLAT_SUITES or suite.endswith("/")
         self.components = list(dict.fromkeys(components)) or ([] if self.flat else ["main"])
         self.keyring = keyring
         self.verify_signature = verify_signature
@@ -139,7 +147,7 @@ class Repo:
 
     def _base(self):
         if self.flat:
-            return self.url if self.suite == "./" else f"{self.url}/{self.suite}"
+            return self.url if self.suite == "./" else f"{self.url}/{self.suite.rstrip('/')}"
         return f"{self.url}/dists/{self.suite}"
 
     def _get(self, path):

@@ -64,7 +64,7 @@ Signature rules, as apt uses them:
 | `name` | yes | Same as the file name. |
 | `method` | yes | `apt`, `github` or `url`: take built packages. `build`: build from source, see [Builds](#builds). |
 | `source.url` | yes | Repository, GitHub project or file URL. An `http://` apt URL is tried as `https://` first. |
-| `source.suite` | apt | Suite (`noble`, `stable`) or a flat repository (`./`). |
+| `source.suite` | apt | Suite (`noble`, `stable`) or a flat repository: `./`, or a path that ends in `/` (`apt/stable/`), as apt reads it. |
 | `source.components` | no | apt components. Default: `main`. |
 | `source.tag` | no | github: release tag. Default: latest release. |
 | `source.sha256` | no | url: expected SHA256. |
