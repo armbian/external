@@ -1,0 +1,47 @@
+Source: umu-launcher
+Section: games
+Priority: optional
+Maintainer: Armbian <info@armbian.com>
+Rules-Requires-Root: no
+Build-Depends: debhelper-compat (= 13),
+ python3,
+ python3-build,
+ python3-installer,
+ python3-hatchling,
+ scdoc,
+ cargo,
+ rustc,
+ ca-certificates
+Standards-Version: 4.7.0
+Homepage: https://github.com/Open-Wine-Components/umu-launcher
+
+Package: umu-launcher
+Architecture: all
+Depends: ${misc:Depends},
+ python3-umu-launcher (= ${binary:Version})
+Recommends: curl, dbus, desktop-file-utils, fontconfig, fonts-liberation, libasound2-plugins,
+ libegl1, libfreetype6, libgbm1, libgdk-pixbuf-2.0-0, libnss3, libsdl2-2.0-0, libusb-1.0-0,
+ libva-drm2, libvulkan1, libx11-6, libx11-xcb1, libxss1, lsb-release, lsof,
+ mesa-vulkan-drivers | vulkan-icd, steam-devices, usbutils, x11-xserver-utils,
+ xdg-desktop-portal, xdg-user-dirs, xdg-utils, zenity
+Suggests: pipewire
+Description: unified launcher for Windows games on Linux
+ umu-run runs Proton with game fixes outside of Steam, in the Steam Linux
+ Runtime. Lutris uses it.
+ .
+ Upstream: https://github.com/Open-Wine-Components/umu-launcher (GPL-3.0).
+
+Package: python3-umu-launcher
+Section: python
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends},
+ python3 (>= 3.14),
+ python3-xlib (>= 0.33),
+ python3-xxhash,
+ python3-cbor2,
+ python3-urllib3,
+ python3-truststore
+Recommends: libgl1-mesa-dri:i386 [amd64], libglx-mesa0:i386 [amd64], apparmor-profiles
+Description: unified launcher for Windows games on Linux (Python module)
+ The umu Python module and its umu_delta extension. Install umu-launcher
+ for the umu-run command.

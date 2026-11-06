@@ -1,0 +1,35 @@
+Use zstd from the Python 3.14 standard library. Debian has no pyzstd.
+
+diff --git a/umu/umu_bspatch.py b/umu/umu_bspatch.py
+index 04ca288..807ee2d 100644
+--- a/umu/umu_bspatch.py
++++ b/umu/umu_bspatch.py
+@@ -10,8 +10,9 @@ from typing import TypedDict
+ from umu.umu_log import log
+ from umu.umu_util import memfdfile
+ 
++# Debian has no pyzstd. Use zstd from the Python 3.14 standard library.
+ with suppress(ModuleNotFoundError):
+-    from pyzstd import DParameter, ZstdDict, decompress
++    from compression.zstd import DecompressionParameter, ZstdDict, decompress
+     from xxhash import xxh3_64_intdigest
+ 
+ 
+@@ -299,7 +300,7 @@ class CustomPatcher:
+                 with mmap(fp.fileno(), length=0, access=ACCESS_WRITE) as mm:
+                     # Prepare the zst dictionary and opt
+                     zst_dict = ZstdDict(mm, is_raw=True)
+-                    zst_opt = {DParameter.windowLogMax: ZSTD_WINDOW_LOG_MAX}
++                    zst_opt = {DecompressionParameter.window_log_max: ZSTD_WINDOW_LOG_MAX}
+ 
+                     # If file will become large, increase
+                     if stats.st_size < size:
+@@ -307,7 +308,7 @@ class CustomPatcher:
+ 
+                     # Patch the region
+                     mm[:size] = decompress(
+-                        bdiff, zstd_dict=zst_dict.as_prefix, option=zst_opt
++                        bdiff, zstd_dict=zst_dict.as_prefix, options=zst_opt
+                     )
+ 
+                     # If file will become small, decrease
