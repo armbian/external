@@ -70,3 +70,4 @@ omarchy-refresh-plymouth (Update > Config > Plymouth, Plymouth reset) | done | U
 Install > Gaming > Steam, Lutris (lib32 drivers) | done | Arch multilib becomes Debian i386 multiarch: steam-installer (contrib) and mesa-vulkan-drivers:i386 or nvidia-driver-libs:i386 (deps.map). omarchy-install-gaming-gpu-lib32 enables i386 first. Debian has no arm64 Steam: the entry shows on x86 only (transform 86-steam-debian).
 Setup > Security > FIDO2 | done | pamu2fcfg is a separate Debian package that libpam-u2f only recommends; the setup installs it (transform 84-fido2-pamu2fcfg).
 wine-mono, wine-gecko | done | WineHQ does not package them: Wine downloads them when a prefix needs them. Both map to winehq-staging (deps.map).
+Install, Remove, Setup > Default > Browser: Zen | done | Removed: Zen has no Debian package or apt repository, only tarballs (maintainer decision, transform 83-no-zen-browser).
