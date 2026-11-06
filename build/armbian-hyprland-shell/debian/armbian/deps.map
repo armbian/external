@@ -259,11 +259,9 @@ freerdp freerdp3-wayland
 google-chrome google-chrome-stable
 helix hx
 libappindicator libayatana-appindicator3-1
-libfido2 libfido2-1
 libfido2 fido2-tools
 microsoft-edge-stable-bin microsoft-edge-stable
 openbsd-netcat netcat-openbsd
-openssh openssh-client
 openssh openssh-server
 pam-u2f libpam-u2f
 python-gpgme python3-gpg
@@ -273,3 +271,8 @@ words wamerican
 brave-bin brave-browser
 brave-origin-bin brave-origin
 heroic-games-launcher-bin heroic
+steam steam-installer
+lib32-vulkan-intel mesa-vulkan-drivers:i386
+lib32-vulkan-radeon mesa-vulkan-drivers:i386
+lib32-nvidia-utils nvidia-driver-libs:i386
+lib32-nvidia-580xx-utils nvidia-driver-libs:i386
