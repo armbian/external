@@ -1,0 +1,2 @@
+# Omarchy font configuration, active system-wide as in upstream.
+usr/share/fontconfig/conf.avail/50-omarchy.conf etc/fonts/conf.d/50-omarchy.conf

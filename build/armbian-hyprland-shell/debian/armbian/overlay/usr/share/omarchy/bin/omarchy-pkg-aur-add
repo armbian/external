@@ -1,0 +1,6 @@
+#!/bin/bash
+
+# Armbian: Debian has no AUR. Install the packages from the Debian and
+# Armbian repositories instead.
+
+exec omarchy-pkg-add "$@"

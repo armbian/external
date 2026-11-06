@@ -1,0 +1,27 @@
+#!/bin/sh
+# Armbian: system setup that upstream does at install time
+# (install/config/firewall.sh, install/config/enable-services.sh). Each part
+# runs once. armbian-hyprland-shell-setup.service starts it at boot.
+set -e
+state=/var/lib/armbian-hyprland-shell
+mkdir -p "$state"
+
+# Firewall, as upstream. Keep the rules of an admin who already enabled ufw.
+if [ ! -e "$state/firewall-done" ] && command -v ufw >/dev/null && command -v ufw-docker >/dev/null; then
+	if ! grep -q '^ENABLED=yes' /etc/ufw/ufw.conf; then
+		# Armbian images enable SSH: keep it reachable.
+		ufw allow 22/tcp comment 'ssh' >/dev/null
+		# -e: a failed rule install, such as ufw-docker, stops the setup.
+		# Then firewall-done is not written and the next boot tries again.
+		bash -e /usr/share/omarchy/install/config/firewall.sh
+		ufw --force enable
+	fi
+	touch "$state/firewall-done"
+fi
+
+# Docker starts on first use, as upstream: the socket, not the daemon at boot.
+if [ ! -e "$state/docker-done" ] && [ -e /usr/lib/systemd/system/docker.socket ]; then
+	systemctl disable docker.service
+	systemctl enable docker.socket
+	touch "$state/docker-done"
+fi

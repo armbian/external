@@ -1,0 +1,17 @@
+#!/bin/sh
+# Apply the Armbian transform rules to an upstream Omarchy tree.
+# Usage: apply <tree>
+# Each rule fails when upstream no longer matches it. Fix the rule, do not
+# skip it: see build/armbian-hyprland-shell/AGENTS.md.
+set -eu
+
+tree=$(cd "${1:-.}" && pwd)
+dir=$(dirname "$(readlink -f "$0")")
+export TRANSFORM_LIB="$dir/lib.sh"
+
+for rule in "$dir"/rules.d/*.sh; do
+	echo "transform: $(basename "$rule")"
+	# -e: a failed replace stops the rule. The child shell does not
+	# inherit set -e from this script.
+	(cd "$tree" && sh -e "$rule")
+done

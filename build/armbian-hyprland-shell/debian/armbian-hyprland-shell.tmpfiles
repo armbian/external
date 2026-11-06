@@ -1,0 +1,11 @@
+# Arch lets the group wheel read the system journal; Debian only adm. The
+# admin group on Debian is sudo: omarchy-crash-watch reads coredump entries.
+a+ /run/log/journal    - - - - d:group:sudo:r-x,group:sudo:r-x
+a+ /var/log/journal    - - - - d:group:sudo:r-x,group:sudo:r-x
+a+ /var/log/journal/%m - - - - d:group:sudo:r-x,group:sudo:r-x
+a+ /var/log/journal/%m/system.journal - - - - group:sudo:r--
+
+# Lock folder for omarchy-sudo-passwordless, passwordless-transition and
+# omarchy-windows-vm. Debian /run/lock is world-writable (transform
+# 89-protected-lock-dir).
+d /run/omarchy 0755 root root -

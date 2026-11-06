@@ -1,0 +1,10 @@
+#!/bin/bash
+
+# Armbian: apt version. Drop package files that the repositories no longer
+# have.
+
+set -e
+
+echo -e "\e[32m\nPrune package cache\e[0m"
+sudo apt-get autoclean -qq || echo -e "\e[33mCould not prune the package cache.\e[0m" >&2
+echo

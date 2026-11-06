@@ -1,0 +1,20 @@
+name: armbian-hyprland-shell
+method: build
+# Omarchy (MIT) with Armbian branding: Hyprland Lua config, Quickshell shell,
+# scripts and themes. Local packaging in build/armbian-hyprland-shell/debian/.
+# Rules for changes: build/armbian-hyprland-shell/AGENTS.md.
+# Hyprland 0.55 or newer (Lua config) and Quickshell are only in forky and sid.
+upstream:
+  url: https://github.com/basecamp/omarchy
+  ref: v4.5.0
+releases:
+- forky
+- sid
+architectures:
+- amd64
+- arm64
+target: desktop
+repositories:
+- beta
+install:
+- armbian-hyprland-shell
