@@ -1,0 +1,19 @@
+name: omazed
+method: build
+# Zed theme sync for Omarchy (MIT), for the armbian-hyprland-shell desktop.
+# Local packaging in build/omazed/debian/, after the upstream Arch PKGBUILD
+# (omacom/omarchy-pkgs, pkgbuilds/omazed).
+upstream:
+  url: https://github.com/aps6/omazed
+  ref: v2.2.1
+releases:
+- forky
+- sid
+architectures:
+- amd64
+- arm64
+target: desktop
+repositories:
+- beta
+install:
+- omazed
