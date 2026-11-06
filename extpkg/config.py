@@ -99,7 +99,9 @@ def _check_build(pkg, path, need):
         need(os.path.isfile(os.path.join(os.path.dirname(path), pkg["name"], "debian", "control")),
              f"without packaging, {pkg['name']}/debian/control is required")
     if up:
-        need(isinstance(up, dict) and up.get("url"), "upstream.url is required")
+        need(isinstance(up, dict) and bool(up.get("url")) != bool(up.get("version_url")),
+             "upstream needs url or version_url")
+        need(not up.get("version_url") or set(up) == {"version_url"}, "upstream.version_url takes no other keys")
         rb = up.get("rebase")
         need(rb is None or (isinstance(rb, dict) and rb.get("url") and rb.get("ref")),
              "upstream.rebase needs url and ref")

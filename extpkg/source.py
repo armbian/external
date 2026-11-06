@@ -111,6 +111,14 @@ def file_version(text):
     return text.split()[0].replace("-devel", "").replace("-rc", "~rc")
 
 
+def url_version(text):
+    """Body of upstream.version_url: one version, for example 1.0.70."""
+    ver = text.strip().lstrip("v")
+    if not re.match(r"^[0-9][0-9A-Za-z.+~]*$", ver):
+        raise net.FetchError(f"no version in {text[:40]!r}")
+    return ver
+
+
 def _commit_time(url, commit):
     """Commit time, from a fetch of that one commit without file contents."""
     with tempfile.TemporaryDirectory() as tmp:
@@ -138,8 +146,15 @@ def upstream(up):
     upstream.version, the next upstream release, or upstream.version_file, a
     file that holds it (mesa: VERSION). The snapshot then sorts below that
     release: <version>~git<YYYYMMDDHHMM>.<commit>.
+
+    upstream.version_url: no code to clone. The URL returns the version of a
+    vendor release. debian/rules downloads that release.
     """
     def go():
+        if up.get("version_url"):
+            ver = url_version(net.get_bytes(up["version_url"]).decode())
+            return {"url": up["version_url"], "ref": ver, "commit": "", "version": ver, "rebase": None,
+                    "meson_subprojects": [], "version_url": True}
         ref = up.get("ref", "latest")
         if ref == "latest":
             if "github.com/" in up["url"] and not up.get("tags"):
@@ -169,7 +184,7 @@ def upstream(up):
         return {"url": up["url"], "ref": ref, "commit": commit, "version": ver, "rebase": rebase,
                 "meson_subprojects": up.get("meson_subprojects", []), "submodules": bool(up.get("submodules"))}
 
-    key = (up["url"], up.get("ref", "latest"), up.get("tags"), up.get("version"), up.get("version_file"),
+    key = (up.get("url"), up.get("version_url"), up.get("ref", "latest"), up.get("tags"), up.get("version"), up.get("version_file"),
            repr(up.get("rebase")), repr(up.get("meson_subprojects")), bool(up.get("submodules")))
     return _once(key, go)
 

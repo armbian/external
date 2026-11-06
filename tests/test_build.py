@@ -37,6 +37,12 @@ class Version(unittest.TestCase):
         self.assertEqual(source.version({}, "noble", "1:26.0.8-1ubuntu0.3", {"version": "27.0.0~git2611031200.abc"}),
                          "1:27.0.0~git2611031200.abc-1ubuntu0.3+armbian1~noble")
 
+    def test_url_version(self):
+        self.assertEqual(source.url_version("1.0.70\n"), "1.0.70")
+        self.assertEqual(source.url_version("v2.1.311"), "2.1.311")
+        with self.assertRaises(net.FetchError):
+            source.url_version("<html>")
+
     def test_local_packaging(self):
         self.assertEqual(source.version({}, "sid", None, {"version": "1.0"}), "1.0-0+armbian1~sid")
 
@@ -74,6 +80,14 @@ class Config(unittest.TestCase):
                     {"revision": 0}):
             with self.subTest(bad=bad), self.assertRaises(config.ConfigError):
                 self.load({**self.base(packaging=pk), **bad})
+
+    def test_version_url(self):
+        os.makedirs(os.path.join(self.dir, "x", "debian"))
+        open(os.path.join(self.dir, "x", "debian", "control"), "w").close()
+        self.load(self.base(upstream={"version_url": "https://example.com/stable"}))
+        for bad in ({"version_url": "u", "url": "v"}, {"version_url": "u", "ref": "v1"}):
+            with self.subTest(bad=bad), self.assertRaises(config.ConfigError):
+                self.load(self.base(upstream=bad))
 
     def test_mirror_rejects_build_keys(self):
         with self.assertRaises(config.ConfigError):

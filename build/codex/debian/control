@@ -1,0 +1,15 @@
+Source: codex
+Section: devel
+Priority: optional
+Maintainer: Armbian <info@armbian.com>
+Build-Depends: debhelper-compat (= 13), curl, ca-certificates
+Standards-Version: 4.7.0
+Homepage: https://github.com/openai/codex
+
+Package: codex
+Architecture: amd64 arm64
+Depends: ${misc:Depends}
+Description: OpenAI Codex coding agent for the terminal
+ Codex reads, changes and runs code in a project, on request.
+ Repack of the codex-package release from GitHub. Sign in with a
+ ChatGPT account or an API key.

@@ -65,6 +65,9 @@ def _packaging(b, work):
 
 def _upstream(up, tree):
     """Clone the upstream code into tree. Rebase it when the config asks."""
+    if up.get("version_url"):
+        os.makedirs(tree)
+        return
     if up["rebase"]:
         _git("clone", "-q", "--filter=blob:none", "--branch", up["ref"], up["url"], tree)
         _git("checkout", "-q", up["commit"], cwd=tree)
@@ -115,7 +118,7 @@ def _changelog(tree, b, release):
     what = []
     if b["upstream"]:
         up = b["upstream"]
-        what.append(f"upstream {up['url']} {up['ref']} {up['commit'][:12]}")
+        what.append(f"upstream {up['url']} {up['ref']} {up['commit'][:12]}".rstrip())
         if up["rebase"]:
             what.append(f"rebased onto {up['rebase']['url']} {up['rebase']['ref']} {up['rebase']['commit'][:12]}")
     if b["packaged"]:

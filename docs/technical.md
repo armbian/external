@@ -186,6 +186,7 @@ install: [fastfetch]
 | `upstream.version` | For a branch: the next upstream release, for example `27.0.0`. |
 | `upstream.version_file` | For a branch: a file that holds that version, for example `VERSION` (`27.0.0-devel` gives `27.0.0`). Read from the rebase base when `rebase` is set. |
 | `upstream.rebase.url`, `.ref` | Optional, off by default. A fork: rebase it onto this branch before each build. A conflict fails the build, and the last good packages stay. |
+| `upstream.version_url` | Instead of `url`: a vendor release without a git repository. The URL returns the version, for example `1.0.70`. Nothing is cloned. `debian/rules` downloads the release and checks it (`grok`). |
 | `upstream.submodules` | `true`: also clone the git submodules, at the commits that the upstream commit pins. Default `false`. |
 | `upstream.meson_subprojects` | Meson wraps to download before the build: names or globs, for example `*-rs`. Debian packaging builds with `--wrap-mode=nodownload`. Meson uses a wrap only when the system has no copy. |
 | `revision` | Armbian revision. Default 1. Increase it when the patches or the build keys change, but the sources do not. A live run fails when changed inputs give a version that is already uploaded: the upload never replaces a file. A dry run warns. |

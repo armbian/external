@@ -1,0 +1,14 @@
+name: codex
+method: build
+# OpenAI Codex CLI (Apache-2.0), used by the armbian-hyprland-shell agents
+# panel. Repacks the codex-package release asset that upstream's installer
+# uses. Local packaging in build/codex/debian/.
+upstream:
+  url: https://github.com/openai/codex
+releases: all
+architectures:
+- amd64
+- arm64
+target: utils
+install:
+- codex
