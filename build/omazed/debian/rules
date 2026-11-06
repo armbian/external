@@ -1,0 +1,13 @@
+#!/usr/bin/make -f
+# Upstream omazed is shell scripts. Install steps follow the upstream Arch
+# PKGBUILD (omacom/omarchy-pkgs, pkgbuilds/omazed). omazed finds its
+# template next to itself, so the template stays in /usr/bin.
+PKG = debian/omazed
+
+%:
+	dh $@
+
+override_dh_auto_install:
+	install -D -m755 -t $(PKG)/usr/bin omazed omazed-generator.sh omazed-font.sh
+	install -D -m644 -t $(PKG)/usr/bin omazed-theme.tpl
+	install -D -m644 -t $(PKG)/usr/share/doc/omazed LICENSE README.md
