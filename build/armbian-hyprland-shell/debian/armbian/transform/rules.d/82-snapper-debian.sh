@@ -1,5 +1,6 @@
 # Snapper: Debian reads SNAPPER_CONFIGS from /etc/default/snapper, a conffile
-# of the snapper package. Set the variable there. Do not replace the file.
+# of the snapper package. Add root to the variable there and keep the other
+# configs. Do not replace the file.
 # Debian has no limine-snapper-sync: enable the cleanup timer alone.
 # Armbian images can have an ext4 root. There snapper has nothing to
 # snapshot: return 127 like a missing snapper, so omarchy-update stays quiet.
@@ -9,9 +10,18 @@
 . "$TRANSFORM_LIB"
 
 replace install/config/snapper.sh 'SNAPPER_CONF_PATH="${OMARCHY_SNAPPER_CONF_PATH:-/etc/conf.d/snapper}"' 'SNAPPER_CONF_PATH="${OMARCHY_SNAPPER_CONF_PATH:-/etc/default/snapper}"' 1
-replace install/config/snapper.sh "printf '%s\\n' 'SNAPPER_CONFIGS=\"root\"' >\"\$SNAPPER_CONF_PATH\"" "touch \"\$SNAPPER_CONF_PATH\"
-sed -i '/^SNAPPER_CONFIGS=/d' \"\$SNAPPER_CONF_PATH\"
-printf '%s\\n' 'SNAPPER_CONFIGS=\"root\"' >>\"\$SNAPPER_CONF_PATH\"" 1
+snapper_configs=$(cat << 'EOT'
+touch "$SNAPPER_CONF_PATH"
+configs="$(sed -n 's/^SNAPPER_CONFIGS="\(.*\)"$/\1/p' "$SNAPPER_CONF_PATH")"
+case " $configs " in
+*" root "*) ;;
+*) configs="${configs:+$configs }root" ;;
+esac
+sed -i '/^SNAPPER_CONFIGS=/d' "$SNAPPER_CONF_PATH"
+printf 'SNAPPER_CONFIGS="%s"\n' "$configs" >>"$SNAPPER_CONF_PATH"
+EOT
+)
+replace install/config/snapper.sh "printf '%s\\n' 'SNAPPER_CONFIGS=\"root\"' >\"\$SNAPPER_CONF_PATH\"" "$snapper_configs" 1
 replace install/config/snapper.sh 'systemctl enable --now snapper-cleanup.timer limine-snapper-sync.service' 'systemctl enable --now snapper-cleanup.timer' 1
 replace bin/omarchy-snapshot 'if omarchy-cmd-missing snapper; then
   exit 127 # omarchy-update can use this to just ignore if snapper is not available
