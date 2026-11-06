@@ -35,6 +35,13 @@ class Site(unittest.TestCase):
         self.assertEqual(p["releases"]["trixie"]["amd64"]["state"], "stable")   # stable has it
         self.assertEqual(p["status"], "ready")
 
+    def test_release_arches_union(self):
+        pkg = dict(PKG, architectures=["amd64", "riscv64"])
+        old = {"releases": ["noble"], "release_arches": {"noble": ["amd64"]}, "files": []}
+        new = {"releases": ["noble"], "release_arches": {"noble": ["amd64", "riscv64"]}, "files": []}
+        p = site.collect([pkg], {"new": new, "old": old})["packages"][0]
+        self.assertEqual(sorted(p["releases"]["noble"]), ["amd64", "riscv64"])
+
     def test_missing_is_partial(self):
         p = site.collect([PKG], self.manifest([entry("noble", "arm64", True)]))["packages"][0]
         self.assertEqual(p["releases"]["trixie"]["arm64"]["state"], "missing")
