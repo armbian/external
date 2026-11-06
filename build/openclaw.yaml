@@ -1,0 +1,21 @@
+name: openclaw
+method: build
+# Multi-channel AI gateway (MIT), used by the armbian-hyprland-shell
+# agents. Ships the npm release and its installer in /usr/share/openclaw.
+# omarchy-install-openclaw-cli uses them to set up a self-updating copy
+# in ~/.openclaw. Local packaging in build/openclaw/debian/, after the
+# upstream Arch PKGBUILD (omacom/omarchy-pkgs, pkgbuilds/openclaw).
+# The latest GitHub release tag gives the npm version.
+upstream:
+  url: https://github.com/openclaw/openclaw
+releases:
+- forky
+- sid
+architectures:
+- amd64
+- arm64
+target: desktop
+repositories:
+- beta
+install:
+- openclaw
