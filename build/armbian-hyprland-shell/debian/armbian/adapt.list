@@ -57,7 +57,8 @@ etc/cups | todo | cups-browsed.conf and cups-files.conf replace Debian conffiles
 etc/docker, etc/gnupg | todo | Files that Debian packages or users own: install only where no other package owns them.
 etc/plymouth | todo | Upstream plymouthd.conf selects the Omarchy theme: keep the Armbian theme.
 etc/mkinitcpio.conf.d, etc/limine-entry-tool.d | todo | Arch boot: adapt to initramfs-tools and GRUB or U-Boot.
-default/limine, default/snapper | todo | Snapshots and boot entries: Debian snapper, Armbian boot loaders.
+default/snapper, install/config/snapper.sh | done | system-setup runs snapper.sh once on a btrfs root. Debian keeps SNAPPER_CONFIGS in /etc/default/snapper (transform 82-snapper-debian).
+default/limine, limine-snapper-restore | todo | Snapshot boot entries and restore: Armbian boot loaders.
 migrations | todo | Migrations that call pacman: check each one. New users start with all migrations done.
 pinta, moonlight-qt | done | Built in armbian/external from source (build/pinta.yaml, build/moonlight-qt.yaml).
 dotnet-runtime | done | Not needed: Pinta is built self-contained, and the dotnet dev environment installs with mise.

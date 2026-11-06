@@ -8,7 +8,7 @@ upstream:
   url: https://github.com/basecamp/omarchy
   ref: v4.5.0
 # Packaging changes without a new upstream tag.
-revision: 2
+revision: 3
 releases:
 - forky
 - sid
