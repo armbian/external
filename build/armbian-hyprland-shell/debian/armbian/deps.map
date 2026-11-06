@@ -251,3 +251,22 @@ yt-dlp yt-dlp
 zbar zbar-tools
 zoxide zoxide
 zram-generator source:armbian-platform
+# Packages that Install menu entries and omarchy-install-* scripts add.
+dropbox nautilus-dropbox
+dropbox-cli nautilus-dropbox
+firefox firefox-esr
+freerdp freerdp3-wayland
+google-chrome google-chrome-stable
+helix hx
+libappindicator libayatana-appindicator3-1
+libfido2 libfido2-1
+libfido2 fido2-tools
+microsoft-edge-stable-bin microsoft-edge-stable
+openbsd-netcat netcat-openbsd
+openssh openssh-client
+openssh openssh-server
+pam-u2f libpam-u2f
+python-gpgme python3-gpg
+python-protobuf python3-protobuf
+visual-studio-code-bin code
+words wamerican
