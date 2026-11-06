@@ -1,0 +1,18 @@
+name: claude-desktop
+method: apt
+# Claude desktop app (beta on Linux), offered in the armbian-hyprland-shell
+# Install menu. Signed with the Anthropic key of claude-code (keys/claude-code.gpg).
+# Its postinst also registers the vendor repository, as the vendor documents.
+source:
+  url: https://downloads.claude.ai/claude-desktop/apt/stable
+  suite: stable
+  components:
+  - main
+releases: all
+architectures:
+- arm64
+- amd64
+target: desktop
+install:
+- claude-desktop
+filter: Name (= claude-desktop)
