@@ -28,8 +28,11 @@ if [ ! -e "$state/docker-done" ] && [ -e /usr/lib/systemd/system/docker.socket ]
 fi
 
 # Snapshots, as upstream: a snapper config for a btrfs root. omarchy-update
-# takes a snapshot before it updates.
+# takes a snapshot before it updates. Upstream runs this on a new install
+# only: keep a root config that an admin made before.
 if [ ! -e "$state/snapper-done" ] && command -v snapper >/dev/null && [ "$(findmnt -n -o FSTYPE /)" = btrfs ]; then
-	bash -e /usr/share/omarchy/install/config/snapper.sh
+	if [ ! -e /etc/snapper/configs/root ]; then
+		bash -e /usr/share/omarchy/install/config/snapper.sh
+	fi
 	touch "$state/snapper-done"
 fi
