@@ -20,9 +20,12 @@ if ! modprobe overlay; then
 	exit 0
 fi
 mkdir -p "$d/lower" "$d/rw"
-mount -n -o move "${rootmnt}" "$d/lower"
-mount -n -t tmpfs -o mode=0755 tmpfs "$d/rw"
+if ! mount -n -t tmpfs -o mode=0755 tmpfs "$d/rw"; then
+	log_failure_msg "armbian-snapshot: no tmpfs, the snapshot stays read-only"
+	exit 0
+fi
 mkdir -p "$d/rw/upper" "$d/rw/work"
+mount -n -o move "${rootmnt}" "$d/lower"
 if ! mount -n -t overlay -o "lowerdir=$d/lower,upperdir=$d/rw/upper,workdir=$d/rw/work" overlay "${rootmnt}"; then
 	log_failure_msg "armbian-snapshot: overlay failed, the snapshot stays read-only"
 	mount -n -o move "$d/lower" "${rootmnt}"

@@ -5,6 +5,8 @@
 # Upstream keeps /home on its own subvolume (@home), so a restore does not
 # touch it. Armbian images keep /home in the root: copy the current /home
 # into the restored root. --with-home restores /home from the snapshot too.
+# GRUB boots the root with rootflags=subvol=@. U-Boot boards boot the btrfs
+# default subvolume, which the build sets to @: move the default too.
 set -euo pipefail
 
 with_home=no
@@ -21,17 +23,33 @@ if [[ ! $n =~ ^[0-9]+$ ]]; then
 	exit 1
 fi
 
-uuid="$(sed -n 's/.*root=UUID=\([^ ]*\).*/\1/p' /proc/cmdline)"
-subvol="$(sed -n 's/.*rootflags=subvol=\([^ ,]*\).*/\1/p' /proc/cmdline)"
-base="${subvol%%/*}"
-if [[ -z $uuid || -z $base ]]; then
-	echo "The root is not a btrfs subvolume on root=UUID=: cannot restore." >&2
+# The btrfs device and the root subvolume. A snapshot boot has an overlay
+# root: read them from the snapshot below it.
+lower=/
+[[ $(findmnt -n -o FSTYPE /) == overlay ]] && lower=/run/armbian-snapshot/lower
+if [[ $(findmnt -n -o FSTYPE "$lower") != btrfs ]]; then
+	echo "The root is not on btrfs: cannot restore." >&2
+	exit 1
+fi
+dev="$(findmnt -n -o SOURCE "$lower" | sed 's/\[.*//')"
+fsroot="$(findmnt -n -o FSROOT "$lower")"
+fsroot="${fsroot#/}"
+base="${fsroot%%/*}"
+if [[ -z $base || $base == .snapshots ]]; then
+	echo "The root is the top level of the btrfs volume, not a subvolume: cannot restore." >&2
 	exit 1
 fi
 
 top="$(mktemp -d)"
 trap 'umount "$top" 2> /dev/null || true; rmdir "$top"' EXIT
-mount -o subvolid=5 "$(blkid -U "$uuid")" "$top"
+mount -o subvolid=5 "$dev" "$top"
+
+# An earlier restore that stopped half way: there is no root subvolume.
+if [[ ! -d $top/$base ]]; then
+	echo "$base is missing. An earlier restore stopped half way." >&2
+	echo "Rename the newest $base.new-* (or $base.old-*) back to $base on the top level of $dev." >&2
+	exit 1
+fi
 
 src="$top/$base/.snapshots/$n/snapshot"
 if [[ ! -d $src ]]; then
@@ -46,17 +64,41 @@ if [[ -t 0 ]]; then
 	[[ $answer == [yY]* ]] || exit 1
 fi
 
-btrfs subvolume snapshot "$src" "$top/$base.new-$stamp" > /dev/null
-rmdir "$top/$base.new-$stamp/.snapshots" 2> /dev/null || true
+new="$top/$base.new-$stamp"
+old="$top/$base.old-$stamp"
+btrfs subvolume snapshot "$src" "$new" > /dev/null
+rmdir "$new/.snapshots" 2> /dev/null || true
 # /home in the root subvolume (no own subvolume): take the current one.
 # The reflink copy shares the data blocks, so it is fast and takes no space.
 if [[ $with_home == no && -d $top/$base/home && $(stat -c %i "$top/$base/home") != 256 ]]; then
-	rm -rf "$top/$base.new-$stamp/home"
-	cp -a --reflink=always "$top/$base/home" "$top/$base.new-$stamp/home"
+	rm -rf "$new/home"
+	cp -a --reflink=always "$top/$base/home" "$new/home"
 fi
-mv "$top/$base" "$top/$base.old-$stamp"
-mv "$top/$base.new-$stamp" "$top/$base"
-mv "$top/$base.old-$stamp/.snapshots" "$top/$base/.snapshots"
+
+# Was the root the default subvolume (U-Boot boot)?
+root_id="$(btrfs subvolume show "$top/$base" | awk '/Subvolume ID:/ { print $3 }')"
+default_id="$(btrfs subvolume get-default "$top" | awk '{ print $2 }')"
+
+# Swap the subvolumes. On a failure, put the old root back.
+step=0
+rollback() {
+	echo "Restore failed. Putting the old root back." >&2
+	if [[ $step -ge 3 ]]; then mv "$top/$base/.snapshots" "$old/.snapshots"; fi
+	if [[ $step -ge 2 ]]; then mv "$top/$base" "$new"; fi
+	if [[ $step -ge 1 ]]; then mv "$old" "$top/$base"; fi
+	btrfs subvolume delete "$new" > /dev/null 2>&1 || true
+}
+trap 'rollback; umount "$top" 2> /dev/null || true; rmdir "$top"' ERR
+mv "$top/$base" "$old"
+step=1
+mv "$new" "$top/$base"
+step=2
+mv "$old/.snapshots" "$top/$base/.snapshots"
+step=3
+if [[ $root_id == "$default_id" ]]; then
+	btrfs subvolume set-default "$top/$base"
+fi
+trap - ERR
 
 echo "Snapshot $n is the root now. Reboot to use it."
-echo "Remove the old root when you no longer need it: btrfs subvolume delete <top>/$base.old-$stamp"
+echo "The old root is the subvolume $base.old-$stamp on the top level of $dev."

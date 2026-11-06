@@ -18,9 +18,11 @@ limit=10
 [ "$(stat -f -c %T /)" = btrfs ] || exit 0
 [ -d "$snapdir" ] || exit 0
 
+# Snapshot path relative to the top level: @/.snapshots, or .snapshots when
+# the root is the top level itself.
 rootsubvol="$(make_system_path_relative_to_its_root /)"
 rootsubvol="${rootsubvol#/}"
-[ -n "$rootsubvol" ] || exit 0
+snappath="${rootsubvol:+$rootsubvol/}.snapshots"
 
 # Services that must not run on a snapshot: they change the real disk
 # (first-boot re-key), take a snapshot of the overlay, or remount it with
@@ -52,11 +54,11 @@ for n in $(ls -1 "$snapdir" 2> /dev/null | grep -E '^[0-9]+$' | sort -n -r | hea
 	entries="${entries}
 	menuentry '${title}' --class armbian --class gnu-linux --class os {
 $(prepare_grub_to_access_device "${GRUB_DEVICE_BOOT}" | grub_add_tab | grub_add_tab)
-		linux	$(make_system_path_relative_to_its_root "/boot/vmlinuz-$v") root=UUID=${GRUB_DEVICE_UUID} ro rootflags=subvol=${rootsubvol}/.snapshots/${n}/snapshot armbian.snapshot=${n} ${masks} ${GRUB_CMDLINE_LINUX} ${GRUB_CMDLINE_LINUX_DEFAULT}
+		linux	$(make_system_path_relative_to_its_root "/boot/vmlinuz-$v") root=UUID=${GRUB_DEVICE_UUID} ro rootflags=subvol=${snappath}/${n}/snapshot armbian.snapshot=${n} ${masks} ${GRUB_CMDLINE_LINUX} ${GRUB_CMDLINE_LINUX_DEFAULT}
 		initrd	$(make_system_path_relative_to_its_root "/boot/initrd.img-$v")
 	}"
 done
 
 [ -n "$entries" ] || exit 0
-echo "submenu '${GRUB_DISTRIBUTOR:-Armbian} snapshots' --class armbian {${entries}
+printf "%s\n" "submenu '${GRUB_DISTRIBUTOR:-Armbian} snapshots' --class armbian {${entries}
 }"
