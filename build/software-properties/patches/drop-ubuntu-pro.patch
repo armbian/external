@@ -1,0 +1,76 @@
+Drop Ubuntu Pro: the Ubuntu Pro tab, ESM status and the ubuntu-pro-client
+dependencies. Armbian replaces ubuntu-pro-client with a fake package.
+
+diff --git a/debian/control b/debian/control
+index 57a6b3e..abc88f6 100644
+--- a/debian/control
++++ b/debian/control
+@@ -85,8 +85,6 @@ Depends: gir1.2-gtk-4.0,
+          python3-gi,
+          python3-software-properties (= ${binary:Version}),
+          software-properties-common,
+-         ubuntu-pro-client,
+-         ubuntu-advantage-desktop-daemon,
+          ubuntu-drivers-common (>= 1:0.9.6),
+          ${misc:Depends},
+          ${python3:Depends}
+diff --git a/softwareproperties/gtk/SoftwarePropertiesGtk.py b/softwareproperties/gtk/SoftwarePropertiesGtk.py
+index 068150b..11f9e96 100644
+--- a/softwareproperties/gtk/SoftwarePropertiesGtk.py
++++ b/softwareproperties/gtk/SoftwarePropertiesGtk.py
+@@ -57,7 +57,6 @@ from .DialogEdit import DialogEdit
+ from .DialogEditDeb822 import DialogEditDeb822
+ from .DialogCacheOutdated import DialogCacheOutdated
+ from .DialogAddSourcesList import DialogAddSourcesList
+-from .UbuntuProPage import UbuntuProPage
+ 
+ import softwareproperties
+ import softwareproperties.distro
+@@ -65,10 +64,7 @@ from softwareproperties.SoftwareProperties import SoftwareProperties
+ import softwareproperties.SoftwareProperties
+ 
+ from softwareproperties.gtk.utils import (
+-    get_ua_status,
+-    get_ua_service_status,
+     current_distro,
+-    is_current_distro_lts,
+     maybe_hint_dialog_window,
+ )
+ 
+@@ -286,9 +282,7 @@ class SoftwarePropertiesGtk(SoftwareProperties, SimpleGtkbuilderApp):
+         self.show_distro()
+         # Setup and show the Additonal Drivers tab
+         self.init_drivers()
+-        # Setup and show the Ubuntu Pro tab if the serie is a LTS
+-        if is_current_distro_lts():
+-            self.init_ubuntu_pro()
++        # Armbian: no Ubuntu Pro tab. The tab stays hidden.
+ 
+         # Connect to switch-page before setting initial tab. Otherwise the
+         # first switch goes unnoticed.
+@@ -492,15 +486,10 @@ class SoftwarePropertiesGtk(SoftwareProperties, SimpleGtkbuilderApp):
+                 self.dev_box.append(checkbox)
+                 checkbox.show()
+ 
+-        status = get_ua_status()
+-        if not is_current_distro_lts():
+-                esm_available = False
+-                esm_enabled = False
+-        else:
+-                (infra_available, infra_status) = get_ua_service_status("esm-infra", status=status)
+-                (apps_available, apps_status) = get_ua_service_status("esm-apps", status=status)
+-                esm_available = bool(infra_available or apps_available)
+-                esm_enabled = "enabled" in (infra_status, apps_status)
++        # Armbian: no Ubuntu Pro, so no ESM.
++        status = {}
++        esm_available = False
++        esm_enabled = False
+         distro = current_distro()
+         if esm_enabled:
+                 eol_text = _("Extended Security Maintenance")
+@@ -1742,5 +1731,3 @@ class SoftwarePropertiesGtk(SoftwareProperties, SimpleGtkbuilderApp):
+         else:
+             self.label_driver_action.set_label(_("No proprietary drivers are in use."))
+ 
+-    def init_ubuntu_pro(self):
+-        self.ubuntu_pro_page = UbuntuProPage(self)
