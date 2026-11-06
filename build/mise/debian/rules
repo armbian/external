@@ -1,0 +1,30 @@
+#!/usr/bin/make -f
+# Upstream mise built with cargo. Crates come from crates.io, pinned by
+# Cargo.lock. Install steps follow the upstream Arch PKGBUILD
+# (omacom/omarchy-pkgs, pkgbuilds/mise-bin).
+PKG = debian/mise
+export CARGO_HOME = $(CURDIR)/debian/cargo-home
+export CARGO_TARGET_DIR = $(CURDIR)/target
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+
+override_dh_auto_build:
+	cargo build --release --locked --bin mise
+
+override_dh_auto_install:
+	install -D -m755 target/release/mise $(PKG)/usr/bin/mise
+	# apt updates mise, not mise itself.
+	install -D -m644 /dev/null $(PKG)/usr/lib/mise/.disable-self-update
+	install -D -m644 man/man1/mise.1 $(PKG)/usr/share/man/man1/mise.1
+	install -D -m644 completions/mise.bash $(PKG)/usr/share/bash-completion/completions/mise
+	install -D -m644 completions/_mise $(PKG)/usr/share/zsh/vendor-completions/_mise
+	install -D -m644 completions/mise.fish $(PKG)/usr/share/fish/vendor_completions.d/mise.fish
+	install -D -m644 -t $(PKG)/usr/share/doc/mise LICENSE README.md
+
+override_dh_auto_test:
+
+override_dh_auto_clean:
+	rm -rf target debian/cargo-home

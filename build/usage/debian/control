@@ -1,0 +1,18 @@
+Source: usage
+Section: utils
+Priority: optional
+Maintainer: Armbian <info@armbian.com>
+Build-Depends: debhelper-compat (= 13),
+ cargo,
+ rustc
+Standards-Version: 4.7.0
+Homepage: https://github.com/jdx/usage
+
+Package: usage
+Architecture: any
+Depends: ${shlibs:Depends},
+ ${misc:Depends}
+Description: CLI specification tool for completions and docs
+ Used by mise shell completions in the armbian-hyprland-shell desktop.
+ .
+ Upstream: https://github.com/jdx/usage (MIT).

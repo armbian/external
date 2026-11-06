@@ -1,0 +1,43 @@
+Source: gpu-screen-recorder
+Section: video
+Priority: optional
+Maintainer: Armbian <info@armbian.com>
+Build-Depends: debhelper-compat (= 13),
+ meson,
+ ninja-build,
+ pkgconf,
+ libavcodec-dev,
+ libavfilter-dev,
+ libavformat-dev,
+ libavutil-dev,
+ libswresample-dev,
+ libcap-dev,
+ libdbus-1-dev,
+ libdrm-dev,
+ libgl-dev,
+ libegl-dev,
+ libpipewire-0.3-dev,
+ libspa-0.2-dev,
+ libpulse-dev,
+ libva-dev,
+ libwayland-dev,
+ libx11-dev,
+ libxcomposite-dev,
+ libxdamage-dev,
+ libxfixes-dev,
+ libxrandr-dev,
+ libvulkan-dev
+Standards-Version: 4.7.0
+Homepage: https://git.dec05eba.com/gpu-screen-recorder
+
+Package: gpu-screen-recorder
+Architecture: any
+Depends: ${shlibs:Depends},
+ ${misc:Depends},
+ libcap2-bin
+Recommends: mesa-va-drivers
+Description: Screen recorder with GPU encoding
+ Records the screen with the GPU video encoder. Part of the
+ armbian-hyprland-shell desktop.
+ .
+ Upstream: https://git.dec05eba.com/gpu-screen-recorder (GPL-3.0).

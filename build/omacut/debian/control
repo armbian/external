@@ -1,0 +1,27 @@
+Source: omacut
+Section: utils
+Priority: optional
+Maintainer: Armbian <info@armbian.com>
+Build-Depends: debhelper-compat (= 13),
+ qmake6,
+ qt6-base-dev,
+ qt6-declarative-dev,
+ qt6-multimedia-dev
+Standards-Version: 4.7.0
+Homepage: https://github.com/omacom/omacut
+
+Package: omacut
+Architecture: any
+Depends: ${shlibs:Depends},
+ ${misc:Depends},
+ qml6-module-qtmultimedia,
+ qml6-module-qtqml,
+ qml6-module-qtquick,
+ qml6-module-qtquick-controls,
+ qml6-module-qtquick-layouts,
+ ffmpeg,
+ xdg-desktop-portal
+Description: Video length trimmer built with Qt Quick and ffmpeg
+ Omarchy app, part of the armbian-hyprland-shell desktop.
+ .
+ Upstream: https://github.com/omacom/omacut (MIT).

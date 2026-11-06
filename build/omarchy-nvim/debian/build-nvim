@@ -1,0 +1,71 @@
+#!/bin/bash
+# build-nvim build <starter-commit> | install <package-dir>
+# Steps and helpers from the upstream Arch PKGBUILD (pkgbuilds/omarchy-nvim).
+set -euo pipefail
+SRC=pkgbuilds/omarchy-nvim
+W=$PWD/debian/nvim-build
+export HOME=$W/home XDG_CONFIG_HOME=$W/home/.config XDG_DATA_HOME=$W/home/.local/share
+export XDG_STATE_HOME=$W/home/.local/state XDG_CACHE_HOME=$W/home/.cache
+
+slim_lazy_repos() {
+  local dir
+  for dir in "$1"/lazy/*/; do
+    [[ -d "$dir/.git" ]] || continue
+    git -C "$dir" sparse-checkout set --no-cone '/*' '!/test/' '!/tests/' '!/spec/'
+    git -C "$dir" for-each-ref --format='%(refname)' refs/remotes refs/tags |
+      while IFS= read -r ref; do
+        [[ $ref == refs/remotes/origin/HEAD ]] && continue
+        git -C "$dir" update-ref -d "$ref"
+      done
+    rm -f "$dir/.git/FETCH_HEAD" "$dir/.git/ORIG_HEAD"
+    { git -C "$dir" rev-parse HEAD; git -C "$dir" for-each-ref --format='%(objectname)' refs/heads; } |
+      sort -u >"$dir/.git/shallow"
+    git -C "$dir" reflog expire --expire=all --all
+    git -C "$dir" config --unset-all remote.origin.promisor || true
+    git -C "$dir" config --unset-all remote.origin.partialclonefilter || true
+    rm -f "$dir/.git/objects/pack/"*.promisor "$dir/.git/objects/info/commit-graph"
+    rm -rf "$dir/.git/objects/info/commit-graphs"
+    git -C "$dir" -c gc.writeCommitGraph=false gc --prune=now --quiet
+  done
+}
+
+restore_lazy_worktrees() {
+  local dir
+  for dir in "$1"/lazy/*/; do
+    [[ -d "$dir/.git" ]] || continue
+    git --git-dir="$dir/.git" --work-tree="$dir" restore .
+  done
+}
+
+case $1 in
+build)
+  rm -rf "$W"; mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_STATE_HOME" "$XDG_CACHE_HOME"
+  git init -q "$XDG_CONFIG_HOME/nvim"
+  git -C "$XDG_CONFIG_HOME/nvim" fetch -q --depth 1 https://github.com/LazyVim/starter "$2"
+  git -C "$XDG_CONFIG_HOME/nvim" checkout -q FETCH_HEAD
+  rm -rf "$XDG_CONFIG_HOME/nvim/.git"
+  cp -r $SRC/lua $SRC/plugin $SRC/lazyvim.json "$XDG_CONFIG_HOME/nvim/"
+  nvim --headless "+Lazy! sync" "+qa!" || true
+  # Fail here, not on first use, when the plugin sync did not work.
+  test -d "$XDG_DATA_HOME/nvim/lazy/LazyVim"
+  slim_lazy_repos "$XDG_DATA_HOME/nvim"
+  ;;
+install)
+  P=$2; S=$P/usr/share/omarchy-nvim
+  install -d "$S" "$P/etc/skel/.config" "$P/etc/skel/.local/share" "$P/usr/bin"
+  cp -a "$XDG_CONFIG_HOME/nvim" "$S/config"
+  cp -a "$XDG_DATA_HOME/nvim" "$S/data"
+  rm -rf "$S/data/site"/*
+  mkdir -p "$S/data/site"
+  chmod -R 755 "$S"
+  find "$S" -type f -exec chmod 644 {} +
+  restore_lazy_worktrees "$S/data"
+  cp -a "$S/config" "$P/etc/skel/.config/nvim"
+  cp -a "$S/data" "$P/etc/skel/.local/share/nvim"
+  ln -snf ../../../../.local/state/omarchy/current/theme/neovim.lua \
+    "$P/etc/skel/.config/nvim/lua/plugins/theme.lua"
+  rm -rf "$S/data"
+  install -m755 $SRC/omarchy-nvim-setup "$P/usr/bin/omarchy-nvim-setup"
+  ln -s omarchy-nvim-setup "$P/usr/bin/omarchy-nvim-refresh"
+  ;;
+esac

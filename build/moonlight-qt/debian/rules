@@ -1,0 +1,21 @@
+#!/usr/bin/make -f
+# Upstream moonlight-qt built with qmake6, as the Arch package does. The
+# submodules come from upstream.submodules in build/moonlight-qt.yaml.
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+include /usr/share/dpkg/buildflags.mk
+PKG = debian/moonlight-qt
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	qmake6 QMAKE_CFLAGS="$(CFLAGS) $(CPPFLAGS)" QMAKE_CXXFLAGS="$(CXXFLAGS) $(CPPFLAGS)" \
+		QMAKE_LFLAGS="$(LDFLAGS)" PREFIX=/usr moonlight-qt.pro
+
+override_dh_auto_build:
+	$(MAKE) release
+
+override_dh_auto_install:
+	$(MAKE) install INSTALL_ROOT=$(CURDIR)/$(PKG)
+
+override_dh_auto_test:

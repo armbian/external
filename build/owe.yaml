@@ -1,0 +1,19 @@
+name: owe
+method: build
+# Wallpaper and theme renderer of the Omarchy desktop (MIT), needed by
+# armbian-hyprland-shell. Local packaging in build/owe/debian/, after the
+# upstream Arch PKGBUILD (omacom/omarchy-pkgs, pkgbuilds/owe).
+upstream:
+  url: https://github.com/omacom/owe
+  ref: v0.2.13
+releases:
+- forky
+- sid
+architectures:
+- amd64
+- arm64
+target: desktop
+repositories:
+- beta
+install:
+- owe

@@ -1,0 +1,21 @@
+name: pinta
+method: build
+# Image editor modeled after Paint.NET (MIT), preinstalled by the
+# armbian-hyprland-shell desktop. Local packaging in build/pinta/debian/,
+# after the upstream Arch PKGBUILD (omacom/omarchy-pkgs, pkgbuilds/pinta).
+# Debian has no .NET: the build downloads the .NET SDK and publishes
+# Pinta self-contained, so the package needs no .NET runtime.
+upstream:
+  url: https://github.com/PintaProject/Pinta
+  ref: 3.1.2
+releases:
+- forky
+- sid
+architectures:
+- amd64
+- arm64
+target: desktop
+repositories:
+- beta
+install:
+- pinta

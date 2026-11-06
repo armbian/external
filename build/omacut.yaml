@@ -1,0 +1,19 @@
+name: omacut
+method: build
+# Omarchy app (MIT), part of the armbian-hyprland-shell desktop. Local
+# packaging in build/omacut/debian/, after the upstream Arch PKGBUILD
+# (omacom/omarchy-pkgs, pkgbuilds/omacut).
+upstream:
+  url: https://github.com/omacom/omacut
+  ref: v0.7.2
+releases:
+- forky
+- sid
+architectures:
+- amd64
+- arm64
+target: desktop
+repositories:
+- beta
+install:
+- omacut

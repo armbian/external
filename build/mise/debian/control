@@ -1,0 +1,27 @@
+Source: mise
+Section: devel
+Priority: optional
+Maintainer: Armbian <info@armbian.com>
+Build-Depends: debhelper-compat (= 13),
+ cargo,
+ rustc,
+ pkgconf,
+ cmake,
+ clang,
+ libclang-dev,
+ libssl-dev,
+ nasm [amd64]
+Standards-Version: 4.7.0
+Homepage: https://mise.jdx.dev
+
+Package: mise
+Architecture: any
+Depends: ${shlibs:Depends},
+ ${misc:Depends},
+ usage
+Recommends: git, curl, ca-certificates
+Description: Dev tool, environment and task manager
+ Installs language runtimes and CLI tools per project or globally. Part of
+ the armbian-hyprland-shell desktop.
+ .
+ Upstream: https://github.com/jdx/mise (MIT).

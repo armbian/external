@@ -1,0 +1,15 @@
+Debian: reinstall with apt, not pacman.
+
+diff --git a/pkgbuilds/omarchy-nvim/omarchy-nvim-setup b/pkgbuilds/omarchy-nvim/omarchy-nvim-setup
+index 26d56fa..aaf2fcb 100755
+--- a/pkgbuilds/omarchy-nvim/omarchy-nvim-setup
++++ b/pkgbuilds/omarchy-nvim/omarchy-nvim-setup
+@@ -57,7 +57,7 @@ fi
+ 
+ if [[ ! -d "$CONFIG_SOURCE_DIR" || ! -d "$DATA_SOURCE_DIR" ]]; then
+   echo "Error: omarchy-nvim defaults not found in $CONFIG_SOURCE_DIR / $DATA_SOURCE_DIR." >&2
+-  echo "The package owns both; restore them with: sudo pacman -S omarchy-nvim" >&2
++  echo "The package owns both; restore them with: sudo apt install --reinstall omarchy-nvim" >&2
+   exit 1
+ fi
+ 

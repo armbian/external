@@ -1,0 +1,31 @@
+#!/usr/bin/make -f
+# Patch JetBrains Mono with the Nerd Fonts font-patcher of the release that
+# upstream Arch ships (ttf-jetbrains-mono-nerd-basic).
+PKG = debian/fonts-jetbrains-mono-nerd
+NF_VERSION = 3.5.1
+NF_SHA256 = 42bcb32145499a35732274c7fc48deb434ad0d2e0e118f98527c1479c6fa251a
+STYLES = Regular Bold Italic BoldItalic
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	curl -fsSL -o debian/FontPatcher.zip \
+		https://github.com/ryanoasis/nerd-fonts/releases/download/v$(NF_VERSION)/FontPatcher.zip
+	echo "$(NF_SHA256)  debian/FontPatcher.zip" | sha256sum -c -
+	unzip -q -o debian/FontPatcher.zip -d debian/font-patcher
+	for s in $(STYLES); do \
+		fontforge -script debian/font-patcher/font-patcher --complete --careful --quiet \
+			--no-progressbars --outputdir debian/patched fonts/ttf/JetBrainsMono-$$s.ttf || exit 1; \
+	done
+
+override_dh_auto_install:
+	for s in $(STYLES); do \
+		install -D -m644 debian/patched/JetBrainsMonoNerdFont-$$s.ttf \
+			$(PKG)/usr/share/fonts/truetype/jetbrains-mono-nerd/JetBrainsMonoNerdFont-$$s.ttf || exit 1; \
+	done
+	install -D -m644 OFL.txt $(PKG)/usr/share/doc/fonts-jetbrains-mono-nerd/OFL.txt
+	install -D -m644 debian/font-patcher/readme.md $(PKG)/usr/share/doc/fonts-jetbrains-mono-nerd/nerd-fonts-readme.md
+
+override_dh_auto_clean:
+	rm -rf debian/FontPatcher.zip debian/font-patcher debian/patched

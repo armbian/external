@@ -1,0 +1,19 @@
+name: omacalc
+method: build
+# Omarchy app (MIT), part of the armbian-hyprland-shell desktop. Local
+# packaging in build/omacalc/debian/, after the upstream Arch PKGBUILD
+# (omacom/omarchy-pkgs, pkgbuilds/omacalc).
+upstream:
+  url: https://github.com/omacom-io/omacalc
+  ref: v0.3.1
+releases:
+- forky
+- sid
+architectures:
+- amd64
+- arm64
+target: desktop
+repositories:
+- beta
+install:
+- omacalc

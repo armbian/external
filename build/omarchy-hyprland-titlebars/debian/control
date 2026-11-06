@@ -1,0 +1,27 @@
+Source: omarchy-hyprland-titlebars
+Section: x11
+Priority: optional
+Maintainer: Armbian <info@armbian.com>
+Build-Depends: debhelper-compat (= 13),
+ cmake,
+ pkgconf,
+ hyprland-dev,
+ libdrm-dev,
+ libinput-dev,
+ libudev-dev,
+ libpixman-1-dev,
+ libwayland-dev,
+ libxkbcommon-dev
+Standards-Version: 4.7.0
+Homepage: https://github.com/omacom/omarchy-hyprland-titlebars
+
+Package: omarchy-hyprland-titlebars
+Architecture: any
+Depends: ${shlibs:Depends},
+ ${misc:Depends},
+ ${hyprland:Depends}
+Description: Hyprland plugin: titlebars for floating windows
+ Omarchy loads it for its floating workspace mode. Part of the
+ armbian-hyprland-shell desktop.
+ .
+ Upstream: https://github.com/omacom/omarchy-hyprland-titlebars.

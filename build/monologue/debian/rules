@@ -1,0 +1,23 @@
+#!/usr/bin/make -f
+# Upstream monologue built with qmake (bin/build). Install steps follow the
+# upstream Arch PKGBUILD (omacom/omarchy-pkgs, pkgbuilds/monologue).
+PKG = debian/monologue
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+
+override_dh_auto_build:
+	./bin/build
+
+override_dh_auto_install:
+	install -D -m755 build/monologue $(PKG)/usr/bin/monologue
+	install -D -m644 pkgbuild/monologue.svg $(PKG)/usr/share/icons/hicolor/scalable/apps/monologue.svg
+	install -D -m644 pkgbuild/monologue.desktop $(PKG)/usr/share/applications/monologue.desktop
+	install -D -m644 LICENSE $(PKG)/usr/share/doc/monologue/LICENSE
+
+override_dh_auto_test:
+
+override_dh_auto_clean:
+	rm -rf build

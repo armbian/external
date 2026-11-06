@@ -1,0 +1,32 @@
+#!/usr/bin/make -f
+# Upstream cliamp built with Go. Modules come from the Go proxy, pinned by
+# go.sum. Install steps follow the upstream Arch PKGBUILD
+# (omacom/omarchy-pkgs, pkgbuilds/cliamp).
+include /usr/share/dpkg/pkg-info.mk
+PKG = debian/cliamp
+export GOPATH = $(CURDIR)/debian/go
+export GOCACHE = $(CURDIR)/debian/go-cache
+# The CI build tree is inside a git checkout: no VCS stamp.
+export GOFLAGS = -modcacherw -buildvcs=false
+export GOTOOLCHAIN = local
+export CGO_ENABLED = 1
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+
+override_dh_auto_build:
+	go build -trimpath -buildmode=pie \
+		-ldflags="-s -w -X main.version=v$(DEB_VERSION_UPSTREAM) -linkmode=external" -o cliamp .
+
+override_dh_auto_install:
+	install -D -m755 cliamp $(PKG)/usr/bin/cliamp
+	install -D -m644 cliamp.desktop $(PKG)/usr/share/applications/cliamp.desktop
+	install -D -m644 Cliamp.png $(PKG)/usr/share/icons/hicolor/512x512/apps/cliamp.png
+	install -D -m644 LICENSE $(PKG)/usr/share/doc/cliamp/LICENSE
+
+override_dh_auto_test:
+
+override_dh_auto_clean:
+	rm -rf cliamp debian/go debian/go-cache

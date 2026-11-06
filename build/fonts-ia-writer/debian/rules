@@ -1,0 +1,14 @@
+#!/usr/bin/make -f
+# Static fonts, as the upstream Arch PKGBUILD installs them
+# (omacom/omarchy-pkgs, pkgbuilds/ttf-ia-writer).
+DIR = debian/fonts-ia-writer/usr/share/fonts/truetype/ia-writer
+
+%:
+	dh $@
+
+override_dh_auto_install:
+	install -d $(DIR)
+	install -m644 "iA Writer Mono/Static/"iAWriterMonoS-*.ttf \
+		"iA Writer Duo/Static/"iAWriterDuoS-*.ttf \
+		"iA Writer Quattro/Static/"iAWriterQuattroS-*.ttf $(DIR)/
+	install -D -m644 "iA Writer Mono/LICENSE.md" debian/fonts-ia-writer/usr/share/doc/fonts-ia-writer/LICENSE.md

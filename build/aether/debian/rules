@@ -1,0 +1,36 @@
+#!/usr/bin/make -f
+# Upstream aether is a Wails app. Build the frontend with npm, then the Go
+# binary with the Wails production tags (what "wails build" runs). Install
+# steps follow the upstream Arch PKGBUILD (omacom/omarchy-pkgs, pkgbuilds/aether).
+PKG = debian/aether
+export GOPATH = $(CURDIR)/debian/go
+export GOCACHE = $(CURDIR)/debian/go-cache
+# The CI build tree is inside a git checkout: no VCS stamp.
+export GOFLAGS = -modcacherw -buildvcs=false
+export GOTOOLCHAIN = local
+export CGO_ENABLED = 1
+export npm_config_cache = $(CURDIR)/debian/npm-cache
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+
+override_dh_auto_build:
+	cd frontend && npm ci --no-audit --no-fund && npm run build
+	go build -trimpath -buildmode=pie -tags desktop,production,webkit2_41 \
+		-ldflags="-s -w" -o aether .
+
+override_dh_auto_install:
+	install -D -m755 aether $(PKG)/usr/bin/aether
+	install -D -m644 build/linux/aether.desktop $(PKG)/usr/share/applications/aether.desktop
+	install -D -m644 li.oever.aether.url-handler.desktop \
+		$(PKG)/usr/share/applications/li.oever.aether.url-handler.desktop
+	install -D -m644 icon.png $(PKG)/usr/share/pixmaps/aether.png
+	install -D -m644 assets/aether-icon-512.png $(PKG)/usr/share/icons/hicolor/512x512/apps/aether.png
+	install -D -m644 README.md $(PKG)/usr/share/doc/aether/README.md
+
+override_dh_auto_test:
+
+override_dh_auto_clean:
+	rm -rf aether frontend/node_modules frontend/dist debian/go debian/go-cache debian/npm-cache

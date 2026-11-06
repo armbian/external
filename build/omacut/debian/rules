@@ -1,0 +1,23 @@
+#!/usr/bin/make -f
+# Upstream omacut built with qmake (bin/build). Install steps follow the
+# upstream Arch PKGBUILD (omacom/omarchy-pkgs, pkgbuilds/omacut).
+PKG = debian/omacut
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+
+override_dh_auto_build:
+	./bin/build
+
+override_dh_auto_install:
+	install -D -m755 build/omacut $(PKG)/usr/bin/omacut
+	install -D -m644 pkgbuild/omacut.svg $(PKG)/usr/share/icons/hicolor/scalable/apps/omacut.svg
+	install -D -m644 pkgbuild/omacut.desktop $(PKG)/usr/share/applications/omacut.desktop
+	install -D -m644 LICENSE $(PKG)/usr/share/doc/omacut/LICENSE
+
+override_dh_auto_test:
+
+override_dh_auto_clean:
+	rm -rf build

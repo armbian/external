@@ -1,0 +1,19 @@
+name: herdr
+method: build
+# Terminal workspace manager (AGPL-3.0), part of the armbian-hyprland-shell
+# desktop. Local packaging in build/herdr/debian/, after the upstream Arch
+# PKGBUILD (omacom/omarchy-pkgs, pkgbuilds/herdr).
+upstream:
+  url: https://github.com/herdrdev/herdr
+  ref: v0.9.1
+releases:
+- forky
+- sid
+architectures:
+- amd64
+- arm64
+target: desktop
+repositories:
+- beta
+install:
+- herdr

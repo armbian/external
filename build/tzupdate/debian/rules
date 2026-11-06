@@ -1,0 +1,22 @@
+#!/usr/bin/make -f
+# Upstream tzupdate built with cargo. Crates come from crates.io, pinned by
+# Cargo.lock.
+export CARGO_HOME = $(CURDIR)/debian/cargo-home
+export CARGO_TARGET_DIR = $(CURDIR)/target
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+
+override_dh_auto_build:
+	cargo build --release --locked
+
+override_dh_auto_install:
+	install -D -m755 target/release/tzupdate debian/tzupdate/usr/bin/tzupdate
+	install -D -m644 -t debian/tzupdate/usr/share/doc/tzupdate LICENSE README.md
+
+override_dh_auto_test:
+
+override_dh_auto_clean:
+	rm -rf target debian/cargo-home

@@ -1,0 +1,31 @@
+Source: gliff
+Section: net
+Priority: optional
+Maintainer: Armbian <info@armbian.com>
+Build-Depends: debhelper-compat (= 13),
+ cargo,
+ rustc,
+ pkgconf,
+ nasm [amd64],
+ libgtk-4-dev,
+ libadwaita-1-dev,
+ libdrm-dev,
+ libgbm-dev,
+ libva-dev,
+ libdbus-1-dev,
+ libwayland-dev,
+ libxkbcommon-dev,
+ libvulkan-dev
+Standards-Version: 4.7.0
+Homepage: https://github.com/omacom/gliff
+
+Package: gliff
+Architecture: any
+Depends: ${shlibs:Depends},
+ ${misc:Depends},
+ openssh-client,
+ mesa-vulkan-drivers | vulkan-icd
+Description: Remote Hyprland desktop over SSH
+ Omarchy app, part of the armbian-hyprland-shell desktop.
+ .
+ Upstream: https://github.com/omacom/gliff (MIT).
