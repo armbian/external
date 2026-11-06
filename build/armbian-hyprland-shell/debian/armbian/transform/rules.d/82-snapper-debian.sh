@@ -3,6 +3,8 @@
 # Debian has no limine-snapper-sync: enable the cleanup timer alone.
 # Armbian images can have an ext4 root. There snapper has nothing to
 # snapshot: return 127 like a missing snapper, so omarchy-update stays quiet.
+# Armbian has no snapshot boot entries yet (limine on Arch): say how to
+# restore instead.
 . "$TRANSFORM_LIB"
 
 replace install/config/snapper.sh 'SNAPPER_CONF_PATH="${OMARCHY_SNAPPER_CONF_PATH:-/etc/conf.d/snapper}"' 'SNAPPER_CONF_PATH="${OMARCHY_SNAPPER_CONF_PATH:-/etc/default/snapper}"' 1
@@ -15,3 +17,4 @@ replace bin/omarchy-snapshot 'if omarchy-cmd-missing snapper; then
 fi' 'if omarchy-cmd-missing snapper || [[ $(findmnt -n -o FSTYPE /) != btrfs ]]; then
   exit 127 # omarchy-update can use this to just ignore if snapper is not available
 fi' 1
+replace bin/omarchy-snapshot '  echo "Snapshots can be selected during boot."' '  echo "Restore from a snapshot with: sudo snapper -c root rollback <number>"' 1
