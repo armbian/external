@@ -1,0 +1,34 @@
+#!/usr/bin/make -f
+# Repack the upstream release that matches the tag. Its SHA256 must match
+# checksums.txt of the same release.
+include /usr/share/dpkg/pkg-info.mk
+include /usr/share/dpkg/architecture.mk
+
+PKG = debian/once
+ASSET = once-linux-$(DEB_HOST_ARCH)
+RELEASE = https://github.com/basecamp/once/releases/download/v$(DEB_VERSION_UPSTREAM)
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	curl -fsSL --retry 3 -o debian/$(ASSET) $(RELEASE)/$(ASSET)
+	curl -fsSL --retry 3 -o debian/checksums.txt $(RELEASE)/checksums.txt
+	cd debian && grep "  $(ASSET)$$" checksums.txt | sha256sum -c -
+
+override_dh_auto_install:
+	install -D -m755 debian/$(ASSET) $(PKG)/usr/bin/once
+	install -D -m644 MIT-LICENSE $(PKG)/usr/share/doc/once/LICENSE
+
+# Like the Arch package: the service is not enabled. An upgrade restarts
+# it only when it is enabled. Removal stops it.
+override_dh_installsystemd:
+	dh_installsystemd --name=once-background --no-enable
+
+override_dh_auto_configure override_dh_auto_test:
+
+# Upstream binary: keep it as released.
+override_dh_strip override_dh_dwz:
+
+override_dh_auto_clean:
+	rm -f debian/once-linux-* debian/checksums.txt
