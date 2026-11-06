@@ -7,6 +7,8 @@ Package list with versions per release and architecture: https://external.armbia
 This repository holds the package list, the upstream signing keys and the tool that downloads, builds, checks and sorts the packages.
 The Armbian repository update takes the result and publishes it.
 
+![Package pipeline: mirror and build configs, GitHub Actions, verified packages, Armbian APT repository](docs/images/pipeline.png)
+
 ## Layout
 
 ```
