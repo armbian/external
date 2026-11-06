@@ -1,0 +1,19 @@
+#!/usr/bin/make -f
+# Upstream omarchy-emacs is Emacs Lisp and shell scripts. Install steps
+# follow the upstream Arch PKGBUILD (omacom/omarchy-pkgs,
+# pkgbuilds/omarchy-emacs).
+PKG = debian/omarchy-emacs
+SHARE = $(PKG)/usr/share/omarchy-emacs
+
+%:
+	dh $@
+
+override_dh_auto_install:
+	install -D -m644 -t $(SHARE)/config config/init.el config/omarchy.el config/shell-bashrc
+	install -D -m644 -t $(SHARE)/config/themes config/themes/omarchy-theme.el
+	install -D -m644 -t $(SHARE) omarchy-colors.el.tpl
+	install -D -m755 -t $(SHARE)/hooks hooks/font-set hooks/theme-set
+	install -D -m755 -t $(PKG)/usr/bin bin/omarchy-emacs-setup \
+		bin/omarchy-emacs-sync-hooks bin/omarchy-restart-emacs \
+		bin/omarchy-install-emacs
+	install -D -m644 -t $(PKG)/usr/share/doc/omarchy-emacs LICENSE README.md

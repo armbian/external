@@ -1,0 +1,18 @@
+Source: omarchy-emacs
+Section: editors
+Priority: optional
+Maintainer: Armbian <info@armbian.com>
+Build-Depends: debhelper-compat (= 13)
+Standards-Version: 4.7.0
+Homepage: https://github.com/scottjones/omarchy-emacs
+
+Package: omarchy-emacs
+Architecture: all
+Depends: ${misc:Depends},
+ bash,
+ emacs-pgtk
+Description: Emacs setup that follows the Omarchy theme and font
+ Omarchy add-on, for the armbian-hyprland-shell desktop.
+ Run "omarchy-emacs-setup" once per user.
+ .
+ Upstream: https://github.com/scottjones/omarchy-emacs (MIT).

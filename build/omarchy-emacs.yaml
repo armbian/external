@@ -1,0 +1,20 @@
+name: omarchy-emacs
+method: build
+# Emacs theme and font sync for Omarchy (MIT), for the
+# armbian-hyprland-shell desktop. Local packaging in
+# build/omarchy-emacs/debian/, after the upstream Arch PKGBUILD
+# (omacom/omarchy-pkgs, pkgbuilds/omarchy-emacs).
+upstream:
+  url: https://github.com/scottjones/omarchy-emacs
+  ref: v1.10.1
+releases:
+- forky
+- sid
+architectures:
+- amd64
+- arm64
+target: desktop
+repositories:
+- beta
+install:
+- omarchy-emacs
