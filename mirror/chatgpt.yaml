@@ -1,0 +1,21 @@
+name: chatgpt
+method: apt
+# ChatGPT desktop app with Codex, offered in the armbian-hyprland-shell
+# Install menu as openai-codex-desktop. About 560 MB per package: forky and
+# sid only. keys/chatgpt.gpg: 3BFA0E4AE8B8CC16A2D9BA684A3B4A566C4660E4, as in
+# OpenAI's install-arch.sh. Its postinst also registers the vendor repository.
+source:
+  url: https://persistent.oaistatic.com/codex-app-prod/linux/deb
+  suite: stable
+  components:
+  - main
+releases:
+- forky
+- sid
+architectures:
+- amd64
+- arm64
+target: desktop
+install:
+- chatgpt
+filter: Name (= chatgpt)

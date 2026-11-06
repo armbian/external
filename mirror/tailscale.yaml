@@ -1,0 +1,20 @@
+name: tailscale
+method: apt
+# Tailscale, offered in the armbian-hyprland-shell Install menu. Static Go
+# binaries: the forky suite serves forky and sid. keys/tailscale.gpg:
+# 2596A99EAAB33821893C0A79458CA832957F5868.
+source:
+  url: https://pkgs.tailscale.com/stable/debian
+  suite: forky
+  components:
+  - main
+releases:
+- forky
+- sid
+architectures:
+- amd64
+- arm64
+target: utils
+install:
+- tailscale
+filter: Name (= tailscale)

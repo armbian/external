@@ -1,0 +1,18 @@
+name: nordvpn
+method: apt
+# NordVPN client, offered in the armbian-hyprland-shell Install menu.
+# keys/nordvpn.gpg: BC5480EFEC5C081CE5BCFBE26B219E535C964CA1.
+source:
+  url: https://repo.nordvpn.com/deb/nordvpn/debian
+  suite: stable
+  components:
+  - main
+releases: all
+architectures:
+- amd64
+- arm64
+target: desktop
+install:
+- nordvpn
+- nordvpn-gui
+filter: Name (= nordvpn) | Name (= nordvpn-gui)

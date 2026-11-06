@@ -1,0 +1,17 @@
+name: signal-desktop
+method: apt
+# Signal Desktop, offered in the armbian-hyprland-shell Install menu.
+# One suite (xenial) for all distributions, amd64 only. keys/signal.gpg:
+# DBA36B5181D0C816F630E889D980A17457F6FB06, as signs the repository.
+source:
+  url: https://updates.signal.org/desktop/apt
+  suite: xenial
+  components:
+  - main
+releases: all
+architectures:
+- amd64
+target: desktop
+install:
+- signal-desktop
+filter: Name (= signal-desktop)

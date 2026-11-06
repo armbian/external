@@ -1,0 +1,18 @@
+name: winehq-staging-sid
+method: apt
+# Wine (staging), offered in the armbian-hyprland-shell Install menu. Debian
+# sid has no wine. WineHQ builds amd64 only (WoW64, no i386 needed on forky).
+# keys/winehq.gpg: D43F640145369C51D786DDEA76F1A20FF987672F.
+source:
+  url: https://dl.winehq.org/wine-builds/debian
+  suite: sid
+  components:
+  - main
+releases:
+- sid
+architectures:
+- amd64
+target: desktop
+install:
+- winehq-staging
+filter: Name (= winehq-staging) | Name (= wine-staging) | Name (% wine-staging-*)
