@@ -1,0 +1,15 @@
+name: heroic
+method: github
+# Heroic Games Launcher (GPL-3.0), offered in the armbian-hyprland-shell
+# Install menu. Upstream publishes .deb packages for amd64 and arm64.
+source:
+  url: https://github.com/Heroic-Games-Launcher/HeroicGamesLauncher
+releases:
+- forky
+- sid
+architectures:
+- amd64
+- arm64
+target: desktop
+install:
+- heroic
