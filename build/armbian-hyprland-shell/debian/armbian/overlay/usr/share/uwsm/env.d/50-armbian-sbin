@@ -1,0 +1,6 @@
+# Armbian: Arch merges /usr/sbin into /usr/bin, so Omarchy calls rfkill, iw
+# and modprobe without a path. Debian keeps sbin off the PATH of a user.
+case ":$PATH:" in
+  *:/usr/sbin:*) ;;
+  *) export PATH="$PATH:/usr/local/sbin:/usr/sbin:/sbin" ;;
+esac

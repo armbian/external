@@ -1,0 +1,19 @@
+name: omawrite
+method: build
+# Omarchy app (MIT), part of the armbian-hyprland-shell desktop. Local
+# packaging in build/omawrite/debian/, after the upstream Arch PKGBUILD
+# (omacom/omarchy-pkgs, pkgbuilds/omawrite).
+upstream:
+  url: https://github.com/omacom/omawrite
+  ref: v0.7.2
+releases:
+- forky
+- sid
+architectures:
+- amd64
+- arm64
+target: desktop
+repositories:
+- beta
+install:
+- omawrite

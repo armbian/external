@@ -1,0 +1,65 @@
+# Arch-specific upstream parts and their Debian adaptation.
+# Format: <upstream path> | <status> | <what Armbian does>
+# Status: done, todo. A todo entry is not installed yet, or fails on Debian.
+# See build/armbian-hyprland-shell/AGENTS.md, rule 3.
+
+etc/sudoers.d/* | done | Group %wheel becomes %sudo (transform 30-sudoers-group).
+bin/omarchy-provision-owner | done | The owner gets the group sudo and a %sudo rule (transform 35-owner-group). Other wheel mentions in bin are comments.
+Learn > manual and community, update what's new and help | done | docs.armbian.com, the Armbian release notes and the Armbian Discord (transform 95-armbian-links).
+Learn > Arch | done | Removed: Armbian is Debian, and Learn > Armbian covers it (maintainer decision, transform 96-learn-no-arch).
+pacman outside omarchy-pkg-* (fingerprint setup, remove launcher entry, upload log, debug log) | done | apt and dpkg; logs go to paste.armbian.com (transforms 97-pacman-to-apt, 93-debug-dpkg).
+PAM includes (lock screen, fingerprint, FIDO2) | done | Arch system-local-login and system-auth become Debian common-* stacks. The lock screen did not unlock before (transform 98-pam-debian).
+etc/sddm.conf.d (theme) | done | armbian-firstlogin writes armbian.conf with Current=breeze. overlay etc/sddm.conf.d/zz-armbian-hyprland-shell.conf sorts last and keeps the Omarchy greeter.
+shell/plugins/menu/MenuModel.js (menu package guards) | done | The menu built its package set with pacman, so omarchy-pkg-present was always false. The set comes from dpkg and deps.map (overlay usr/lib/armbian-hyprland-shell/pkg-names, transform 99-menu-guards-dpkg).
+etc/NetworkManager/conf.d/omarchy-connectivity.conf, network panel captive portal | done | Debian endpoint network-test.debian.org instead of ping.omacom.io (transform 94-connectivity-debian).
+timezone at first login | done | armbian-firstlogin sets it from the public IP, but Wi-Fi laptops are offline then. First-run sets it with tzupdate while it is still UTC (overlay install/user/first-run/armbian-timezone.sh, transform 91-first-run-timezone).
+install/config/firewall.sh | done | Runs once at boot (overlay usr/lib/armbian-hyprland-shell/system-setup, armbian-hyprland-shell-setup.service), after allowing SSH 22, which Armbian enables. Kept when the admin already enabled ufw.
+install/config/enable-services.sh (docker) | done | Docker starts on first use: docker.socket enabled, docker.service disabled once (system-setup).
+localsend command | done | The LocalSend .deb installs localsend_app; Arch installs localsend. Menu, share helper and Nautilus extension call localsend_app (transform 92-localsend-command).
+default/wayland-sessions/omarchy.desktop | done | Session name "Armbian (Hyprland uwsm)" (transform 40-session-name).
+default/plymouth | done | Not installed: Armbian ships its own Plymouth theme (armbian-plymouth-theme).
+install/user/theme.sh | done | New users start with the armbian theme (transform 50-default-theme).
+config/chromium-flags.conf | done | The Arch Chromium launcher reads it; the Debian wrapper does not. overlay etc/chromium.d/zz-omarchy-flags adds its flags and merges its extensions into --load-extension.
+/usr/share/chromium/extensions/*.json (Claude, 1Password) | done | Debian /etc/chromium.d/extensions loads every entry there as an unpacked extension, and Chromium shows an error dialog. overlay etc/chromium.d/extensions-armbian passes only folders; Chromium reads the .json files itself.
+default/applications/mimeapps.list, default/hypr/apps/system.lua | done | Evince becomes Papers, its Debian successor (transform 70-pdf-viewer-papers).
+default/omarchy/launcher.hides | done | Also hides im-config: Debian fcitx5 depends on it, and its entry opens nothing (transform 75-launcher-hides-im-config).
+
+omarchy-pkg-* (pacman, yay) | done | apt versions, same names and arguments (overlay usr/share/omarchy/bin). omarchy-pkg-debname translates Arch names with deps.map, installed at /usr/share/armbian-hyprland-shell/deps.map.
+omarchy-pkg-aur-* | done | Debian has no AUR: the commands use the Debian and Armbian repositories (overlay).
+omarchy-version | done | Version of the armbian-hyprland-shell package (overlay).
+omarchy-update-available | done | Reports a new armbian-hyprland-shell in the apt lists (overlay).
+omarchy-update-system-pkgs | done | apt-get update and upgrade, changed conffiles kept (overlay).
+omarchy-update-keyring, omarchy-update-aur-pkgs | done | No-op: apt keys come from keyring packages; no AUR (overlay).
+omarchy-update-pkg-prune, omarchy-update-orphan-pkgs | done | apt-get autoclean and autoremove, same prompts (overlay).
+omarchy-update-restart | done | dpkg -S finds the package of a kernel (transform 60-kernel-owner-dpkg).
+omarchy-menu-keybindings (lua) | done | Debian keeps lua at 5.1, which has no -E. The key sheet calls lua5.5 (transform 85-keybindings-lua55, deps.map lua).
+sbin commands (rfkill, iw, modprobe) | done | Arch merges /usr/sbin into /usr/bin. uwsm adds the sbin folders to the session PATH (overlay usr/share/uwsm/env.d/50-armbian-sbin).
+pactl, rfkill, cryptsetup | done | Arch base packages provide them. deps.map maps libpulse, util-linux and cryptsetup to the Debian packages.
+superwhisper-bin (dictation) | done | Proprietary: only the vendor channel may distribute it. Install, first run and removal use the official vendor installer in ~/.local (transform 90-superwhisper-vendor-installer). deps.map recommends its dependencies.
+default/bashrc | done | bash owns /etc/skel/.bashrc, and dpkg cannot divert a conffile. User setup and omarchy-reinstall-configs copy it over an unchanged Debian ~/.bashrc (overlay install/user/bashrc.sh, transform 45-bashrc-user-step).
+omarchy-settings.install (passwordless sudo) | done | Same steps in the maintainer scripts and usr/lib/armbian-hyprland-shell/passwordless-transition (overlay).
+/run/lock (sudo-passwordless and Windows VM locks) | done | Arch /run/lock is root 0755, Debian 1777: the lock checks refused it. /run/omarchy from the package tmpfiles (transform 89-protected-lock-dir).
+default/libalpm/hooks/05-omarchy-passwordless-revoke.hook | done | Installed: omarchy-sudo-passwordless checks it. The maintainer scripts do its work.
+default/libalpm/hooks/10-*, 90-* | done | Hyprland reload pause and resume run from preinst and postinst.
+default/libalpm/hooks/00-omarchy-update-guard.hook | todo | Blocks pacman updates outside omarchy-update. apt has no such hook yet.
+omarchy-agent-account-add (agent CLIs) | done | Installs the CLIs with mise, as upstream. mise is built in armbian/external. Fixes "Installing the Claude CLI didn't finish".
+owe (owed.service, /usr/share/owe hooks) | done | Built in armbian/external (build/owe.yaml). A dependency: first-run fails without it.
+default/systemd/user/*.service | done | Installed but not enabled for all users, as upstream: dh_installsystemduser --no-enable. First-run enables them per user.
+journal access (Arch group wheel) | done | The group sudo reads the journal (debian/armbian-hyprland-shell.tmpfiles). omarchy-crash-watch needs it.
+bt-agent.service | done | bt-agent comes from bluez-tools, a dependency.
+default/systemd/zram-generator.conf.d, zram-generator | done | Not installed: armbian-zram-config manages zram swap and the /var/log zram. Both gave two zram swaps (maintainer decision: keep Armbian).
+omarchy-power-profiles-daemon | done | Debian power-profiles-daemon. The Omarchy patches add Apple, NVIDIA N1X/GB10 and Snapdragon X support only.
+etc-overrides/os-release | done | Not installed: it is Omarchy branding. Armbian keeps its own os-release.
+
+etc/nsswitch.conf, etc/security/faillock.conf | todo | Upstream overwrites base files: compare with Debian, then install as a divert or a drop-in.
+etc/sysusers.d | done | Installed. postinst creates the cups-browsed user: the upstream drop-in runs cups-browsed as that user.
+etc/cups | todo | cups-browsed.conf and cups-files.conf replace Debian conffiles: compare first.
+etc/docker, etc/gnupg | todo | Files that Debian packages or users own: install only where no other package owns them.
+etc/plymouth | todo | Upstream plymouthd.conf selects the Omarchy theme: keep the Armbian theme.
+etc/mkinitcpio.conf.d, etc/limine-entry-tool.d | todo | Arch boot: adapt to initramfs-tools and GRUB or U-Boot.
+default/limine, default/snapper | todo | Snapshots and boot entries: Debian snapper, Armbian boot loaders.
+migrations | todo | Migrations that call pacman: check each one. New users start with all migrations done.
+pinta, moonlight-qt | done | Built in armbian/external from source (build/pinta.yaml, build/moonlight-qt.yaml).
+dotnet-runtime | done | Not needed: Pinta is built self-contained, and the dotnet dev environment installs with mise.
+voxtype-bin | done | Upstream .deb, mirrored for amd64 (mirror/voxtype.yaml). arm64: todo, upstream has no .deb.
+deps.map source:vendor | todo | qmk-hid, v4l2-relayd: no Debian or Armbian package yet.

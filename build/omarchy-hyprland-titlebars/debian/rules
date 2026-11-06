@@ -1,0 +1,19 @@
+#!/usr/bin/make -f
+# Upstream plugin built with CMake. Install steps follow the upstream Arch
+# PKGBUILD (omacom/omarchy-pkgs, pkgbuilds/omarchy-hyprland-titlebars).
+# Hyprland loads a plugin only when it matches the Hyprland build: depend on
+# the exact Hyprland version that the plugin was built against.
+HYPRLAND_VERSION = $(shell dpkg-query -W -f='$${Version}' hyprland-dev)
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	dh_auto_configure -- -DCMAKE_BUILD_TYPE=Release
+
+override_dh_auto_install:
+	dh_auto_install
+	install -D -m644 -t debian/omarchy-hyprland-titlebars/usr/share/doc/omarchy-hyprland-titlebars LICENSE LICENSE.MIT
+
+override_dh_gencontrol:
+	dh_gencontrol -- -Vhyprland:Depends="hyprland (= $(HYPRLAND_VERSION))"

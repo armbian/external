@@ -1,0 +1,26 @@
+#!/usr/bin/make -f
+# Upstream gliff built with cargo. Crates come from crates.io, pinned by
+# Cargo.lock. Install steps follow the upstream Arch PKGBUILD
+# (omacom/omarchy-pkgs, pkgbuilds/gliff).
+PKG = debian/gliff
+export CARGO_HOME = $(CURDIR)/debian/cargo-home
+export CARGO_TARGET_DIR = $(CURDIR)/target
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+
+override_dh_auto_build:
+	cargo build --release --locked
+
+override_dh_auto_install:
+	install -D -m755 -t $(PKG)/usr/bin target/release/gliff target/release/gliff-server target/release/gliff-probe
+	install -D -m644 pkgbuild/gliff.svg $(PKG)/usr/share/icons/hicolor/scalable/apps/gliff.svg
+	install -D -m644 pkgbuild/gliff.desktop $(PKG)/usr/share/applications/gliff.desktop
+	install -D -m644 -t $(PKG)/usr/share/doc/gliff LICENSE NOTICE README.md docs/hardware-quirks.md
+
+override_dh_auto_test:
+
+override_dh_auto_clean:
+	rm -rf target debian/cargo-home

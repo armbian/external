@@ -76,7 +76,8 @@ class Config(unittest.TestCase):
         pk = {"url": "https://deb.debian.org/debian", "suite": "sid", "package": "x"}
         for bad in ({"architectures": ["armhf"]}, {"filter": "Name (% x)"}, {"source": {"url": "u"}},
                     {"repositories": ["testing"]}, {"repositories": []},
-                    {"upstream": {"url": "u", "rebase": {"url": "v"}}}, {"revision": 0}):
+                    {"upstream": {"url": "u", "rebase": {"url": "v"}}}, {"upstream": {"url": "u", "submodules": "yes"}},
+                    {"revision": 0}):
             with self.subTest(bad=bad), self.assertRaises(config.ConfigError):
                 self.load({**self.base(packaging=pk), **bad})
 
@@ -169,6 +170,41 @@ class Upstream(unittest.TestCase):
         tree = os.path.join(self.tmp, "tree")
         builder._upstream(self.up(), tree)
         self.assertEqual(sorted(os.listdir(tree)), ["a", "b", "c"])
+
+    def test_submodules(self):
+        sub = os.path.join(self.tmp, "sub")
+        git(self.tmp, "init", "-q", "-b", "main", sub)
+        commit(sub, "s", "sub\n")
+        git(self.fork, "-c", "protocol.file.allow=always", "submodule", "add", "-q", f"file://{sub}", "lib")
+        git(self.fork, "commit", "-q", "-m", "submodule")
+        head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=self.fork, capture_output=True, text=True).stdout.strip()
+        commit(sub, "later", "not pinned\n")
+        tree = os.path.join(self.tmp, "tree")
+        builder._upstream({"url": f"file://{self.fork}", "ref": "feature", "commit": head, "rebase": None,
+                           "submodules": True}, tree)
+        self.assertEqual(sorted(os.listdir(os.path.join(tree, "lib"))), ["s"])
+
+    def test_submodules_relative_url(self):
+        sub = os.path.join(self.tmp, "sub")
+        git(self.tmp, "init", "-q", "-b", "main", sub)
+        commit(sub, "s", "sub\n")
+        # The fork's origin is the base repository: "../sub" is next to it.
+        git(self.fork, "-c", "protocol.file.allow=always", "submodule", "add", "-q", "../sub", "lib")
+        git(self.fork, "commit", "-q", "-m", "submodule")
+        head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=self.fork, capture_output=True, text=True).stdout.strip()
+        # Away from the repositories: a relative URL must resolve through
+        # origin, not through the build tree.
+        tree = os.path.join(self.tmp, "build", "work", "tree")
+        builder._upstream({"url": f"file://{self.fork}", "ref": "feature", "commit": head, "rebase": None,
+                           "submodules": True}, tree)
+        self.assertEqual(sorted(os.listdir(os.path.join(tree, "lib"))), ["s"])
+
+    def test_branch_moved(self):
+        tree = os.path.join(self.tmp, "tree")
+        planned = self.fork_head
+        commit(self.fork, "d", "after the plan\n")
+        builder._upstream({"url": f"file://{self.fork}", "ref": "feature", "commit": planned, "rebase": None}, tree)
+        self.assertEqual(sorted(os.listdir(tree)), ["a", "b"])
 
     def test_conflict_fails(self):
         commit(self.base, "b", "conflict\n")

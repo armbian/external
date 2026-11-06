@@ -1,0 +1,12 @@
+#!/bin/sh
+# Port of the upstream Arch omarchy-settings.install pre_remove.
+set -e
+
+if [ "$1" = remove ]; then
+	/usr/lib/armbian-hyprland-shell/passwordless-transition begin || {
+		echo "ERROR: Could not revoke temporary sudo grants before the removal. Administrator cleanup is required." >&2
+		exit 1
+	}
+fi
+
+#DEBHELPER#

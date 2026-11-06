@@ -1,0 +1,33 @@
+#!/usr/bin/make -f
+# Upstream herdr built with cargo. Crates come from crates.io, pinned by
+# Cargo.lock. Install steps follow the upstream Arch PKGBUILD
+# (omacom/omarchy-pkgs, pkgbuilds/herdr).
+PKG = debian/herdr
+export CARGO_HOME = $(CURDIR)/debian/cargo-home
+export CARGO_TARGET_DIR = $(CURDIR)/target
+ZIGVER = 0.16.0
+ZIGARCH = $(shell dpkg-architecture -qDEB_HOST_GNU_CPU)
+ZIGSUM_x86_64 = 70e49664a74374b48b51e6f3fdfbf437f6395d42509050588bd49abe52ba3d00
+ZIGSUM_aarch64 = ea4b09bfb22ec6f6c6ceac57ab63efb6b46e17ab08d21f69f3a48b38e1534f17
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+
+override_dh_auto_build:
+	# libghostty-vt builds with Zig 0.16. Debian has no Zig: fetch the
+	# upstream release, as the Arch PKGBUILD does.
+	curl -fsSL -o debian/zig.tar.xz https://ziglang.org/download/$(ZIGVER)/zig-$(ZIGARCH)-linux-$(ZIGVER).tar.xz
+	echo "$(ZIGSUM_$(ZIGARCH))  debian/zig.tar.xz" | sha256sum -c -
+	mkdir -p debian/zig && tar -xJf debian/zig.tar.xz -C debian/zig --strip-components=1
+	ZIG=$(CURDIR)/debian/zig/zig ZIG_GLOBAL_CACHE_DIR=$(CURDIR)/debian/zig-cache cargo build --release --locked
+
+override_dh_auto_install:
+	install -D -m755 target/release/herdr $(PKG)/usr/bin/herdr
+	install -D -m644 LICENSE $(PKG)/usr/share/doc/herdr/LICENSE
+
+override_dh_auto_test:
+
+override_dh_auto_clean:
+	rm -rf target debian/cargo-home

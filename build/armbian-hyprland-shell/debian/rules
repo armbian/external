@@ -1,0 +1,103 @@
+#!/usr/bin/make -f
+# Upstream Omarchy, transformed for Armbian. No compilation.
+# Changes follow build/armbian-hyprland-shell/AGENTS.md. The install
+# layout follows upstream docs/file-layout.md: one Armbian package holds
+# what upstream splits into the omarchy and omarchy-settings packages.
+PKG = debian/armbian-hyprland-shell
+SHARE = $(PKG)/usr/share/omarchy
+SKEL = $(PKG)/etc/skel
+ICONS = $(PKG)/usr/share/icons/hicolor
+
+# etc/ drop-ins installed as upstream does. The others wait for a Debian
+# adaptation: see debian/armbian/adapt.list.
+ETC_DIRS = fastfetch modprobe.d mise mpv NetworkManager profile.d \
+	sddm.conf.d sudoers.d sysctl.d systemd sysusers.d tmpfiles.d udev xdg xkb
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	sh debian/armbian/transform/apply .
+	# A broken sudoers file locks out sudo: check every drop-in.
+	for f in etc/sudoers.d/*; do visudo -c -q -f $$f || exit 1; done
+
+override_dh_auto_install:
+	# Package omarchy: commands, shell, themes, install scripts, migrations.
+	install -d $(SHARE) $(PKG)/usr/bin
+	cp -a agents applications bin config default etc install manual \
+		migrations shell themes icon.png icon.txt logo.svg logo.txt version \
+		LICENSE $(SHARE)/
+
+	# Package omarchy-settings: system files.
+	install -D -m644 default/uwsm/env.d/10-omarchy $(PKG)/usr/share/uwsm/env.d/10-omarchy
+	install -D -m644 -t $(PKG)/usr/lib/environment.d default/environment.d/*.conf
+	install -D -m644 -t $(PKG)/usr/share/xdg-terminal-exec default/xdg-terminal-exec/*.list
+	install -D -m644 default/applications/mimeapps.list $(PKG)/usr/share/applications/mimeapps.list
+	install -d $(PKG)/usr/lib/systemd/user
+	cp -a default/systemd/user/. $(PKG)/usr/lib/systemd/user/
+	install -D -m755 default/systemd/system-sleep/unmount-fuse $(PKG)/usr/lib/systemd/system-sleep/unmount-fuse
+	install -D -m644 -t $(PKG)/usr/lib/systemd/timesyncd.conf.d default/systemd/timesyncd.conf.d/*.conf
+	install -D -m644 default/fonts/omarchy/omarchy.ttf $(PKG)/usr/share/fonts/omarchy/omarchy.ttf
+	install -D -m644 default/fontconfig/conf.avail/50-omarchy.conf \
+		$(PKG)/usr/share/fontconfig/conf.avail/50-omarchy.conf
+	install -d $(PKG)/usr/share/sddm/themes
+	cp -a default/sddm/omarchy $(PKG)/usr/share/sddm/themes/
+	install -D -m644 default/sddm/hyprland.lua $(PKG)/usr/share/sddm/hyprland.lua
+	# omarchy-sudo-passwordless checks this hook before a temporary grant. On
+	# Debian, the maintainer scripts do what it does.
+	install -D -m644 default/libalpm/hooks/05-omarchy-passwordless-revoke.hook \
+		$(PKG)/usr/share/libalpm/hooks/05-omarchy-passwordless-revoke.hook
+	install -D -m644 default/wayland-sessions/omarchy.desktop $(PKG)/usr/share/wayland-sessions/omarchy.desktop
+	# Application icons by icon id, as upstream omarchy-settings does: the
+	# desktop files name them in lowercase with dashes.
+	rm -r $(SHARE)/applications/icons
+	install -d $(ICONS)/256x256/apps $(ICONS)/48x48/apps
+	for icon in applications/icons/*; do \
+		name=$${icon##*/}; \
+		id=$$(printf '%s\n' "$${name%.*}" | tr '[:upper:]' '[:lower:]' | sed 's/[^[:alnum:]]\+/-/g; s/^-//; s/-$$//'); \
+		case "$$name" in \
+		*.svg) install -D -m644 "$$icon" $(ICONS)/scalable/apps/$$id.svg ;; \
+		*) magick "$$icon" -thumbnail 256x256 -background transparent -gravity center -extent 256x256 \
+				"PNG32:$(ICONS)/256x256/apps/$$id.png" && \
+			magick "$$icon" -thumbnail 48x48 -background transparent -gravity center -extent 48x48 \
+				"PNG32:$(ICONS)/48x48/apps/$$id.png" || exit 1 ;; \
+		esac; \
+	done
+	for d in $(ETC_DIRS); do install -d $(PKG)/etc/$$d; cp -a etc/$$d/. $(PKG)/etc/$$d/; done
+	chmod 0440 $(PKG)/etc/sudoers.d/*
+
+	# Seed for new users (/etc/skel).
+	install -d $(SKEL)/.config $(SKEL)/.local/share/applications \
+		$(SKEL)/.local/state/omarchy/toggles/hypr $(SKEL)/.local/state/omarchy/migrations \
+		$(SKEL)/.local/share/nautilus-python/extensions $(SKEL)/.config/omarchy/branding
+	cp -a config/. $(SKEL)/.config/
+	cp -a applications/*.desktop $(SKEL)/.local/share/applications/
+	cp -a default/hypr/toggles/flags.lua default/hypr/toggles/single-window-aspect-ratio.lua \
+		default/hypr/toggles/window-no-gaps.lua $(SKEL)/.local/state/omarchy/toggles/hypr/
+	cp -a default/nautilus-python/extensions/*.py $(SKEL)/.local/share/nautilus-python/extensions/
+	# New users start with every shipped migration done.
+	for m in migrations/*.sh; do touch $(SKEL)/.local/state/omarchy/migrations/$${m#migrations/}; done
+
+	# Armbian files over the upstream ones: theme, fonts, branding.
+	cp -a debian/armbian/overlay/. $(PKG)/
+	# Upstream runs the commands from /usr/bin when OMARCHY_PATH is
+	# /usr/share/omarchy. The overlay adds commands too.
+	for f in $(SHARE)/bin/*; do ln -s ../share/omarchy/bin/$${f##*/} $(PKG)/usr/bin/$${f##*/}; done
+	# Arch to Debian package names, for the omarchy-pkg-* commands.
+	install -D -m644 debian/armbian/deps.map $(PKG)/usr/share/armbian-hyprland-shell/deps.map
+	install -D -m644 $(SHARE)/icon.png $(PKG)/usr/share/pixmaps/omarchy.png
+	install -D -m644 $(SHARE)/icon.png $(PKG)/usr/share/icons/hicolor/256x256/apps/omarchy.png
+	install -m644 $(SHARE)/logo.txt $(SKEL)/.config/omarchy/branding/about.txt
+	install -m644 $(SHARE)/logo.txt $(SKEL)/.config/omarchy/branding/screensaver.txt
+
+# Recommends come from debian/armbian/deps.map: every Debian package that
+# upstream's Arch package list maps to.
+override_dh_gencontrol:
+	dh_gencontrol -- -Varmbian:Recommends="$$(awk '!/^#/ && $$2 !~ /^source:/ {print $$2}' \
+		debian/armbian/deps.map | sort -u | paste -sd, | sed 's/,/, /g')"
+
+override_dh_auto_test:
+
+# Upstream enables user units per user (first-run), not for all users.
+override_dh_installsystemduser:
+	dh_installsystemduser --no-enable

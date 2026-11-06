@@ -1,0 +1,32 @@
+mode = "dark"
+
+# Armbian: near-black backgrounds, Armbian orange accent.
+accent = "#f71000"
+selection = "#3a1a16"
+muted = "#3d3d3d"
+
+background = "#161616"
+dark_background = "#101010"
+darker_background = "#0b0b0b"
+lighter_background = "#222222"
+
+foreground = "#e6e6e6"
+dark_foreground = "#757575"
+light_foreground = "#eeeeee"
+bright_foreground = "#ffffff"
+
+red = "#f7604a"
+yellow = "#e6c15a"
+orange = "#ff8a00"
+green = "#8cc85f"
+cyan = "#5fd7c7"
+blue = "#6cb6eb"
+magenta = "#c991e1"
+brown = "#8a4a2a"
+
+bright_red = "#ff7a66"
+bright_yellow = "#f2d37a"
+bright_green = "#a6e07a"
+bright_cyan = "#7fe6d8"
+bright_blue = "#8ccaf5"
+bright_magenta = "#dbaef0"

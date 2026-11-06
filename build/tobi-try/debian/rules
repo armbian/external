@@ -1,0 +1,16 @@
+#!/usr/bin/make -f
+# Upstream try is a Ruby script. Install steps follow the upstream Arch
+# PKGBUILD (omacom/omarchy-pkgs, pkgbuilds/tobi-try).
+PKG = debian/tobi-try
+LIB = $(PKG)/usr/lib/tobi-try
+
+%:
+	dh $@
+
+override_dh_auto_install:
+	install -d $(LIB)/lib $(PKG)/usr/bin
+	# System Ruby, not one that mise puts first on PATH.
+	sed '1c#!/usr/bin/ruby' try.rb > $(LIB)/try.rb
+	chmod 755 $(LIB)/try.rb
+	install -m644 lib/tui.rb lib/fuzzy.rb $(LIB)/lib/
+	ln -s ../lib/tobi-try/try.rb $(PKG)/usr/bin/try

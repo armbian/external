@@ -1,0 +1,20 @@
+name: hyprland-preview-share-picker
+method: build
+# Screen share picker with previews for Hyprland (MIT), part of the
+# armbian-hyprland-shell desktop. Local packaging in
+# build/hyprland-preview-share-picker/, after the upstream Arch PKGBUILD
+# (omacom/omarchy-pkgs, pkgbuilds/hyprland-preview-share-picker).
+upstream:
+  url: https://github.com/WhySoBad/hyprland-preview-share-picker
+  ref: v0.3.1
+releases:
+- forky
+- sid
+architectures:
+- amd64
+- arm64
+target: desktop
+repositories:
+- beta
+install:
+- hyprland-preview-share-picker

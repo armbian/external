@@ -1,0 +1,19 @@
+Source: owe
+Section: x11
+Priority: optional
+Maintainer: Armbian <info@armbian.com>
+Build-Depends: debhelper-compat (= 13), meson, ninja-build, pkgconf,
+ libwayland-dev, libwayland-bin, wayland-protocols,
+ libegl-dev, libgles-dev, libgl-dev, libepoxy-dev,
+ libmpv-dev, libavformat-dev, libavcodec-dev, libavutil-dev, libswscale-dev,
+ libsystemd-dev
+Standards-Version: 4.7.0
+Homepage: https://github.com/omacom/owe
+
+Package: owe
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, socat
+Description: wallpaper and theme renderer for Wayland
+ owe draws the desktop wallpaper and the theme transitions of the Omarchy
+ desktop on Wayland compositors with the layer shell protocol. The owed
+ daemon renders; the owe command controls it.

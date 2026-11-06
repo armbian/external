@@ -1,0 +1,26 @@
+Source: hyprland-preview-share-picker
+Section: x11
+Priority: optional
+Maintainer: Armbian <info@armbian.com>
+Build-Depends: debhelper-compat (= 13),
+ cargo,
+ rustc,
+ pkgconf,
+ libgtk-4-dev,
+ libgtk4-layer-shell-dev,
+ libwayland-dev,
+ hyprland-protocols
+Standards-Version: 4.7.0
+Homepage: https://github.com/WhySoBad/hyprland-preview-share-picker
+
+Package: hyprland-preview-share-picker
+Architecture: any
+Depends: ${shlibs:Depends},
+ ${misc:Depends},
+ xdg-desktop-portal-hyprland,
+ hyprland,
+ slurp
+Description: Screen share picker with window previews for Hyprland
+ Part of the armbian-hyprland-shell desktop.
+ .
+ Upstream: https://github.com/WhySoBad/hyprland-preview-share-picker (MIT).

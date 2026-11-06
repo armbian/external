@@ -1,0 +1,19 @@
+name: aether
+method: build
+# Omarchy theme generator (MIT), part of the armbian-hyprland-shell desktop.
+# Upstream Arch ships the release binary: this builds the source. Local
+# packaging in build/aether/debian/.
+upstream:
+  url: https://github.com/omacom/aether
+  ref: v4.32.0
+releases:
+- forky
+- sid
+architectures:
+- amd64
+- arm64
+target: desktop
+repositories:
+- beta
+install:
+- aether

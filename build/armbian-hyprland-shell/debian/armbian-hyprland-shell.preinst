@@ -1,0 +1,22 @@
+#!/bin/sh
+# Ports of the upstream Arch hooks: omarchy-settings.install pre_upgrade and
+# libalpm 10-omarchy-hyprland-reload-pause.hook.
+set -e
+
+if [ "$1" = upgrade ]; then
+	# The helper locks in /run/omarchy. tmpfiles creates it at boot and in
+	# postinst; make sure it exists here too. Only root can create it in /run.
+	[ -d /run/omarchy ] || install -d -m 0755 -o root -g root /run/omarchy
+	# The helper comes with this package: an older version may not have it.
+	if [ -x /usr/lib/armbian-hyprland-shell/passwordless-transition ]; then
+		/usr/lib/armbian-hyprland-shell/passwordless-transition begin
+	else
+		: >/run/omarchy-sudo-passwordless-package-removing && rm -f /etc/sudoers.d/99-omarchy-nopasswd-*
+	fi || {
+		echo "ERROR: Could not revoke temporary sudo grants before the upgrade. Administrator cleanup is required." >&2
+		exit 1
+	}
+	[ ! -x /usr/bin/omarchy-hyprland-reload-guard ] || /usr/bin/omarchy-hyprland-reload-guard pause || true
+fi
+
+#DEBHELPER#

@@ -5,7 +5,7 @@ on a runner of the architecture. Steps:
 
 1. Packaging: unpack the source package (hashes checked against the signed
    index), or take build/<name>/debian.
-2. Upstream: clone the tag or branch, rebase it when the config asks, and put
+2. Upstream: fetch the planned commit of the tag or branch, rebase it when the config asks, and put
    the packaging on top.
 3. Patches: build/<name>/patches/series, then patches/<release>/series,
    applied with patch -p1.
@@ -74,10 +74,20 @@ def _upstream(up, tree):
         _git("fetch", "-q", "--filter=blob:none", up["rebase"]["url"], up["rebase"]["commit"], cwd=tree)
         _git("-c", "user.name=Armbian", "-c", "user.email=info@armbian.com", "rebase", "-q", "FETCH_HEAD", cwd=tree)
     else:
-        _git("clone", "-q", "--depth", "1", "--branch", up["ref"], up["url"], tree)
-        head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=tree, capture_output=True, text=True).stdout.strip()
-        if head != up["commit"]:
-            raise BuildError(f"{up['url']} {up['ref']} moved: {head[:12]}, plan has {up['commit'][:12]}")
+        # Fetch the planned commit: a branch can move during the run.
+        os.makedirs(tree)
+        _git("init", "-q", cwd=tree)
+        # origin: relative submodule URLs resolve against it.
+        _git("remote", "add", "origin", up["url"], cwd=tree)
+        _git("fetch", "-q", "--depth", "1", "origin", up["commit"], cwd=tree)
+        _git("checkout", "-q", "FETCH_HEAD", cwd=tree)
+    if up.get("submodules"):
+        # The superproject commit pins each submodule commit.
+        _git("-c", "protocol.file.allow=always", "submodule", "update", "-q", "--init", "--recursive", cwd=tree)
+        # Each submodule keeps a .git file that points into the removed .git.
+        for root, _, files in os.walk(tree):
+            if ".git" in files and root != tree:
+                os.remove(os.path.join(root, ".git"))
     shutil.rmtree(os.path.join(tree, ".git"))
 
 

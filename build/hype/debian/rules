@@ -1,0 +1,24 @@
+#!/usr/bin/make -f
+# Upstream hype built with qmake (bin/build). Install steps follow the
+# upstream Arch PKGBUILD (omacom/omarchy-pkgs, pkgbuilds/hype).
+PKG = debian/hype
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+
+override_dh_auto_build:
+	./bin/build
+
+override_dh_auto_install:
+	install -D -m755 build/hype $(PKG)/usr/bin/hype
+	install -D -m644 pkgbuild/hype.svg $(PKG)/usr/share/icons/hicolor/scalable/apps/hype.svg
+	install -D -m644 pkgbuild/hype.desktop $(PKG)/usr/share/applications/hype.desktop
+	install -D -m644 LICENSE $(PKG)/usr/share/doc/hype/LICENSE
+	install -D -m644 README.md $(PKG)/usr/share/doc/hype/README.md
+
+override_dh_auto_test:
+
+override_dh_auto_clean:
+	rm -rf build

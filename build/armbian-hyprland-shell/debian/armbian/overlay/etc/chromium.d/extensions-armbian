@@ -1,0 +1,12 @@
+# Armbian: /etc/chromium.d/extensions passes every entry in
+# /usr/share/chromium/extensions to --load-extension. That flag takes
+# unpacked extension folders. Omarchy puts external extension .json files
+# there, and Chromium reads those itself. Pass only the folders.
+_armbian_ext=
+for _d in /usr/share/chromium/extensions/*/; do
+	[ -d "$_d" ] && _armbian_ext="${_armbian_ext:+$_armbian_ext,}${_d%/}"
+done
+CHROMIUM_FLAGS=$(printf '%s\n' "$CHROMIUM_FLAGS" | sed 's/ --load-extension=.*$//')
+[ -n "$_armbian_ext" ] && CHROMIUM_FLAGS="$CHROMIUM_FLAGS --load-extension=$_armbian_ext"
+export CHROMIUM_FLAGS
+unset _armbian_ext _d

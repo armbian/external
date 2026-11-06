@@ -1,0 +1,15 @@
+[Unit]
+Description=Armbian Hyprland desktop system setup (firewall, Docker)
+# Early boot, before the sockets: docker.socket comes before basic.target,
+# so default dependencies would make an ordering cycle.
+DefaultDependencies=no
+After=local-fs.target
+Before=ufw.service docker.socket shutdown.target
+Conflicts=shutdown.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/armbian-hyprland-shell/system-setup
+
+[Install]
+WantedBy=multi-user.target

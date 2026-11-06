@@ -1,0 +1,23 @@
+#!/bin/bash
+
+# Armbian: apt version. Install the given packages (Arch names are
+# translated) when any is missing.
+
+names=$(omarchy-pkg-debname "$@") || exit 1
+
+if omarchy-pkg-missing "$@"; then
+  if (( EUID == 0 )); then
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -- $names || exit 1
+  else
+    sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -- $names || exit 1
+  fi
+fi
+
+for pkg in "$@"; do
+  if ! omarchy-pkg-present "$pkg"; then
+    echo -e "\033[31mError: Package '$pkg' did not install\033[0m" >&2
+    exit 1
+  fi
+done
+
+exit 0

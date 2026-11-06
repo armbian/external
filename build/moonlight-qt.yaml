@@ -1,0 +1,21 @@
+name: moonlight-qt
+method: build
+# Game streaming client for NVIDIA GameStream and Sunshine (GPL-3.0),
+# preinstalled by the armbian-hyprland-shell desktop. Local packaging in
+# build/moonlight-qt/debian/, after the Arch package
+# (archlinux/packaging/packages/moonlight-qt).
+upstream:
+  url: https://github.com/moonlight-stream/moonlight-qt
+  ref: v6.2.0
+  submodules: true
+releases:
+- forky
+- sid
+architectures:
+- amd64
+- arm64
+target: desktop
+repositories:
+- beta
+install:
+- moonlight-qt

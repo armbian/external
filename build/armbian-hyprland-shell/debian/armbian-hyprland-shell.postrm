@@ -1,0 +1,9 @@
+#!/bin/sh
+# Port of the upstream Arch omarchy-settings.install post_remove.
+set -e
+
+if [ "$1" = remove ] || [ "$1" = purge ]; then
+	rm -f /etc/sudoers.d/99-omarchy-nopasswd-* /run/omarchy-sudo-passwordless-package-removing
+fi
+
+#DEBHELPER#

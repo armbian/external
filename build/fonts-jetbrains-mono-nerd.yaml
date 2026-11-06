@@ -1,0 +1,20 @@
+name: fonts-jetbrains-mono-nerd
+method: build
+# JetBrains Mono with Nerd Font glyphs (OFL-1.1), the monospace font of the
+# armbian-hyprland-shell desktop. Upstream Arch ships the Nerd Fonts release
+# (ttf-jetbrains-mono-nerd-basic): this patches JetBrains Mono with the same
+# Nerd Fonts font-patcher. Local packaging in build/fonts-jetbrains-mono-nerd/.
+upstream:
+  url: https://github.com/JetBrains/JetBrainsMono
+  ref: v2.304
+releases:
+- forky
+- sid
+architectures:
+- amd64
+- arm64
+target: desktop
+repositories:
+- beta
+install:
+- fonts-jetbrains-mono-nerd

@@ -1,0 +1,24 @@
+#!/usr/bin/make -f
+# Upstream omacalc built with qmake (bin/build). Install steps follow the
+# upstream Arch PKGBUILD (omacom/omarchy-pkgs, pkgbuilds/omacalc).
+PKG = debian/omacalc
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+
+override_dh_auto_build:
+	./bin/build
+
+override_dh_auto_install:
+	install -D -m755 build/omacalc $(PKG)/usr/bin/omacalc
+	install -D -m644 pkgbuild/omacalc.svg $(PKG)/usr/share/icons/hicolor/scalable/apps/omacalc.svg
+	install -D -m644 pkgbuild/omacalc.desktop $(PKG)/usr/share/applications/omacalc.desktop
+	install -D -m644 LICENSE $(PKG)/usr/share/doc/omacalc/LICENSE
+	install -D -m644 fonts/OFL.txt $(PKG)/usr/share/doc/omacalc/OFL.txt
+
+override_dh_auto_test:
+
+override_dh_auto_clean:
+	rm -rf build

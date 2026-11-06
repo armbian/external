@@ -1,0 +1,19 @@
+name: ttfx
+method: build
+# Omarchy terminal text effects (MIT), part of the armbian-hyprland-shell
+# desktop. Local packaging in build/ttfx/debian/, after the upstream Arch
+# PKGBUILD (omacom/omarchy-pkgs, pkgbuilds/ttfx).
+upstream:
+  url: https://github.com/omacom/ttfx
+  ref: v0.5.1
+releases:
+- forky
+- sid
+architectures:
+- amd64
+- arm64
+target: desktop
+repositories:
+- beta
+install:
+- ttfx

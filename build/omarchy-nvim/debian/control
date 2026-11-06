@@ -1,0 +1,28 @@
+Source: omarchy-nvim
+Section: editors
+Priority: optional
+Maintainer: Armbian <info@armbian.com>
+Build-Depends: debhelper-compat (= 13),
+ neovim (>= 0.9),
+ git,
+ curl,
+ ca-certificates,
+ nodejs,
+ npm,
+ tree-sitter-cli,
+ build-essential
+Standards-Version: 4.7.0
+Homepage: https://github.com/LazyVim/LazyVim
+
+Package: omarchy-nvim
+Architecture: any
+Depends: ${misc:Depends},
+ neovim (>= 0.9),
+ git,
+ curl
+Description: LazyVim configuration with cached plugins
+ Omarchy's Neovim setup: LazyVim with themes that follow the desktop theme.
+ New users get it through /etc/skel. Part of the armbian-hyprland-shell
+ desktop.
+ .
+ Upstream: https://github.com/omacom/omarchy-pkgs (pkgbuilds/omarchy-nvim).

@@ -1,0 +1,14 @@
+name: obsidian
+method: github
+# Markdown notes. Part of the armbian-hyprland-shell desktop (upstream
+# Omarchy installs it by default). Upstream ships a .deb for amd64 only.
+source:
+  url: https://github.com/obsidianmd/obsidian-releases
+releases:
+- forky
+- sid
+architectures:
+- amd64
+target: desktop
+install:
+- obsidian

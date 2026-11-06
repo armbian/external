@@ -1,0 +1,24 @@
+#!/usr/bin/make -f
+# Upstream signed built with qmake (bin/build). Install steps follow the
+# upstream Arch PKGBUILD (omacom/omarchy-pkgs, pkgbuilds/signed).
+PKG = debian/signed
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+
+override_dh_auto_build:
+	./bin/build
+
+override_dh_auto_install:
+	install -D -m755 build/signed $(PKG)/usr/bin/signed
+	install -D -m644 pkgbuild/signed.svg $(PKG)/usr/share/icons/hicolor/scalable/apps/signed.svg
+	install -D -m644 pkgbuild/signed.desktop $(PKG)/usr/share/applications/signed.desktop
+	install -D -m644 LICENSE $(PKG)/usr/share/doc/signed/LICENSE
+	install -D -m644 README.md $(PKG)/usr/share/doc/signed/README.md
+
+override_dh_auto_test:
+
+override_dh_auto_clean:
+	rm -rf build

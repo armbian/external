@@ -1,0 +1,21 @@
+Source: herdr
+Section: utils
+Priority: optional
+Maintainer: Armbian <info@armbian.com>
+Build-Depends: debhelper-compat (= 13),
+ cargo,
+ rustc,
+ curl,
+ ca-certificates,
+ xz-utils
+Standards-Version: 4.7.0
+Homepage: https://github.com/herdrdev/herdr
+
+Package: herdr
+Architecture: any
+Depends: ${shlibs:Depends},
+ ${misc:Depends}
+Description: Terminal workspace manager for agents and shells
+ Part of the armbian-hyprland-shell desktop.
+ .
+ Upstream: https://github.com/herdrdev/herdr.

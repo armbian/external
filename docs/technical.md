@@ -187,6 +187,7 @@ install: [fastfetch]
 | `upstream.version_file` | For a branch: a file that holds that version, for example `VERSION` (`27.0.0-devel` gives `27.0.0`). Read from the rebase base when `rebase` is set. |
 | `upstream.rebase.url`, `.ref` | Optional, off by default. A fork: rebase it onto this branch before each build. A conflict fails the build, and the last good packages stay. |
 | `upstream.version_url` | Instead of `url`: a vendor release without a git repository. The URL returns the version, for example `1.0.70`. Nothing is cloned. `debian/rules` downloads the release and checks it (`grok`). |
+| `upstream.submodules` | `true`: also clone the git submodules, at the commits that the upstream commit pins. Default `false`. |
 | `upstream.meson_subprojects` | Meson wraps to download before the build: names or globs, for example `*-rs`. Debian packaging builds with `--wrap-mode=nodownload`. Meson uses a wrap only when the system has no copy. |
 | `revision` | Armbian revision. Default 1. Increase it when the patches or the build keys change, but the sources do not. A live run fails when changed inputs give a version that is already uploaded: the upload never replaces a file. A dry run warns. |
 | `build_depends` | Other build configs whose packages this build needs, for example `libdrm` for `mesa`. One level only. |
@@ -293,7 +294,7 @@ Check uses no secrets.
 Runs daily, by hand, and on pull requests that change `build/`, `extpkg/` or the workflow. Manual inputs: `only` and `dry_run` (default true).
 Pull requests are always dry runs. Scheduled runs are dry runs until the repository variable `BUILD_LIVE` is `true`.
 
-1. **plan**: resolve the sources. List the builds whose identity is not in the last manifest.
+1. **plan**: resolve the sources. List the builds whose identity is not in the manifest of the last live run. Dry runs and pull requests also use that manifest.
 2. **deps**: the configs that others name in `build_depends`.
 3. **build**: the other configs, with the deps outputs. Both stages: one job per config, release and architecture. Container `debian:<release>` or `ubuntu:<release>`, runner `ubuntu-24.04` (amd64) or `ubuntu-24.04-arm` (arm64). `apt-get build-dep`, then `dpkg-buildpackage`. Tests are not run (`nocheck`).
 4. **publish**: place the built files in the Sync layout, upload, and remove old versions. Status and manifest go to `.sync/shard-build.json` and `.sync/manifest-shard-build.json`, next to the Sync shards.

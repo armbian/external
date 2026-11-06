@@ -1,0 +1,29 @@
+#!/usr/bin/make -f
+# Upstream disktree built with cargo. Crates come from crates.io, pinned by
+# Cargo.lock. Install steps follow the upstream Arch PKGBUILD
+# (omacom/omarchy-pkgs, pkgbuilds/disktree-bin).
+PKG = debian/disktree
+export CARGO_HOME = $(CURDIR)/debian/cargo-home
+export CARGO_TARGET_DIR = $(CURDIR)/target
+include /usr/share/dpkg/pkg-info.mk
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+
+override_dh_auto_build:
+	cargo build --release --locked -p disktree-app
+
+override_dh_auto_install:
+	install -D -m755 target/release/disktree $(PKG)/usr/bin/disktree
+	install -D -m644 assets/disktree.svg $(PKG)/usr/share/icons/hicolor/scalable/apps/disktree.svg
+	install -d $(PKG)/usr/share/applications
+	sed -e 's|@BINDIR@/||' -e 's|@VERSION@|$(DEB_VERSION_UPSTREAM)|' packaging/disktree.desktop.in \
+		> $(PKG)/usr/share/applications/disktree.desktop
+	install -D -m644 -t $(PKG)/usr/share/doc/disktree LICENSE README.md
+
+override_dh_auto_test:
+
+override_dh_auto_clean:
+	rm -rf target debian/cargo-home

@@ -63,12 +63,14 @@ jobs:
           path: armbian-build
           sparse-checkout: config/distributions
 
-      - name: Restore state (last successful run)
+      # Dry runs also start from the last live run: it holds what is published.
+      # Pull requests can only read caches of main, and main runs live.
+      - name: Restore state (last successful live run)
         uses: actions/cache/restore@v6
         with:
           path: state
-          key: state-${{ env.DRY_RUN == 'true' && 'dry' || 'live' }}-build-${{ github.run_id }}
-          restore-keys: state-${{ env.DRY_RUN == 'true' && 'dry' || 'live' }}-build-
+          key: state-live-build-${{ github.run_id }}
+          restore-keys: state-live-build-
 
       - name: Plan
         id: matrix
@@ -208,12 +210,14 @@ jobs:
           path: built
           merge-multiple: true
 
-      - name: Restore state (last successful run)
+      # Dry runs also start from the last live run: it holds what is published.
+      # Pull requests can only read caches of main, and main runs live.
+      - name: Restore state (last successful live run)
         uses: actions/cache/restore@v6
         with:
           path: state
-          key: state-${{ env.DRY_RUN == 'true' && 'dry' || 'live' }}-build-${{ github.run_id }}
-          restore-keys: state-${{ env.DRY_RUN == 'true' && 'dry' || 'live' }}-build-
+          key: state-live-build-${{ github.run_id }}
+          restore-keys: state-live-build-
 
       - name: Upload credentials
         id: creds

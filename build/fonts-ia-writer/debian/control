@@ -1,0 +1,16 @@
+Source: fonts-ia-writer
+Section: fonts
+Priority: optional
+Maintainer: Armbian <info@armbian.com>
+Build-Depends: debhelper-compat (= 13)
+Standards-Version: 4.7.0
+Homepage: https://github.com/iaolo/iA-Fonts
+
+Package: fonts-ia-writer
+Architecture: all
+Multi-Arch: foreign
+Depends: ${misc:Depends}
+Description: iA Writer Mono, Duo and Quattro fonts
+ The fonts of the iA Writer app. Part of the armbian-hyprland-shell desktop.
+ .
+ Upstream: https://github.com/iaolo/iA-Fonts (OFL-1.1).

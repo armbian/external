@@ -1,0 +1,18 @@
+Source: ttfx
+Section: utils
+Priority: optional
+Maintainer: Armbian <info@armbian.com>
+Build-Depends: debhelper-compat (= 13),
+ cargo,
+ rustc
+Standards-Version: 4.7.0
+Homepage: https://github.com/omacom/ttfx
+
+Package: ttfx
+Architecture: any
+Depends: ${shlibs:Depends},
+ ${misc:Depends}
+Description: Terminal text effects
+ Omarchy tool, part of the armbian-hyprland-shell desktop.
+ .
+ Upstream: https://github.com/omacom/ttfx (MIT).

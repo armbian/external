@@ -1,0 +1,32 @@
+Source: omasnap
+Section: graphics
+Priority: optional
+Maintainer: Armbian <info@armbian.com>
+Build-Depends: debhelper-compat (= 13),
+ cmake,
+ ninja-build,
+ pkgconf,
+ qt6-base-dev,
+ qt6-base-private-dev,
+ liblayershellqtinterface-dev,
+ libwayland-dev,
+ libwayland-bin,
+ wayland-protocols,
+ libdeflate-dev
+Standards-Version: 4.7.0
+Homepage: https://github.com/omacom/omasnap
+
+Package: omasnap
+Architecture: any
+Depends: ${shlibs:Depends},
+ ${misc:Depends},
+ hyprland,
+ qt6-wayland,
+ tesseract-ocr,
+ tesseract-ocr-eng,
+ wl-clipboard,
+ xdg-utils
+Description: Wayland screenshot and annotation overlay for Hyprland
+ Omarchy app, part of the armbian-hyprland-shell desktop.
+ .
+ Upstream: https://github.com/omacom/omasnap (MIT, OFL-1.1).

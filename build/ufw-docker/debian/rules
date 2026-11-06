@@ -1,0 +1,8 @@
+#!/usr/bin/make -f
+# Upstream ufw-docker is one shell script.
+
+%:
+	dh $@
+
+override_dh_auto_install:
+	install -D -m755 ufw-docker debian/ufw-docker/usr/bin/ufw-docker

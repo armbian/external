@@ -1,0 +1,6 @@
+#!/bin/bash
+
+# Armbian: apt keys come from the armbian-keyring and debian-archive-keyring
+# packages. The system update keeps them current.
+
+exit 0

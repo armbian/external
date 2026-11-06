@@ -1,0 +1,27 @@
+#!/usr/bin/make -f
+# Upstream ttfx built with cargo. Crates come from crates.io, pinned by
+# Cargo.lock. Install steps follow the upstream Arch PKGBUILD
+# (omacom/omarchy-pkgs, pkgbuilds/ttfx).
+PKG = debian/ttfx
+export CARGO_HOME = $(CURDIR)/debian/cargo-home
+export CARGO_TARGET_DIR = $(CURDIR)/target
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+
+override_dh_auto_build:
+	cargo build --release --locked
+
+override_dh_auto_install:
+	install -D -m755 target/release/ttfx $(PKG)/usr/bin/ttfx
+	install -D -m644 -t $(PKG)/usr/share/doc/ttfx LICENSE NOTICE README.md
+	install -d $(PKG)/usr/share/bash-completion/completions $(PKG)/usr/share/zsh/site-functions
+	target/release/ttfx --print-completion bash > $(PKG)/usr/share/bash-completion/completions/ttfx
+	target/release/ttfx --print-completion zsh > $(PKG)/usr/share/zsh/site-functions/_ttfx
+
+override_dh_auto_test:
+
+override_dh_auto_clean:
+	rm -rf target debian/cargo-home

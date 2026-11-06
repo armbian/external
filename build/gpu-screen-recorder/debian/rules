@@ -1,0 +1,15 @@
+#!/usr/bin/make -f
+# Upstream gpu-screen-recorder built with meson. The maintainer script sets
+# the capability that the meson install script would set (postinst).
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	dh_auto_configure -- -Dsystemd=true -Dcapabilities=false -Dnvidia_suspend_fix=false
+
+override_dh_auto_test:
+
+# Upstream enables user units per user (first-run), not for all users.
+override_dh_installsystemduser:
+	dh_installsystemduser --no-enable

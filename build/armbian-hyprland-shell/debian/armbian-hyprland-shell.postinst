@@ -1,0 +1,19 @@
+#!/bin/sh
+# Ports of the upstream Arch hooks: omarchy-settings.install post_install and
+# libalpm 90-omarchy-hyprland-reload-resume.hook.
+set -e
+
+#DEBHELPER#
+
+# After the debhelper code: its tmpfiles step creates /run/omarchy, the lock
+# folder that passwordless-transition needs.
+if [ "$1" = configure ]; then
+	/usr/lib/armbian-hyprland-shell/passwordless-transition installed || \
+		echo "ERROR: Temporary sudo grants remain or their boot cleanup is missing; passwordless sudo stays disabled until this package installs cleanly." >&2
+	/usr/bin/omarchy-hyprland-reload-guard resume || true
+	# The upstream cups-browsed drop-in runs the service as this user.
+	systemd-sysusers omarchy-cups-browsed.conf
+	if [ -d /run/systemd/system ] && systemctl is-enabled --quiet cups-browsed.service 2>/dev/null; then
+		systemctl restart cups-browsed.service || true
+	fi
+fi

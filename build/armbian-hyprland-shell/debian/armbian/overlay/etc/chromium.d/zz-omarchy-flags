@@ -1,0 +1,25 @@
+# Armbian: the Arch Chromium launcher reads ~/.config/chromium-flags.conf. The
+# Debian wrapper does not. Omarchy keeps its Chromium flags there: Wayland,
+# the password store and its extensions. Chromium takes only the last
+# --load-extension, so merge the extension list into the existing one.
+_armbian_conf="${XDG_CONFIG_HOME:-$HOME/.config}/chromium-flags.conf"
+if [ -r "$_armbian_conf" ]; then
+	_armbian_ext=
+	while IFS= read -r _armbian_line || [ -n "$_armbian_line" ]; do
+		case "$_armbian_line" in
+		"" | \#*) ;;
+		--load-extension=*) _armbian_ext="${_armbian_ext:+$_armbian_ext,}${_armbian_line#--load-extension=}" ;;
+		*) CHROMIUM_FLAGS="$CHROMIUM_FLAGS $_armbian_line" ;;
+		esac
+	done <"$_armbian_conf"
+	if [ -n "$_armbian_ext" ]; then
+		case "$CHROMIUM_FLAGS" in
+		*--load-extension=*)
+			CHROMIUM_FLAGS=$(printf '%s\n' "$CHROMIUM_FLAGS" |
+				sed "s#--load-extension=\([^ ]*\)#--load-extension=\1,$_armbian_ext#") ;;
+		*) CHROMIUM_FLAGS="$CHROMIUM_FLAGS --load-extension=$_armbian_ext" ;;
+		esac
+	fi
+	export CHROMIUM_FLAGS
+fi
+unset _armbian_conf _armbian_ext _armbian_line

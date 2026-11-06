@@ -1,0 +1,17 @@
+name: localsend
+method: github
+# File sharing on the local network. Part of the armbian-hyprland-shell
+# desktop (upstream Omarchy installs it by default). The arm64 asset is in
+# localsend-arm64.yaml: the asset names do not match the default patterns.
+source:
+  url: https://github.com/localsend/localsend
+releases:
+- forky
+- sid
+architectures:
+- amd64
+assets:
+- '*-linux-x86-64.deb'
+target: desktop
+install:
+- localsend

@@ -1,0 +1,16 @@
+Source: ufw-docker
+Section: net
+Priority: optional
+Maintainer: Armbian <info@armbian.com>
+Build-Depends: debhelper-compat (= 13)
+Standards-Version: 4.7.0
+Homepage: https://github.com/chaifeng/ufw-docker
+
+Package: ufw-docker
+Architecture: all
+Depends: ${misc:Depends},
+ ufw
+Description: Make ufw rules apply to Docker containers
+ Part of the armbian-hyprland-shell desktop.
+ .
+ Upstream: https://github.com/chaifeng/ufw-docker (GPL-3.0).

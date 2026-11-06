@@ -1,0 +1,19 @@
+name: disktree
+method: build
+# Disk usage viewer (MIT), part of the armbian-hyprland-shell desktop.
+# Upstream Arch ships the release binary (disktree-bin): this builds the
+# source. Local packaging in build/disktree/debian/.
+upstream:
+  url: https://github.com/tobi/disktree
+  ref: v0.11.0
+releases:
+- forky
+- sid
+architectures:
+- amd64
+- arm64
+target: desktop
+repositories:
+- beta
+install:
+- disktree

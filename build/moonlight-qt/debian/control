@@ -1,0 +1,23 @@
+Source: moonlight-qt
+Section: games
+Priority: optional
+Maintainer: Armbian <info@armbian.com>
+Build-Depends: debhelper-compat (= 13), pkgconf,
+ qt6-base-dev, qt6-declarative-dev, libqt6svg6-dev,
+ libegl-dev, libgl-dev, libopus-dev, libsdl2-dev, libsdl2-ttf-dev, libssl-dev,
+ libavcodec-dev, libavformat-dev, libswscale-dev, libva-dev, libvdpau-dev,
+ libxkbcommon-dev, wayland-protocols, libdrm-dev,
+ libplacebo-dev, libvulkan-dev
+Standards-Version: 4.7.0
+Homepage: https://moonlight-stream.org
+
+Package: moonlight-qt
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends},
+ qml6-module-qtquick, qml6-module-qtquick-controls, qml6-module-qtquick-templates,
+ qml6-module-qtquick-layouts, qml6-module-qtquick-window, qml6-module-qtqml-workerscript,
+ qt6-wayland, qt6-svg-plugins
+Description: game streaming client for GameStream and Sunshine
+ Moonlight streams games and the desktop from a PC that runs NVIDIA
+ GameStream or Sunshine. It decodes the stream with hardware acceleration
+ (VA-API, VDPAU, Vulkan) where the GPU supports it.

@@ -1,0 +1,19 @@
+name: gpu-screen-recorder
+method: build
+# Screen recorder with GPU encoding (GPL-3.0), part of the
+# armbian-hyprland-shell desktop: omarchy-cmd-screenrecord uses it. Local
+# packaging in build/gpu-screen-recorder/debian/.
+upstream:
+  url: https://repo.dec05eba.com/gpu-screen-recorder
+  ref: 6.1.7
+releases:
+- forky
+- sid
+architectures:
+- amd64
+- arm64
+target: desktop
+repositories:
+- beta
+install:
+- gpu-screen-recorder

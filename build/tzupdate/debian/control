@@ -1,0 +1,20 @@
+Source: tzupdate
+Section: admin
+Priority: optional
+Maintainer: Armbian <info@armbian.com>
+Build-Depends: debhelper-compat (= 13),
+ cargo,
+ rustc,
+ pkgconf,
+ libssl-dev
+Standards-Version: 4.7.0
+Homepage: https://github.com/cdown/tzupdate
+
+Package: tzupdate
+Architecture: any
+Depends: ${shlibs:Depends},
+ ${misc:Depends}
+Description: Set the time zone from the IP geolocation
+ Part of the armbian-hyprland-shell desktop.
+ .
+ Upstream: https://github.com/cdown/tzupdate (MIT).

@@ -1,0 +1,24 @@
+Source: fonts-jetbrains-mono-nerd
+Section: fonts
+Priority: optional
+Maintainer: Armbian <info@armbian.com>
+Build-Depends: debhelper-compat (= 13),
+ fontforge-nox,
+ python3-fontforge,
+ curl,
+ ca-certificates,
+ unzip
+Standards-Version: 4.7.0
+Homepage: https://www.nerdfonts.com
+
+Package: fonts-jetbrains-mono-nerd
+Architecture: all
+Multi-Arch: foreign
+Depends: ${misc:Depends}
+Description: JetBrains Mono Nerd Font
+ JetBrains Mono with the Nerd Fonts icon glyphs: Regular, Bold, Italic and
+ Bold Italic. Family name "JetBrainsMono Nerd Font". The monospace font of
+ the armbian-hyprland-shell desktop.
+ .
+ Upstream: https://github.com/JetBrains/JetBrainsMono (OFL-1.1),
+ https://github.com/ryanoasis/nerd-fonts (MIT, glyphs under their licenses).
