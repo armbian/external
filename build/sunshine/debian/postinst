@@ -1,0 +1,23 @@
+#!/bin/sh
+# After sunshine.install of the upstream Arch package.
+set -e
+
+if [ "$1" = configure ]; then
+	# KMS capture needs CAP_SYS_ADMIN. CAP_SYS_NICE raises the priority.
+	if ! setcap cap_sys_admin,cap_sys_nice+p /usr/bin/sunshine; then
+		echo "sunshine: setcap failed. KMS capture does not work." >&2
+	fi
+	if [ -d /run/udev ] && command -v udevadm >/dev/null; then
+		udevadm control --reload-rules || true
+		udevadm trigger --property-match=DEVNAME=/dev/uinput || true
+		udevadm trigger --property-match=DEVNAME=/dev/uhid || true
+		udevadm trigger --subsystem-match=hidraw || true
+		udevadm trigger --subsystem-match=input || true
+	fi
+	modprobe uinput 2>/dev/null || true
+	modprobe uhid 2>/dev/null || true
+fi
+
+#DEBHELPER#
+
+exit 0

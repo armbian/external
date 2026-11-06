@@ -1,0 +1,23 @@
+name: sunshine
+method: build
+# Self-hosted game stream host for Moonlight (GPL-3.0). Omarchy installs
+# it with omarchy-install-service-sunshine. Local packaging in
+# build/sunshine/debian/, after the upstream Arch PKGBUILD
+# (omacom/omarchy-pkgs, pkgbuilds/sunshine). The upstream .deb files do
+# not install on forky. The build downloads npm packages and the patched
+# FFmpeg of LizardByte/build-deps, and checks its SHA256.
+upstream:
+  url: https://github.com/LizardByte/Sunshine
+  ref: v2026.914.233613
+  submodules: true
+releases:
+- forky
+- sid
+architectures:
+- amd64
+- arm64
+target: desktop
+repositories:
+- beta
+install:
+- sunshine
