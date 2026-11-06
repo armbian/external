@@ -1,0 +1,62 @@
+#!/usr/bin/make -f
+# Build gh as upstream does (script/build.go, Makefile), with the Go
+# toolchain that go.mod names. The Go archive must match the SHA256 that
+# go.dev publishes.
+include /usr/share/dpkg/pkg-info.mk
+include /usr/share/dpkg/architecture.mk
+
+PKG = debian/gh
+GO_VERSION := $(shell sed -n 's/^toolchain go//p' go.mod)
+ifeq ($(GO_VERSION),)
+GO_VERSION := $(shell sed -n 's/^go //p' go.mod)
+endif
+# amd64 and arm64: for a local test build only.
+GOARCH_amd64 = amd64
+GOARCH_arm64 = arm64
+GOARCH_riscv64 = riscv64
+GO_ARCHIVE = go$(GO_VERSION).linux-$(GOARCH_$(DEB_HOST_ARCH)).tar.gz
+DATE := $(shell date -u -d @$(SOURCE_DATE_EPOCH) +%Y-%m-%d)
+LDFLAGS = -s -w -X github.com/cli/cli/v2/internal/build.Version=$(DEB_VERSION_UPSTREAM) \
+	-X github.com/cli/cli/v2/internal/build.Date=$(DATE)
+
+export PATH := $(CURDIR)/debian/go/bin:$(PATH)
+export GOPATH = $(CURDIR)/debian/gopath
+export GOCACHE = $(CURDIR)/debian/gocache
+export GOTOOLCHAIN = local
+export GOFLAGS = -trimpath -buildvcs=false -modcacherw
+export CGO_ENABLED = 0
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	curl -fsSL --retry 3 -o debian/go.json 'https://go.dev/dl/?mode=json&include=all'
+	sha=$$(python3 -c 'import json,sys; print(next(f["sha256"] for r in json.load(open(sys.argv[1])) for f in r["files"] if f["filename"] == sys.argv[2]))' debian/go.json $(GO_ARCHIVE)) && \
+		curl -fsSL --retry 3 -o debian/$(GO_ARCHIVE) https://go.dev/dl/$(GO_ARCHIVE) && \
+		echo "$$sha  debian/$(GO_ARCHIVE)" | sha256sum -c -
+	tar -xzf debian/$(GO_ARCHIVE) -C debian
+
+override_dh_auto_build:
+	go build -ldflags "$(LDFLAGS)" -o debian/bin/gh ./cmd/gh
+	go run ./cmd/gen-docs --man-page --doc-path debian/man
+	mkdir -p debian/completions
+	debian/bin/gh completion -s bash > debian/completions/gh
+	debian/bin/gh completion -s fish > debian/completions/gh.fish
+	debian/bin/gh completion -s zsh > debian/completions/_gh
+
+override_dh_auto_install:
+	install -D -m755 debian/bin/gh $(PKG)/usr/bin/gh
+	install -d $(PKG)/usr/share/man/man1
+	install -m644 debian/man/*.1 $(PKG)/usr/share/man/man1/
+	install -D -m644 debian/completions/gh $(PKG)/usr/share/bash-completion/completions/gh
+	install -D -m644 debian/completions/gh.fish $(PKG)/usr/share/fish/vendor_completions.d/gh.fish
+	install -D -m644 debian/completions/_gh $(PKG)/usr/share/zsh/vendor-completions/_gh
+	install -D -m644 LICENSE $(PKG)/usr/share/doc/gh/LICENSE
+
+override_dh_auto_test:
+
+# Go builds static binaries, already stripped with -s -w.
+override_dh_strip override_dh_dwz:
+
+override_dh_auto_clean:
+	rm -rf debian/go debian/gopath debian/gocache debian/bin debian/man debian/completions debian/go.json debian/go*.tar.gz

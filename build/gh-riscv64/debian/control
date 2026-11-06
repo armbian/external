@@ -1,0 +1,15 @@
+Source: gh-riscv64
+Section: devel
+Priority: optional
+Maintainer: Armbian <info@armbian.com>
+Build-Depends: debhelper-compat (= 13), curl, ca-certificates, python3
+Standards-Version: 4.7.0
+Homepage: https://github.com/cli/cli
+
+Package: gh
+Architecture: riscv64
+Depends: git, ${misc:Depends}
+Description: GitHub CLI
+ gh brings pull requests, issues, releases and other GitHub
+ concepts to the terminal.
+ Built from source for riscv64, with the Go version that upstream names.
