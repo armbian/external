@@ -167,10 +167,10 @@ def upstream(up):
             stamp = datetime.datetime.fromtimestamp(t, datetime.timezone.utc).strftime("%Y%m%d%H%M")
             ver = f"{version}~git{stamp}.{commit[:10]}"
         return {"url": up["url"], "ref": ref, "commit": commit, "version": ver, "rebase": rebase,
-                "meson_subprojects": up.get("meson_subprojects", [])}
+                "meson_subprojects": up.get("meson_subprojects", []), "submodules": bool(up.get("submodules"))}
 
     key = (up["url"], up.get("ref", "latest"), up.get("tags"), up.get("version"), up.get("version_file"),
-           repr(up.get("rebase")), repr(up.get("meson_subprojects")))
+           repr(up.get("rebase")), repr(up.get("meson_subprojects")), bool(up.get("submodules")))
     return _once(key, go)
 
 

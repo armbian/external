@@ -103,6 +103,7 @@ def _check_build(pkg, path, need):
         rb = up.get("rebase")
         need(rb is None or (isinstance(rb, dict) and rb.get("url") and rb.get("ref")),
              "upstream.rebase needs url and ref")
+        need(isinstance(up.get("submodules", False), bool), "upstream.submodules must be true or false")
     rev = pkg.get("revision", 1)
     need(isinstance(rev, int) and rev >= 1, "revision must be a number >= 1")
     deps = pkg.get("build_depends", [])
