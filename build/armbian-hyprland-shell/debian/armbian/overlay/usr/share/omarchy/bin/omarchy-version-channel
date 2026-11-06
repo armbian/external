@@ -1,0 +1,13 @@
+#!/bin/bash
+
+# Armbian: apt repository. Print the Armbian repository of the system:
+# stable (apt.armbian.com) or rolling (beta.armbian.com).
+
+host=$(grep -ohE '[a-zA-Z0-9.-]*\.armbian\.com' \
+  /etc/apt/sources.list.d/armbian.sources /etc/apt/sources.list.d/armbian.list 2>/dev/null | head -1)
+
+case "$host" in
+  apt.armbian.com) echo "stable" ;;
+  beta.armbian.com) echo "rolling" ;;
+  *) echo "unknown" ;;
+esac

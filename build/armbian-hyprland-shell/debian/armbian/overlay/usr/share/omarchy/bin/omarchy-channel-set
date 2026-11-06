@@ -1,0 +1,33 @@
+#!/bin/bash
+
+# omarchy:summary=Set the Armbian package repository.
+# omarchy:args=<stable|edge>
+# omarchy:requires-sudo=true
+
+# Armbian: apt repository. stable uses apt.armbian.com, edge uses the
+# rolling repository beta.armbian.com. armbian-config switches the apt
+# sources and installs the kernel from the new repository.
+
+set -euo pipefail
+
+case "${1:-}" in
+  stable) repository=stable ;;
+  edge | rolling) repository=rolling ;;
+  *)
+    echo "Usage: omarchy-channel-set [stable|edge]" >&2
+    exit 1
+    ;;
+esac
+
+if ! command -v armbian-config >/dev/null; then
+  echo "Error: armbian-config is not installed." >&2
+  exit 1
+fi
+
+if [[ $(omarchy-version-channel) == "$repository" ]]; then
+  echo "The system already uses the $repository repository."
+  exit 0
+fi
+
+sudo armbian-config --api module_armbian_firmware repository "$repository"
+echo "The system now uses the $repository repository."
