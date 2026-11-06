@@ -276,3 +276,10 @@ lib32-vulkan-intel mesa-vulkan-drivers:i386
 lib32-vulkan-radeon mesa-vulkan-drivers:i386
 lib32-nvidia-utils nvidia-driver-libs:i386
 lib32-nvidia-580xx-utils nvidia-driver-libs:i386
+openai-codex-desktop chatgpt
+spotify spotify-client
+sublime-text-4 sublime-text
+nordvpn-bin nordvpn
+wine-staging winehq-staging
+wine-mono winehq-staging
+wine-gecko winehq-staging
