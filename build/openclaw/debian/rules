@@ -1,0 +1,37 @@
+#!/usr/bin/make -f
+# Download the npm release that matches the tag. Its SHA-512 and SHA-1
+# must match dist.integrity and dist.shasum of the registry metadata.
+include /usr/share/dpkg/pkg-info.mk
+
+PKG = debian/openclaw
+SHARE = $(PKG)/usr/share/openclaw
+REGISTRY = https://registry.npmjs.org/openclaw
+TGZ = openclaw-$(DEB_VERSION_UPSTREAM).tgz
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	curl -fsSL --retry 3 -o debian/$(TGZ) $(REGISTRY)/-/$(TGZ)
+	curl -fsSL --retry 3 -o debian/meta.json $(REGISTRY)/$(DEB_VERSION_UPSTREAM)
+	python3 -I debian/check-dist.py debian/meta.json debian/$(TGZ)
+	mkdir -p debian/npm
+	tar -xzf debian/$(TGZ) -C debian/npm --no-same-owner --wildcards \
+		'package/scripts/install-*.sh' package/dist/control-ui/apple-touch-icon.png package/LICENSE
+
+# install-cli.sh loads helpers from its directory. Fail the build when one
+# is missing.
+override_dh_auto_install:
+	install -D -m644 debian/$(TGZ) $(SHARE)/openclaw.tgz
+	install -D -m644 -t $(SHARE) debian/npm/package/scripts/install-*.sh
+	bash $(SHARE)/install-cli.sh --help >/dev/null
+	install -D -m644 debian/npm/package/dist/control-ui/apple-touch-icon.png $(SHARE)/openclaw.png
+	install -D -m644 debian/npm/package/LICENSE $(PKG)/usr/share/doc/openclaw/LICENSE
+
+override_dh_auto_configure override_dh_auto_test:
+
+# The npm tarball is data for the installer: keep it as released.
+override_dh_strip_nondeterminism:
+
+override_dh_auto_clean:
+	rm -rf debian/npm debian/*.tgz debian/meta.json

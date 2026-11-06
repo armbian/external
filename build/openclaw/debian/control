@@ -1,0 +1,19 @@
+Source: openclaw
+Section: net
+Priority: optional
+Maintainer: Armbian <info@armbian.com>
+Build-Depends: debhelper-compat (= 13), curl, ca-certificates, python3
+Standards-Version: 4.7.0
+Homepage: https://github.com/openclaw/openclaw
+
+Package: openclaw
+Architecture: all
+Depends: ${misc:Depends}, bash, curl, git
+Suggests: ffmpeg, gh, jq, ripgrep, tmux, golang-go
+Description: Multi-channel AI gateway with messaging integrations
+ OpenClaw connects AI agents to messaging channels.
+ .
+ This package holds the npm release and its installer in
+ /usr/share/openclaw. omarchy-install-openclaw-cli sets up a
+ self-updating copy in ~/.openclaw from them. The installer brings
+ its own Node.js.
