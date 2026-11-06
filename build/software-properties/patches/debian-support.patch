@@ -1,0 +1,379 @@
+Debian support, ported from Debian 0.111-1 01_debian-support.patch and
+03_no-launchpad.patch (Matthias Klumpp). Debian has no ubuntu-drivers-common
+and no dh-translations: hide the drivers tab and build without them.
+Show the snap line only when snap is installed.
+
+diff --git a/data/gtkbuilder/main.ui b/data/gtkbuilder/main.ui
+index c5bfb74..6873ba0 100644
+--- a/data/gtkbuilder/main.ui
++++ b/data/gtkbuilder/main.ui
+@@ -292,7 +292,7 @@
+               <object class="GtkNotebookPage">
+                 <property name="position">2</property>
+                 <property name="child">
+-                  <object class="GtkBox">
++                  <object class="GtkBox" id="tab_updates">
+                     <property name="visible">True</property>
+                     <property name="can_focus">False</property>
+                     <property name="halign">center</property>
+@@ -306,7 +306,7 @@
+                         <property name="spacing">18</property>
+                         <property name="orientation">vertical</property>
+                         <child>
+-                          <object class="GtkLabel">
++                          <object class="GtkLabel" id="label_snap_info">
+                             <property name="valign">center</property>
+                             <property name="label" translatable="1">Snap package updates are checked routinely and installed automatically.</property>
+                           </object>
+diff --git a/debian/control b/debian/control
+index abc88f6..f490f1e 100644
+--- a/debian/control
++++ b/debian/control
+@@ -6,7 +6,6 @@ XSBC-Original-Maintainer: Michael Vogt <michael.vogt@ubuntu.com>
+ Build-Depends: dbus-x11 <!nocheck>,
+                debhelper-compat (= 13),
+                dh-python,
+-               dh-translations,
+                gir1.2-gtk-4.0 <!nocheck>,
+                gpg,
+                gpg-agent,
+@@ -85,10 +84,10 @@ Depends: gir1.2-gtk-4.0,
+          python3-gi,
+          python3-software-properties (= ${binary:Version}),
+          software-properties-common,
+-         ubuntu-drivers-common (>= 1:0.9.6),
+          ${misc:Depends},
+          ${python3:Depends}
+ Recommends: gnome-keyring,
++            ubuntu-drivers-common (>= 1:0.9.6),
+             gnome-session-bin | xfce4-session | mate-session-manager
+ Description: manage the repositories that you install software from (gtk)
+  This software provides an abstraction of the used apt repositories.
+diff --git a/debian/rules b/debian/rules
+index ccc571e..43ce781 100755
+--- a/debian/rules
++++ b/debian/rules
+@@ -1,7 +1,7 @@
+ #!/usr/bin/make -f
+ 
+ %:
+-	dh $@ --with python3,translations --buildsystem=pybuild
++	dh $@ --with python3 --buildsystem=pybuild
+ 
+ override_dh_missing:
+ 	dh_missing --list-missing
+diff --git a/softwareproperties/SoftwareProperties.py b/softwareproperties/SoftwareProperties.py
+index a095cb2..c9d61c1 100644
+--- a/softwareproperties/SoftwareProperties.py
++++ b/softwareproperties/SoftwareProperties.py
+@@ -283,6 +283,9 @@ class SoftwareProperties(object):
+     with open(self.popconfile, "w") as f:
+         f.writelines(lines)
+ 
++  def have_unattended_upgrades(self):
++      return os.path.isfile("/usr/bin/unattended-upgrade")
++
+   def get_source_code_state(self):
+     """Return True if all distro componets are also available as
+        source code. Otherwise return Flase. Special case: If the
+diff --git a/softwareproperties/distro.py b/softwareproperties/distro.py
+index 40c7bbc..b7fe7fb 100644
+--- a/softwareproperties/distro.py
++++ b/softwareproperties/distro.py
+@@ -23,6 +23,10 @@
+ import aptsources.distro
+ from gettext import gettext as _
+ 
++
++def is_current_distro_ubuntu():
++    return isinstance(aptsources.distro.get_distro(), aptsources.distro.UbuntuDistribution)
++
+ def get_popcon_description(distro):
+     if isinstance(distro, aptsources.distro.UbuntuDistribution):
+         return(_("<i>To improve the user experience of Ubuntu please "
+diff --git a/softwareproperties/gtk/SoftwarePropertiesGtk.py b/softwareproperties/gtk/SoftwarePropertiesGtk.py
+index 11f9e96..cb5e1fb 100644
+--- a/softwareproperties/gtk/SoftwarePropertiesGtk.py
++++ b/softwareproperties/gtk/SoftwarePropertiesGtk.py
+@@ -60,6 +60,7 @@ from .DialogAddSourcesList import DialogAddSourcesList
+ 
+ import softwareproperties
+ import softwareproperties.distro
++from softwareproperties.distro import is_current_distro_ubuntu
+ from softwareproperties.SoftwareProperties import SoftwareProperties
+ import softwareproperties.SoftwareProperties
+ 
+@@ -68,7 +69,8 @@ from softwareproperties.gtk.utils import (
+     maybe_hint_dialog_window,
+ )
+ 
+-from UbuntuDrivers import detect
++if is_current_distro_ubuntu():
++    from UbuntuDrivers import detect
+ dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
+ 
+ if GLib.pyglib_version < (3, 9, 1):
+@@ -280,9 +282,14 @@ class SoftwarePropertiesGtk(SoftwareProperties, SimpleGtkbuilderApp):
+         # Setup and show the distro elements
+         self.init_distro()
+         self.show_distro()
+-        # Setup and show the Additonal Drivers tab
+-        self.init_drivers()
+         # Armbian: no Ubuntu Pro tab. The tab stays hidden.
++        if is_current_distro_ubuntu():
++            # Setup and show the Additonal Drivers tab
++            self.init_drivers()
++        else:
++            self.vbox_drivers.set_visible(False)
++            self.tab_updates.set_visible(self.have_unattended_upgrades())
++        self.label_snap_info.set_visible(os.path.exists("/usr/bin/snap"))
+ 
+         # Connect to switch-page before setting initial tab. Otherwise the
+         # first switch goes unnoticed.
+@@ -511,18 +518,23 @@ class SoftwarePropertiesGtk(SoftwareProperties, SimpleGtkbuilderApp):
+                 eol_text = _("Basic Security Maintenance")
+                 eol_date = distro.eol
+         self.label_esm_status.set_markup(eol_text)
++        if not is_current_distro_ubuntu():
++            self.label_updates_1.set_markup(_("Software on this system has:"))
+         esm_url = "https://ubuntu.com/esm"  # Non-EOL LTS generic ESM
+         today = datetime.datetime.now().date()
+-        if today >= eol_date:
++        if eol_date and today >= eol_date:
+                 if esm_available:
+                         # EOL LTS uses release-specific ESM ubuntu.com/XX-YY
+                         distro_ver = distro.version.replace(' LTS', '')
+                         esm_url = "https://ubuntu.com/%s" % distro_ver.replace(".", "-")
+                 eol_expiry_text = _("Ended %s - extend or upgrade now") % eol_date.strftime("%x")
+-        elif today >= eol_date - datetime.timedelta(days=60):
++        elif eol_date and today >= eol_date - datetime.timedelta(days=60):
+                 eol_expiry_text = _("Ends %s - extend or upgrade soon") % eol_date.strftime("%x")
+         else:
++            if eol_date:
+                 eol_expiry_text = _("Active until %s") % eol_date.strftime("%x")
++            else:
++                eol_expiry_text = _("End of life date not known yet.")
+         self.label_eol.set_label(eol_expiry_text)
+         self.label_esm_subscribe.set_markup(
+                 "<a href=\"%s\">%s</a>" % (esm_url, _("Extend…"))
+@@ -530,13 +542,15 @@ class SoftwarePropertiesGtk(SoftwareProperties, SimpleGtkbuilderApp):
+         self.label_esm_subscribe.set_visible(
+                 esm_available and not esm_enabled
+         )
+-        eol_expiry_text = _("Ended %s") % eol_date.strftime("%x")
+ 
+         # Setup the combo box for updates subscriptions
+         combobox = self.combobox_updates_subscription
+         self.maybe_disconnect_handler(combobox)
+         self.handlers[combobox] = combobox.connect(
+             "changed", self.on_combobox_updates_subscription_changed)
++        if not is_current_distro_ubuntu():
++            combobox.set_visible(False)
++            self.label_updates_3.set_visible(False)
+ 
+         # setup the server chooser
+         cell = Gtk.CellRendererText()
+@@ -1381,7 +1395,6 @@ class SoftwarePropertiesGtk(SoftwareProperties, SimpleGtkbuilderApp):
+ 
+     def init_drivers(self):
+         """Additional Drivers tab"""
+-
+         self.button_driver_revert = Gtk.Button(label=_("Re_vert"), use_underline=True)
+         self.button_driver_revert.connect("clicked", self.on_driver_changes_revert)
+         self.button_driver_apply = Gtk.Button(label=_("_Apply Changes"), use_underline=True)
+@@ -1487,7 +1500,7 @@ class SoftwarePropertiesGtk(SoftwareProperties, SimpleGtkbuilderApp):
+         self.update_drivers_control_button()
+ 
+     def on_driver_selection_changed(self, button, modalias, pkg_name=None):
+-        if self.ui_building:
++        if self.ui_building or not is_current_distro_ubuntu():
+             return
+ 
+         pkg = None
+diff --git a/softwareproperties/gtk/utils.py b/softwareproperties/gtk/utils.py
+index c16e156..5a0062d 100644
+--- a/softwareproperties/gtk/utils.py
++++ b/softwareproperties/gtk/utils.py
+@@ -27,6 +27,7 @@ from gi.repository import Gio, Gtk, Gdk, GdkX11, GObject
+ import json
+ import os
+ import subprocess
++from softwareproperties.distro import is_current_distro_ubuntu
+ 
+ import logging
+ LOG=logging.getLogger(__name__)
+@@ -52,19 +53,26 @@ def setup_ui(self, path, domain):
+ def has_gnome_online_accounts():
+     return Gio.DesktopAppInfo.new('gnome-online-accounts-panel.desktop') != None
+ 
++def get_distro_info(distro):
++    if isinstance(distro, aptsources.distro.UbuntuDistribution):
++        return distro_info.UbuntuDistroInfo()
++    return distro_info.DebianDistroInfo()
++
+ def is_current_distro_lts():
++    if not is_current_distro_ubuntu():
++        return False
+     distro = aptsources.distro.get_distro()
+-    di = distro_info.UbuntuDistroInfo()
++    di = get_distro_info(distro)
+     return di.is_lts(distro.codename)
+ 
+ def is_current_distro_supported():
+     distro = aptsources.distro.get_distro()
+-    di = distro_info.UbuntuDistroInfo()
++    di = get_distro_info(distro)
+     return distro.codename in di.supported(datetime.now().date())
+ 
+ def current_distro():
+     distro = aptsources.distro.get_distro()
+-    di = distro_info.UbuntuDistroInfo()
++    di = get_distro_info(distro)
+     releases = di.get_all(result="object")
+     for release in releases:
+         if release.series == distro.codename:
+@@ -79,6 +87,8 @@ def get_ua_status():
+     # Invoking `pro status` with subp will result in a network call to
+     # contracts.canonical.com which could raise Timeouts on network limited
+     # machines. So, prefer the status.json file when possible.
++    if not is_current_distro_ubuntu():
++        return {}
+     status_json = ""
+     if os.path.exists(UA_STATUS_JSON):
+         with open(UA_STATUS_JSON) as stream:
+diff --git a/softwareproperties/ppa.py b/softwareproperties/ppa.py
+index 99e8bb1..e69b50d 100644
+--- a/softwareproperties/ppa.py
++++ b/softwareproperties/ppa.py
+@@ -22,7 +22,6 @@
+ 
+ from gettext import gettext as _
+ 
+-from launchpadlib.launchpad import Launchpad
+ from lazr.restfulclient.errors import (NotFound, BadRequest, Unauthorized)
+ 
+ from softwareproperties.shortcuthandler import (ShortcutHandler, ShortcutException,
+@@ -34,6 +33,11 @@ from aptsources.sourceslist import Deb822SourceEntry
+ 
+ from urllib.parse import urlparse
+ 
++try:
++    from launchpadlib.launchpad import Launchpad
++except ImportError as e:
++    Launchpad = None
++
+ 
+ PPA_URI_FORMAT = 'https://ppa.launchpadcontent.net/{team}/{ppa}/ubuntu/'
+ PRIVATE_PPA_URI_FORMAT = 'https://private-ppa.launchpadcontent.net/{team}/{ppa}/ubuntu/'
+@@ -103,6 +107,8 @@ class PPAShortcutHandler(ShortcutHandler):
+ 
+     @property
+     def lp(self):
++        if not Launchpad:
++            return None
+         if not self._lp:
+             if self._lp_anon:
+                 login_func = Launchpad.login_anonymously
+diff --git a/softwareproperties/qt/SoftwarePropertiesQt.py b/softwareproperties/qt/SoftwarePropertiesQt.py
+index c0b8fb7..f24ecdf 100644
+--- a/softwareproperties/qt/SoftwarePropertiesQt.py
++++ b/softwareproperties/qt/SoftwarePropertiesQt.py
+@@ -41,6 +41,7 @@ from PyQt6.QtWidgets import *
+ 
+ import softwareproperties
+ import softwareproperties.distro
++from softwareproperties.distro import is_current_distro_ubuntu
+ from softwareproperties.SoftwareProperties import SoftwareProperties
+ import softwareproperties.SoftwareProperties
+ from .I18nHelper import *
+@@ -52,12 +53,14 @@ from .DialogAdd import DialogAdd
+ from .DialogMirror import DialogMirror
+ from .CdromProgress import CdromProgress
+ 
+-from UbuntuDrivers import detect
+ import sys
+ from functools import partial
+ import aptsources.distro
+ import logging
+ 
++if is_current_distro_ubuntu():
++    from UbuntuDrivers import detect
++
+ class DetectDriverThread(QThread):
+   #WARNING class to run detect_drivers() in separate thread
+   #so GUI won't freeze.
+@@ -133,6 +136,8 @@ class SoftwarePropertiesQt(SoftwareProperties):
+     self.show_cdrom_sources()
+     # Setup and show the Additonal Drivers tab
+     self.init_drivers()
++    # Only show updates tab if unattended-upgrades is installed
++    self.userinterface.tabWidget.setTabVisible(2, self.have_unattended_upgrades())
+ 
+     # Connect to switch-page before setting initial tab. Otherwise the
+     # first switch goes unnoticed.
+@@ -999,6 +1004,10 @@ class SoftwarePropertiesQt(SoftwareProperties):
+ 
+   def init_drivers(self):
+     """Additional Drivers tab"""
++    if not is_current_distro_ubuntu():
++        self.userinterface.tabWidget.setTabVisible(4, False)
++        return
++
+     self.button_driver_revert = QPushButton("Revert")
+     self.button_driver_apply = QPushButton("Apply Changes")
+     self.button_driver_cancel = QPushButton("Cancel")
+@@ -1047,6 +1056,8 @@ class SoftwarePropertiesQt(SoftwareProperties):
+ 
+   def detect_drivers(self):
+     # WARNING: This is run in a separate thread.
++    if not is_current_distro_ubuntu():
++        return
+     self.detect_called = True
+     self.init_apt_cache()
+     try:
+@@ -1063,7 +1074,7 @@ class SoftwarePropertiesQt(SoftwareProperties):
+     #print(modalias)
+     #print(pkg_name)
+ 
+-    if self.ui_building:
++    if self.ui_building or not is_current_distro_ubuntu():
+       return
+ 
+     pkg = None
+diff --git a/tests/test_shortcuts.py b/tests/test_shortcuts.py
+index f518d69..0e997e8 100644
+--- a/tests/test_shortcuts.py
++++ b/tests/test_shortcuts.py
+@@ -11,11 +11,14 @@ from aptsources.distro import get_distro
+ from aptsources.sourceslist import (SourceEntry, Deb822SourceEntry)
+ from contextlib import contextmanager
+ from http.client import HTTPException
+-from launchpadlib.launchpad import Launchpad
+ from lazr.restfulclient.errors import Unauthorized
+ from urllib.request import urlopen
+ from urllib.error import URLError
+ from unittest.mock import (patch, Mock)
++try:
++    from launchpadlib.launchpad import Launchpad
++except ImportError as e:
++    Launchpad = None
+ 
+ sys.path.insert(0, "..")
+ 
+@@ -83,6 +86,7 @@ def has_network():
+     return True
+ 
+ def mock_login_with(*args, **kwargs):
++    assert Launchpad
+     has_subscription = kwargs.pop("has_subscription", True)
+ 
+     _lp = Launchpad.login_anonymously(*args, **kwargs)
+@@ -218,6 +222,8 @@ class ShortcutsTestcase(unittest.TestCase):
+     def test_shortcut_private_ppa(self):
+         # this is the same tests as the public ppa, but login=True will use the mocked lp instance
+         # this *does not* actually test/verify this works with a real private ppa; that must be done manually
++        if not Launchpad:
++            return
+         with patch('launchpadlib.launchpad.Launchpad.login_with', new=mock_login_with):
+             for ppa in VALID_PPAS:
+                 for shortcut in self.create_handlers(ppa, PPAShortcutHandler, login=True):
