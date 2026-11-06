@@ -1,0 +1,17 @@
+name: voxtype
+method: github
+# Push-to-talk dictation (MIT), one of the two dictation backends of the
+# armbian-hyprland-shell desktop (upstream Arch package voxtype-bin).
+# Upstream publishes a .deb for amd64 only.
+source:
+  url: https://github.com/peteonrails/voxtype
+releases:
+- forky
+- sid
+architectures:
+- amd64
+assets:
+- 'voxtype_*_amd64.deb'
+target: desktop
+install:
+- voxtype

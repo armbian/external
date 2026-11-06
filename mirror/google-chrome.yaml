@@ -12,6 +12,7 @@ releases:
 - resolute
 - trixie
 - forky
+- sid
 architectures:
 - amd64
 - arm64

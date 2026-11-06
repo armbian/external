@@ -1,0 +1,15 @@
+name: localsend-arm64
+method: github
+# arm64 asset of localsend.yaml.
+source:
+  url: https://github.com/localsend/localsend
+releases:
+- forky
+- sid
+architectures:
+- arm64
+assets:
+- '*-linux-arm-64.deb'
+target: desktop
+install:
+- localsend
