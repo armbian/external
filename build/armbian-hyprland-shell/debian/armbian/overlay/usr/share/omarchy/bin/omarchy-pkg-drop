@@ -1,0 +1,18 @@
+#!/bin/bash
+
+# Armbian: apt version. Remove the given packages that are installed.
+
+installed=()
+for pkg in "$@"; do
+  if omarchy-pkg-present "$pkg"; then
+    installed+=("$(omarchy-pkg-debname "$pkg")")
+  fi
+done
+
+if (( ${#installed[@]} > 0 )); then
+  if (( EUID == 0 )); then
+    apt-get purge -y --autoremove -- "${installed[@]}"
+  else
+    sudo apt-get purge -y --autoremove -- "${installed[@]}"
+  fi
+fi

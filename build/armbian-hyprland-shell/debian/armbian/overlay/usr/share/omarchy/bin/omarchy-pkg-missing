@@ -1,0 +1,11 @@
+#!/bin/bash
+
+# Armbian: dpkg version. Return 0 when any of the given packages is missing.
+
+for pkg in "$@"; do
+  if ! omarchy-pkg-present "$pkg"; then
+    exit 0
+  fi
+done
+
+exit 1

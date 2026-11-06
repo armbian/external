@@ -1,0 +1,22 @@
+#!/bin/bash
+
+# Armbian: print the Debian package names of Arch package names, from the
+# deps.map of armbian-hyprland-shell. A name that the map does not list is
+# the same in Debian. Exit 1 when a name has no Debian package.
+
+map=/usr/share/armbian-hyprland-shell/deps.map
+status=0
+
+for pkg in "$@"; do
+  debian=$(awk -v p="$pkg" '!/^#/ && $1 == p { print $2; exit }' "$map" 2>/dev/null)
+  if [[ -z $debian ]]; then
+    echo "$pkg"
+  elif [[ $debian == source:* ]]; then
+    echo "Package '$pkg' is not available for Debian yet" >&2
+    status=1
+  else
+    echo "$debian"
+  fi
+done
+
+exit $status

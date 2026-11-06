@@ -1,0 +1,6 @@
+#!/bin/bash
+
+# Armbian: Debian has no AUR. Report the Debian repository as reachable
+# when apt can read its package lists.
+
+apt-cache policy >/dev/null 2>&1

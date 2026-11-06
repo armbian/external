@@ -1,0 +1,5 @@
+#!/bin/bash
+
+# Armbian: Debian has no AUR. The system update covers all packages.
+
+exit 0

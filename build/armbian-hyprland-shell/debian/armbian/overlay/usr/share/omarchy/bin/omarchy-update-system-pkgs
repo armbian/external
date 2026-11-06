@@ -1,0 +1,13 @@
+#!/bin/bash
+
+# Armbian: apt version. Update the system packages. Keep changed config
+# files, as an unattended update cannot answer conffile questions.
+
+set -e
+
+echo -e "\e[32m\nUpdate system packages\e[0m"
+
+sudo apt-get update
+sudo DEBIAN_FRONTEND=noninteractive apt-get -y \
+  -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold \
+  upgrade --with-new-pkgs

@@ -1,0 +1,18 @@
+#!/bin/bash
+
+# Armbian: apt version. Report a new armbian-hyprland-shell in the package
+# lists. Armbian refreshes the lists daily.
+
+set -euo pipefail
+
+installed=$(dpkg-query -W -f='${Version}' armbian-hyprland-shell 2>/dev/null || true)
+candidate=$(apt-cache policy armbian-hyprland-shell 2>/dev/null | awk '/Candidate:/ { print $2 }')
+
+if [[ -n $installed && -n $candidate && $candidate != "(none)" ]] &&
+  dpkg --compare-versions "$candidate" gt "$installed"; then
+  echo "armbian-hyprland-shell $installed -> $candidate"
+  exit 0
+else
+  echo "Armbian is up to date"
+  exit 1
+fi

@@ -1,0 +1,10 @@
+#!/bin/bash
+
+# Armbian: dpkg version. Return 0 when all given packages are installed.
+
+for pkg in "$@"; do
+  name=$(omarchy-pkg-debname "$pkg" 2>/dev/null) || exit 1
+  [[ $(dpkg-query -W -f='${db:Status-Abbrev}' -- "$name" 2>/dev/null) == ii* ]] || exit 1
+done
+
+exit 0

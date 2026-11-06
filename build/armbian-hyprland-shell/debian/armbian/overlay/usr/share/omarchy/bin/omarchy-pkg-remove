@@ -1,0 +1,22 @@
+#!/bin/bash
+
+# Armbian: apt version. Pick installed packages to remove with fzf.
+
+fzf_args=(
+  --multi
+  --preview 'dpkg -s {1}'
+  --preview-label='alt-p: toggle description, alt-j/k: scroll, tab: multi-select'
+  --preview-label-pos='bottom'
+  --preview-window 'down:65%:wrap'
+  --bind 'alt-p:toggle-preview'
+  --bind 'alt-d:preview-half-page-down,alt-u:preview-half-page-up'
+  --bind 'alt-k:preview-up,alt-j:preview-down'
+  --color 'pointer:red,marker:red'
+)
+
+pkg_names=$(apt-mark showmanual | sort | fzf "${fzf_args[@]}")
+
+if [[ -n $pkg_names ]]; then
+  echo "$pkg_names" | tr '\n' ' ' | xargs sudo apt-get purge -y --autoremove
+  omarchy-show-done $?
+fi

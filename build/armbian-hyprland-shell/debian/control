@@ -1,0 +1,39 @@
+Source: armbian-hyprland-shell
+Section: x11
+Priority: optional
+Maintainer: Armbian <info@armbian.com>
+Build-Depends: debhelper-compat (= 13), imagemagick, python3, sudo
+Standards-Version: 4.7.0
+Homepage: https://github.com/basecamp/omarchy
+
+Package: armbian-hyprland-shell
+Architecture: all
+Depends: ${misc:Depends},
+ hyprland (>= 0.55),
+ uwsm,
+ owe,
+ bluez-tools,
+ quickshell,
+ qml6-module-qtquick,
+ qml6-module-qtquick-controls,
+ qml6-module-qtquick-effects,
+ qml6-module-qtquick-layouts,
+ qml6-module-qtquick-shapes,
+ qml6-module-qtquick-window,
+ qml6-module-qtqml-models,
+ qt6-image-formats-plugins,
+ inotify-tools,
+ imagemagick,
+ socat,
+ gawk,
+ libxkbcommon-tools,
+ jq,
+ fonts-jetbrains-mono-nerd,
+ papirus-icon-theme
+Recommends: ${armbian:Recommends}
+Description: Omarchy desktop for Hyprland with Armbian branding
+ The Omarchy desktop: Hyprland configuration in Lua, a Quickshell shell
+ with bar, menus and panels, helper commands and themes. Armbian changes
+ the branding and adapts Arch-specific parts to Debian.
+ .
+ Upstream: https://github.com/basecamp/omarchy (MIT).

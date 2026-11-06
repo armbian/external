@@ -1,0 +1,72 @@
+#!/bin/bash
+# List the upstream changes between two Omarchy tags that need an Armbian
+# decision: a transform rule, an adaptation, a dependency map entry or an
+# overlay change. See build/armbian-hyprland-shell/AGENTS.md, "Update to a
+# new upstream tag".
+#
+# Usage: check-upstream [--repo <omarchy clone>] <old-tag> <new-tag>
+set -euo pipefail
+
+repo=""
+if [[ ${1:-} == --repo ]]; then
+	repo=$2
+	shift 2
+fi
+if [[ $# -ne 2 ]]; then
+	echo "Usage: check-upstream [--repo <omarchy clone>] <old-tag> <new-tag>" >&2
+	exit 2
+fi
+old=$1 new=$2
+
+if [[ -z $repo ]]; then
+	repo=$(mktemp -d)
+	trap 'rm -rf "$repo"' EXIT
+	git clone -q --filter=blob:none --no-checkout https://github.com/basecamp/omarchy "$repo"
+fi
+g() { git -C "$repo" "$@"; }
+g rev-parse -q --verify "$old^{commit}" > /dev/null || g fetch -q origin "refs/tags/$old:refs/tags/$old"
+g rev-parse -q --verify "$new^{commit}" > /dev/null || g fetch -q origin "refs/tags/$new:refs/tags/$new"
+
+# Lines added between the tags, in the given paths, as "file:line: text".
+added() {
+	g diff -U0 "$old" "$new" -- "$@" | awk '
+		/^\+\+\+ b\// { file = substr($0, 7); next }
+		/^@@/ { split($3, a, ","); line = substr(a[1], 2); next }
+		/^\+/ { print file ":" line ": " substr($0, 2); line++ }'
+}
+
+section() { printf '\n== %s\n' "$1"; }
+
+section "Commands: added (A), changed (M), removed (D)"
+# A command that the shell or the bindings call shows "used".
+used=$(g grep -hoE 'omarchy-[a-z0-9-]+' "$new" -- shell default/hypr 2> /dev/null | sort -u || true)
+g diff --name-status "$old" "$new" -- bin | while read -r status path; do
+	cmd=${path#bin/}
+	if grep -qx "$cmd" <<< "$used"; then
+		echo "$status $cmd (used by the shell or bindings)"
+	else
+		echo "$status $cmd"
+	fi
+done
+
+section "Packages: for debian/armbian/deps.map"
+g diff "$old" "$new" -- 'install/*.packages' | grep -E '^[+-][^+-]' | sort -u || true
+
+section "Visible product name: for transform rules"
+added default/i18n/en | grep 'Omarchy' || true
+added bin | grep -E 'notify-send|summary|title' | grep 'Omarchy' || true
+added default/hypr/bindings | grep -E 'bind.*"[^"]*Omarchy' || true
+
+section "Logo font glyphs: for debian/armbian/overlay"
+g diff --stat "$old" "$new" -- default/fonts || true
+
+section "Arch-only commands: for debian/armbian/adapt.list"
+# default/pacman and default/libalpm are Arch only: one adaptation each.
+added bin default install shell ':!default/pacman' ':!default/libalpm' |
+	grep -E '\b(pacman|yay|paru|expac|makepkg|mkinitcpio|limine|snapper)\b' || true
+
+section "Install layout: for debian/rules and debian/links"
+g diff --stat "$old" "$new" -- docs/file-layout.md etc || true
+
+section "Done"
+echo "Compare: https://github.com/basecamp/omarchy/compare/$old...$new"

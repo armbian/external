@@ -1,0 +1,20 @@
+#!/bin/sh
+# Armbian: package names for the menu guards (shell/plugins/menu/MenuModel.js,
+# transform 99-menu-guards-dpkg). Prints the installed Debian packages, what
+# they provide, and the Arch names that deps.map maps to an installed package.
+# As omarchy-pkg-debname, only the first deps.map line of a name counts.
+# The last line is "/" only when the list is complete.
+set -e
+map=/usr/share/armbian-hyprland-shell/deps.map
+installed=$(dpkg-query -W -f '${db:Status-Abbrev}\t${Package}\t${Provides}\n' |
+	awk -F '\t' '$1 ~ /^ii/ {
+		print $2
+		n = split($3, p, ", ")
+		for (i = 1; i <= n; i++) { sub(/ .*/, "", p[i]); if (p[i] != "") print p[i] }
+	}')
+printf '%s\n' "$installed"
+printf '%s\n' "$installed" |
+	awk 'NR == FNR { have[$1] = 1; next }
+		/^#/ || NF < 2 || ($1 in seen) { next }
+		{ seen[$1] = 1; if ($2 in have) print $1 }' - "$map"
+echo /
