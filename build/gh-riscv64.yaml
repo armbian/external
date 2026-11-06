@@ -1,0 +1,16 @@
+name: gh-riscv64
+method: build
+# GitHub CLI for riscv64, built from source on a native riscv64 runner.
+# Upstream releases have no riscv64 build, and Debian forky has no gh.
+# The other architectures come from mirror/gh.yaml.
+# Local packaging in build/gh-riscv64/debian/.
+upstream:
+  url: https://github.com/cli/cli
+releases: all
+architectures:
+- riscv64
+skip:
+- bookworm/riscv64
+target: utils
+install:
+- gh
