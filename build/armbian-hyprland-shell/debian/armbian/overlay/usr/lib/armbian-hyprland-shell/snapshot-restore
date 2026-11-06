@@ -51,6 +51,17 @@ if [[ ! -d $top/$base ]]; then
 	exit 1
 fi
 
+# A restore that stopped after the new root got its name: .snapshots is
+# still in the newest old root. Move it back.
+if [[ ! -e $top/$base/.snapshots || $(stat -c %i "$top/$base/.snapshots") != 256 ]]; then
+	last="$(ls -1d "$top/$base".old-*/.snapshots 2> /dev/null | sort | tail -n 1)"
+	if [[ -n $last ]]; then
+		echo "Moving ${last#"$top"/} back to $base/.snapshots: an earlier restore stopped half way." >&2
+		rmdir "$top/$base/.snapshots" 2> /dev/null || true
+		mv "$last" "$top/$base/.snapshots"
+	fi
+fi
+
 src="$top/$base/.snapshots/$n/snapshot"
 if [[ ! -d $src ]]; then
 	echo "Snapshot $n does not exist." >&2
