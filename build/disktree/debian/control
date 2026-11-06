@@ -1,0 +1,31 @@
+Source: disktree
+Section: utils
+Priority: optional
+Maintainer: Armbian <info@armbian.com>
+Build-Depends: debhelper-compat (= 13),
+ cargo,
+ rustc,
+ pkgconf,
+ libclang-dev,
+ libfreetype-dev,
+ libfontconfig-dev,
+ libwayland-dev,
+ libxkbcommon-dev,
+ libxkbcommon-x11-dev,
+ libxcb1-dev,
+ libvulkan-dev
+Standards-Version: 4.7.0
+Homepage: https://github.com/tobi/disktree
+
+Package: disktree
+Architecture: any
+Depends: ${shlibs:Depends},
+ ${misc:Depends},
+ libvulkan1,
+ libwayland-client0,
+ libxkbcommon0,
+ libxkbcommon-x11-0
+Description: Disk usage viewer
+ Part of the armbian-hyprland-shell desktop.
+ .
+ Upstream: https://github.com/tobi/disktree (MIT).

@@ -1,0 +1,19 @@
+name: cliamp
+method: build
+# Terminal music player (MIT), part of the armbian-hyprland-shell desktop.
+# Local packaging in build/cliamp/debian/, after the upstream Arch PKGBUILD
+# (omacom/omarchy-pkgs, pkgbuilds/cliamp).
+upstream:
+  url: https://github.com/bjarneo/cliamp
+  ref: v2.3.0
+releases:
+- forky
+- sid
+architectures:
+- amd64
+- arm64
+target: desktop
+repositories:
+- beta
+install:
+- cliamp

@@ -1,0 +1,19 @@
+name: monologue
+method: build
+# Omarchy app (MIT), part of the armbian-hyprland-shell desktop. Local
+# packaging in build/monologue/debian/, after the upstream Arch PKGBUILD
+# (omacom/omarchy-pkgs, pkgbuilds/monologue).
+upstream:
+  url: https://github.com/omacom/monologue
+  ref: v0.3.1
+releases:
+- forky
+- sid
+architectures:
+- amd64
+- arm64
+target: desktop
+repositories:
+- beta
+install:
+- monologue

@@ -1,0 +1,21 @@
+name: fonts-ia-writer
+method: build
+# iA Writer Mono, Duo and Quattro fonts (OFL-1.1), part of the
+# armbian-hyprland-shell desktop. Local packaging in
+# build/fonts-ia-writer/debian/, after the upstream Arch PKGBUILD
+# (omacom/omarchy-pkgs, pkgbuilds/ttf-ia-writer).
+upstream:
+  url: https://github.com/iaolo/iA-Fonts
+  ref: master
+  version: '20261002'
+releases:
+- forky
+- sid
+architectures:
+- amd64
+- arm64
+target: desktop
+repositories:
+- beta
+install:
+- fonts-ia-writer

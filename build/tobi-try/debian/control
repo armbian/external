@@ -1,0 +1,16 @@
+Source: tobi-try
+Section: utils
+Priority: optional
+Maintainer: Armbian <info@armbian.com>
+Build-Depends: debhelper-compat (= 13)
+Standards-Version: 4.7.0
+Homepage: https://github.com/tobi/try
+
+Package: tobi-try
+Architecture: all
+Depends: ${misc:Depends},
+ ruby
+Description: Dated scratch directories for quick experiments
+ The try command. Part of the armbian-hyprland-shell desktop.
+ .
+ Upstream: https://github.com/tobi/try (MIT).

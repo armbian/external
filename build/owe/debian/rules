@@ -1,0 +1,20 @@
+#!/usr/bin/make -f
+# Upstream owe built with meson. Install steps follow the upstream Arch
+# PKGBUILD (omacom/omarchy-pkgs, pkgbuilds/owe).
+PKG = debian/owe
+
+%:
+	dh $@
+
+override_dh_auto_install:
+	dh_auto_install
+	install -d $(PKG)/usr/lib/systemd/user
+	sed 's|%h/.local/bin/owed|/usr/bin/owed|' systemd/owed.service \
+		> $(PKG)/usr/lib/systemd/user/owed.service
+	install -D -m755 hooks/owe-idle $(PKG)/usr/bin/owe-idle
+	install -D -m644 hooks/theme-set.d/10-owe-sync $(PKG)/usr/share/owe/10-owe-sync
+	install -D -m644 config/config.toml $(PKG)/usr/share/doc/owe/config.toml.example
+
+# Upstream enables user units per user (first-run), not for all users.
+override_dh_installsystemduser:
+	dh_installsystemduser --no-enable

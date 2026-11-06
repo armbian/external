@@ -1,0 +1,11 @@
+#!/bin/sh
+# Monitor capture on AMD, Intel and NVIDIA Wayland needs cap_sys_admin on
+# gsr-kms-server, else it asks for a password (upstream meson_post_install.sh).
+set -e
+
+if [ "$1" = configure ]; then
+	setcap cap_sys_admin+ep /usr/bin/gsr-kms-server || \
+		echo "gpu-screen-recorder: setcap failed; monitor capture asks for a password." >&2
+fi
+
+#DEBHELPER#

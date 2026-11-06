@@ -1,0 +1,26 @@
+Source: cliamp
+Section: sound
+Priority: optional
+Maintainer: Armbian <info@armbian.com>
+Build-Depends: debhelper-compat (= 13),
+ golang-go,
+ pkgconf,
+ libasound2-dev,
+ libflac-dev,
+ libvorbis-dev,
+ libogg-dev,
+ libmpg123-dev
+Standards-Version: 4.7.0
+Homepage: https://github.com/bjarneo/cliamp
+
+Package: cliamp
+Architecture: any
+Depends: ${shlibs:Depends},
+ ${misc:Depends},
+ ffmpeg,
+ yt-dlp
+Recommends: pipewire-alsa | pulseaudio
+Description: Terminal music player
+ Part of the armbian-hyprland-shell desktop.
+ .
+ Upstream: https://github.com/bjarneo/cliamp (MIT).

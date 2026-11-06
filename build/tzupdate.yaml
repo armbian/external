@@ -1,0 +1,18 @@
+name: tzupdate
+method: build
+# Sets the time zone from the IP geolocation (MIT), part of the
+# armbian-hyprland-shell desktop. Local packaging in build/tzupdate/debian/.
+upstream:
+  url: https://github.com/cdown/tzupdate
+  ref: 3.1.0
+releases:
+- forky
+- sid
+architectures:
+- amd64
+- arm64
+target: desktop
+repositories:
+- beta
+install:
+- tzupdate

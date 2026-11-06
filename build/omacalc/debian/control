@@ -1,0 +1,23 @@
+Source: omacalc
+Section: utils
+Priority: optional
+Maintainer: Armbian <info@armbian.com>
+Build-Depends: debhelper-compat (= 13),
+ qmake6,
+ qt6-base-dev,
+ qt6-declarative-dev
+Standards-Version: 4.7.0
+Homepage: https://github.com/omacom-io/omacalc
+
+Package: omacalc
+Architecture: any
+Depends: ${shlibs:Depends},
+ ${misc:Depends},
+ qml6-module-qtquick,
+ qml6-module-qtquick-controls,
+ qml6-module-qtquick-layouts,
+ xdg-desktop-portal
+Description: Calculator built with Qt Quick
+ Omarchy app, part of the armbian-hyprland-shell desktop.
+ .
+ Upstream: https://github.com/omacom-io/omacalc (MIT).

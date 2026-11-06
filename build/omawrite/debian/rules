@@ -1,0 +1,24 @@
+#!/usr/bin/make -f
+# Upstream omawrite built with qmake (bin/build). Install steps follow the
+# upstream Arch PKGBUILD (omacom/omarchy-pkgs, pkgbuilds/omawrite).
+PKG = debian/omawrite
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+
+override_dh_auto_build:
+	./bin/build
+
+override_dh_auto_install:
+	install -D -m755 build/omawrite $(PKG)/usr/bin/omawrite
+	install -D -m644 pkgbuild/omawrite.svg $(PKG)/usr/share/icons/hicolor/scalable/apps/omawrite.svg
+	install -D -m644 pkgbuild/omawrite.desktop $(PKG)/usr/share/applications/omawrite.desktop
+	install -D -m644 LICENSE $(PKG)/usr/share/doc/omawrite/LICENSE
+	install -D -m644 fonts/OFL.txt $(PKG)/usr/share/doc/omawrite/OFL.txt
+
+override_dh_auto_test:
+
+override_dh_auto_clean:
+	rm -rf build

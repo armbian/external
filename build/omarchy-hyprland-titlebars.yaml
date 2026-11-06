@@ -1,0 +1,20 @@
+name: omarchy-hyprland-titlebars
+method: build
+# Hyprland plugin: titlebars for Omarchy's floating workspace mode (BSD-3,
+# MIT), part of the armbian-hyprland-shell desktop. A plugin works only with
+# the Hyprland it was built against: rebuild after each Hyprland update.
+# Local packaging in build/omarchy-hyprland-titlebars/debian/.
+upstream:
+  url: https://github.com/omacom/omarchy-hyprland-titlebars
+  ref: v0.3.0
+releases:
+- forky
+- sid
+architectures:
+- amd64
+- arm64
+target: desktop
+repositories:
+- beta
+install:
+- omarchy-hyprland-titlebars

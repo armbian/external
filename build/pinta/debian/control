@@ -1,0 +1,18 @@
+Source: pinta
+Section: graphics
+Priority: optional
+Maintainer: Armbian <info@armbian.com>
+Build-Depends: debhelper-compat (= 13), autoconf, autoconf-archive, automake, intltool, gettext, pkgconf,
+ libadwaita-1-dev (>= 1.7), libgtk-4-dev (>= 4.18), libicu-dev,
+ curl, ca-certificates
+Standards-Version: 4.7.0
+Homepage: https://www.pinta-project.com
+
+Package: pinta
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ${pinta:Icu},
+ libgtk-4-1 (>= 4.18), libadwaita-1-0 (>= 1.7), webp-pixbuf-loader
+Description: simple drawing and image editing program
+ Pinta is a drawing and image editing program modeled after Paint.NET,
+ with layers, unlimited undo, adjustments and effects. This build
+ includes the .NET runtime.

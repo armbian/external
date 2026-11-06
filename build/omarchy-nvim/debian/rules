@@ -1,0 +1,19 @@
+#!/usr/bin/make -f
+# Build steps of the upstream Arch PKGBUILD (pkgbuilds/omarchy-nvim), in
+# debian/build-nvim. LazyVim starter pinned to one commit.
+STARTER_COMMIT = 803bc181d7c0d6d5eeba9274d9be49b287294d99
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	debian/build-nvim build $(STARTER_COMMIT)
+
+override_dh_auto_install:
+	debian/build-nvim install debian/omarchy-nvim
+
+# Plugin files: keep them as lazy.nvim wrote them.
+override_dh_strip override_dh_dwz override_dh_shlibdeps override_dh_strip_nondeterminism:
+
+override_dh_auto_clean:
+	rm -rf debian/nvim-build

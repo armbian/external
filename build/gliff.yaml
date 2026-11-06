@@ -1,0 +1,19 @@
+name: gliff
+method: build
+# Omarchy remote desktop over SSH (MIT), part of the armbian-hyprland-shell
+# desktop. Local packaging in build/gliff/debian/, after the upstream Arch
+# PKGBUILD (omacom/omarchy-pkgs, pkgbuilds/gliff).
+upstream:
+  url: https://github.com/omacom/gliff
+  ref: v0.4.2
+releases:
+- forky
+- sid
+architectures:
+- amd64
+- arm64
+target: desktop
+repositories:
+- beta
+install:
+- gliff

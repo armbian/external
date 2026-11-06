@@ -1,0 +1,21 @@
+name: omarchy-nvim
+method: build
+# Omarchy's LazyVim setup with cached plugins (MIT), part of the
+# armbian-hyprland-shell desktop. The files live in the upstream Arch
+# packaging repository (pkgbuilds/omarchy-nvim). Local packaging in
+# build/omarchy-nvim/debian/.
+upstream:
+  url: https://github.com/omacom/omarchy-pkgs
+  ref: master
+  version: 2026.9.21
+releases:
+- forky
+- sid
+architectures:
+- amd64
+- arm64
+target: desktop
+repositories:
+- beta
+install:
+- omarchy-nvim

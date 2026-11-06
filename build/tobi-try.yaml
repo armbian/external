@@ -1,0 +1,19 @@
+name: tobi-try
+method: build
+# try: dated scratch directories for experiments (MIT), part of the
+# armbian-hyprland-shell desktop. Local packaging in build/tobi-try/debian/,
+# after the upstream Arch PKGBUILD (omacom/omarchy-pkgs, pkgbuilds/tobi-try).
+upstream:
+  url: https://github.com/tobi/try
+  ref: v1.10.1
+releases:
+- forky
+- sid
+architectures:
+- amd64
+- arm64
+target: desktop
+repositories:
+- beta
+install:
+- tobi-try

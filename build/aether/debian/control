@@ -1,0 +1,22 @@
+Source: aether
+Section: graphics
+Priority: optional
+Maintainer: Armbian <info@armbian.com>
+Build-Depends: debhelper-compat (= 13),
+ golang-go,
+ nodejs,
+ npm,
+ pkgconf,
+ libgtk-3-dev,
+ libwebkit2gtk-4.1-dev
+Standards-Version: 4.7.0
+Homepage: https://github.com/omacom/aether
+
+Package: aether
+Architecture: any
+Depends: ${shlibs:Depends},
+ ${misc:Depends}
+Description: Theme generator: colors from wallpapers
+ Omarchy app, part of the armbian-hyprland-shell desktop.
+ .
+ Upstream: https://github.com/omacom/aether (MIT).

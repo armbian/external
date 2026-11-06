@@ -1,0 +1,19 @@
+name: omasnap
+method: build
+# Omarchy screenshot and annotation tool (MIT), part of the
+# armbian-hyprland-shell desktop. Local packaging in build/omasnap/debian/,
+# after the upstream Arch PKGBUILD (omacom/omarchy-pkgs, pkgbuilds/omasnap).
+upstream:
+  url: https://github.com/omacom/omasnap
+  ref: v1.25.0
+releases:
+- forky
+- sid
+architectures:
+- amd64
+- arm64
+target: desktop
+repositories:
+- beta
+install:
+- omasnap

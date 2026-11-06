@@ -1,0 +1,56 @@
+#!/usr/bin/make -f
+# Upstream Pinta, after the upstream Arch PKGBUILD (omacom/omarchy-pkgs,
+# pkgbuilds/pinta). Debian has no .NET: download the SDK with the official
+# install script, publish self-contained, and start the native app host.
+include /usr/share/dpkg/architecture.mk
+PKG = debian/pinta
+DOTNET_ROOT = $(CURDIR)/debian/dotnet
+export DOTNET_ROOT
+export PATH := $(DOTNET_ROOT):$(PATH)
+export DOTNET_CLI_HOME = $(CURDIR)/debian/dotnet-home
+export NUGET_PACKAGES = $(CURDIR)/debian/nuget
+export DOTNET_CLI_TELEMETRY_OPTOUT = 1
+export DOTNET_NOLOGO = 1
+RID_amd64 = linux-x64
+RID_arm64 = linux-arm64
+RID = $(RID_$(DEB_HOST_ARCH))
+# .NET loads ICU at run time: depend on the ICU of the build release.
+ICU = $(shell dpkg-query -W -f '$${Package}\n' 'libicu[0-9]*' | grep -E '^libicu[0-9]+$$' | head -1)
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	curl -fsSL https://dot.net/v1/dotnet-install.sh -o debian/dotnet-install.sh
+	bash debian/dotnet-install.sh --channel 10.0 --install-dir $(DOTNET_ROOT) --no-path
+	NOCONFIGURE=1 ./autogen.sh
+	./configure --prefix=/usr --sysconfdir=/etc --localstatedir=/var
+
+override_dh_auto_build:
+	# Upstream make publishes framework-dependent. Publish self-contained
+	# first: make install then finds publish/Pinta.dll and uses it.
+	dotnet publish Pinta/Pinta.csproj --configuration Release -p:BuildTranslations=true \
+		-r $(RID) --self-contained true -p:PublishDir=$(CURDIR)/publish
+	touch publish/Pinta.dll
+
+override_dh_auto_install:
+	$(MAKE) install DESTDIR=$(CURDIR)/$(PKG)
+	# install.proj copies the managed assemblies only. The self-contained
+	# publish also has the app host and the .NET runtime.
+	cp -a publish/. $(PKG)/usr/lib/pinta/
+	find $(PKG)/usr/lib/pinta -name '*.pdb' -delete
+	# Optional LTTng tracing provider: .NET loads it only when LTTng exists.
+	rm $(PKG)/usr/lib/pinta/libcoreclrtraceptprovider.so
+	printf '#!/bin/sh\nexec /usr/lib/pinta/Pinta "$$@"\n' > $(PKG)/usr/bin/pinta
+	chmod 755 $(PKG)/usr/bin/pinta
+	install -D -m644 -t $(PKG)/usr/share/doc/pinta readme.md license-mit.txt license-pdn.txt
+
+override_dh_auto_test:
+
+override_dh_dwz:
+
+override_dh_gencontrol:
+	dh_gencontrol -- -Vpinta:Icu=$(ICU)
+
+override_dh_auto_clean:
+	rm -rf publish debian/dotnet debian/dotnet-home debian/nuget debian/dotnet-install.sh

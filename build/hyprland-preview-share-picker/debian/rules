@@ -1,0 +1,27 @@
+#!/usr/bin/make -f
+# Upstream hyprland-preview-share-picker built with cargo. Crates come from crates.io, pinned by
+# Cargo.lock. Install steps follow the upstream Arch PKGBUILD
+# (omacom/omarchy-pkgs, pkgbuilds/hyprland-preview-share-picker).
+PKG = debian/hyprland-preview-share-picker
+export CARGO_HOME = $(CURDIR)/debian/cargo-home
+export CARGO_TARGET_DIR = $(CURDIR)/target
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+
+override_dh_auto_build:
+	# The hyprland-protocols submodule comes from the Debian package.
+	rm -rf lib/hyprland-protocols && ln -s /usr/share/hyprland-protocols lib/hyprland-protocols
+	cargo build --release --locked
+	target/release/hyprland-preview-share-picker schema > debian/schema.json
+
+override_dh_auto_install:
+	install -D -m755 target/release/hyprland-preview-share-picker $(PKG)/usr/bin/hyprland-preview-share-picker
+	install -D -m644 debian/schema.json $(PKG)/usr/share/hyprland-preview-share-picker/schema.json
+
+override_dh_auto_test:
+
+override_dh_auto_clean:
+	rm -rf target debian/cargo-home

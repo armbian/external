@@ -1,0 +1,24 @@
+#!/usr/bin/make -f
+# Upstream usage built with cargo. Crates come from crates.io, pinned by
+# Cargo.lock. Install steps follow the upstream Arch PKGBUILD
+# (omacom/omarchy-pkgs, pkgbuilds/usage (Arch extra)).
+PKG = debian/usage
+export CARGO_HOME = $(CURDIR)/debian/cargo-home
+export CARGO_TARGET_DIR = $(CURDIR)/target
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+
+override_dh_auto_build:
+	cargo build --release --locked -p usage-cli
+
+override_dh_auto_install:
+	install -D -m755 target/release/usage $(PKG)/usr/bin/usage
+	install -D -m644 LICENSE $(PKG)/usr/share/doc/usage/LICENSE
+
+override_dh_auto_test:
+
+override_dh_auto_clean:
+	rm -rf target debian/cargo-home

@@ -1,0 +1,20 @@
+name: mise
+method: build
+# Dev tool and runtime manager (MIT), part of the armbian-hyprland-shell
+# desktop: it installs the agent CLIs and the language runtimes. Upstream
+# Arch ships the release binary (mise-bin): this builds the source. Local
+# packaging in build/mise/debian/.
+upstream:
+  url: https://github.com/jdx/mise
+  ref: v2026.11.0
+releases:
+- forky
+- sid
+architectures:
+- amd64
+- arm64
+target: desktop
+repositories:
+- beta
+install:
+- mise
