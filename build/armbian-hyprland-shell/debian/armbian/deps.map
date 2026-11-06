@@ -283,3 +283,4 @@ nordvpn-bin nordvpn
 wine-staging winehq-staging
 wine-mono winehq-staging
 wine-gecko winehq-staging
+emacs-wayland emacs-pgtk
