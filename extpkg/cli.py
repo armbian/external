@@ -214,7 +214,7 @@ def cmd_build_matrix(args):
         e = entries[key]
         return {"config": e["config"], "release": e["release"], "arch": e["arch"],
                 "version": e["candidates"][0]["build"]["version"],
-                "runner": "ubuntu-24.04-arm" if e["arch"] == "arm64" else "ubuntu-24.04",
+                "runner": config.RUNNERS[e["arch"]],
                 "image": f"{depcheck.distro_of(e['release'], args.build_dir)}:{e['release']}"}
     out = {"deps": [job(k) for k in sorted(needed) if k[0] in dep_names],
            "builds": [job(k) for k in sorted(needed) if k[0] not in dep_names]}

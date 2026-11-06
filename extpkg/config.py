@@ -15,8 +15,9 @@ from . import query
 MIRROR_METHODS = ("apt", "github", "url")
 BUILD_METHODS = ("build",)
 METHODS = MIRROR_METHODS + BUILD_METHODS
-# Native GitHub-hosted runners only: no emulation.
-BUILD_ARCHES = ("amd64", "arm64")
+# Runner of each build architecture. Native runners only: no emulation.
+RUNNERS = {"amd64": "ubuntu-24.04", "arm64": "ubuntu-24.04-arm", "riscv64": "ubuntu-24.04-riscv"}
+BUILD_ARCHES = tuple(RUNNERS)
 TARGETS = ("main", "utils", "desktop")
 # Old configs: REPOSITORY=B (beta), S (stable), BS (both).
 REPOSITORIES = ("stable", "beta")
