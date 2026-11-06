@@ -1,0 +1,23 @@
+name: umu-launcher
+method: build
+# Unified launcher for Proton outside of Steam (GPL-3.0). Lutris uses it
+# through umu-run. Local packaging in build/umu-launcher/debian/, after
+# upstream packaging/deb/debian/trixie and the upstream Arch PKGBUILD
+# (omacom/omarchy-pkgs, pkgbuilds/umu-launcher). The upstream .deb does not
+# work on forky: it has a Python 3.13 module and needs python3-pyzstd.
+# patches/stdlib-zstd.patch uses compression.zstd from Python 3.14.
+upstream:
+  url: https://github.com/Open-Wine-Components/umu-launcher
+  ref: 1.4.4
+releases:
+- forky
+- sid
+architectures:
+- amd64
+- arm64
+target: desktop
+repositories:
+- beta
+install:
+- umu-launcher
+- python3-umu-launcher

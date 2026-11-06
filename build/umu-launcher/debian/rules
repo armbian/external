@@ -1,0 +1,31 @@
+#!/usr/bin/make -f
+# Upstream umu-launcher, after upstream packaging/deb/debian/trixie and the
+# upstream Arch PKGBUILD (omacom/omarchy-pkgs, pkgbuilds/umu-launcher).
+# System pyzstd and urllib3: patches/stdlib-zstd.patch replaces pyzstd.
+# Crates come from crates.io, pinned by Cargo.lock.
+export CARGO_HOME = $(CURDIR)/debian/cargo-home
+PYTHONDIR = /usr/lib/python3/dist-packages
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	./configure.sh --prefix=/usr --use-system-pyzstd --use-system-urllib
+
+override_dh_auto_build:
+	cargo fetch --locked
+	$(MAKE) all
+
+override_dh_auto_install:
+	$(MAKE) install DESTDIR=$(CURDIR)/debian/tmp PYTHONDIR=$(PYTHONDIR)
+	# The wheel installer uses the Debian local scheme (/usr/local). Move
+	# umu-run to /usr/bin and the module next to umu_delta.
+	install -D -m755 debian/tmp/usr/local/bin/umu-run debian/tmp/usr/bin/umu-run
+	cp -a debian/tmp/usr/local/lib/python3*/dist-packages/. debian/tmp$(PYTHONDIR)/
+	rm -rf debian/tmp/usr/local
+	find debian/tmp -name __pycache__ -prune -exec rm -rf {} +
+
+override_dh_auto_test:
+
+override_dh_auto_clean:
+	rm -rf builddir Makefile debian/cargo-home
