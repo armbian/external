@@ -94,6 +94,21 @@ class Config(unittest.TestCase):
                             upstream={"url": "https://example.com/x.git"}, packaging={"url": "u", "suite": "sid", "package": "x"}))
         self.assertEqual(config.RUNNERS["riscv64"], "ubuntu-24.04-riscv")
 
+    def test_release_arches(self):
+        pkg = {"releases": "all", "architectures": ["amd64", "riscv64"]}
+        rels = {"bookworm": ("arm64", "armhf", "amd64"), "trixie": ("amd64", "riscv64")}
+        self.assertEqual(sorted(config.expand(pkg, rels)),
+                         [("bookworm", "amd64"), ("trixie", "amd64"), ("trixie", "riscv64")])
+        self.assertEqual(len(list(config.expand(pkg, list(rels)))), 4)
+        build = os.path.join(self.dir, "b", "config", "distributions")
+        for rel, sup, arches in (("bookworm", "csc", "arm64,armhf,amd64"), ("sid", "csc", "amd64,loong64\n"),
+                                 ("buster", "eos", "amd64")):
+            os.makedirs(os.path.join(build, rel))
+            open(os.path.join(build, rel, "support"), "w").write(sup)
+            open(os.path.join(build, rel, "architectures"), "w").write(arches)
+        self.assertEqual(config.supported_releases(os.path.join(self.dir, "b")),
+                         {"bookworm": ("arm64", "armhf", "amd64"), "sid": ("amd64", "loong64")})
+
     def test_mirror_rejects_build_keys(self):
         with self.assertRaises(config.ConfigError):
             self.load({"name": "x", "method": "github", "source": {"url": "https://github.com/a/b"},

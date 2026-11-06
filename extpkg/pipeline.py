@@ -80,7 +80,9 @@ def plan(pkgs, releases_all, keys_dir, jobs=8, shard=None, full=False, packages_
         entries = list(ex.map(one, work))
     files = sum(len(e["candidates"]) for e in entries)
     prog.done(f"{files} files, {sum(1 for e in entries if e.get('skip'))} skipped")
-    return {"generated": _now(), "tool": TOOL, "releases": releases_all, "entries": entries,
+    return {"generated": _now(), "tool": TOOL, "releases": list(releases_all),
+            "release_arches": {r: list(a) for r, a in releases_all.items()} if isinstance(releases_all, dict) else {},
+            "entries": entries,
             "covered": covered, "shard": list(shard) if shard else None, "full": full}
 
 
@@ -427,6 +429,7 @@ def fetch(plan_doc, pkgs, out, cache, pub_url=published.DEFAULT_URL, jobs=8, pru
         "generated": _now(),
         "tool": TOOL,
         "releases": plan_doc["releases"],
+        "release_arches": plan_doc.get("release_arches", {}),
         "files": sorted(f.files + carried, key=lambda x: (x["config"], x["release"], x["arch"], x["filename"])),
         "skipped": sorted(f.skipped, key=lambda x: (x["config"], x["release"], x["arch"])),
         "removed": removed,

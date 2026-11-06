@@ -9,8 +9,6 @@ upstream:
 releases: all
 architectures:
 - riscv64
-skip:
-- bookworm/riscv64
 target: utils
 install:
 - gh
