@@ -1,0 +1,18 @@
+Source: once
+Section: admin
+Priority: optional
+Maintainer: Armbian <info@armbian.com>
+Build-Depends: debhelper-compat (= 13), curl, ca-certificates
+Standards-Version: 4.7.0
+Homepage: https://github.com/basecamp/once
+
+Package: once
+Architecture: amd64 arm64
+Depends: ${misc:Depends}, docker.io | docker-ce
+Description: CLI and TUI to install and manage self-hosted web apps
+ Once installs web apps as Docker containers and keeps them up to date.
+ Repack of the static release binary from GitHub.
+ .
+ The once-background service runs background tasks. It is not enabled
+ by default. Enable it with:
+ systemctl enable --now once-background.service

@@ -1,0 +1,17 @@
+name: once
+method: build
+# CLI and TUI for self-hosted web apps (MIT), part of the
+# armbian-hyprland-shell desktop. Repacks the static release binary.
+# Local packaging in build/once/debian/, after the upstream Arch PKGBUILD
+# (omacom/omarchy-pkgs, pkgbuilds/once-bin).
+upstream:
+  url: https://github.com/basecamp/once
+releases: all
+architectures:
+- amd64
+- arm64
+target: utils
+repositories:
+- beta
+install:
+- once
