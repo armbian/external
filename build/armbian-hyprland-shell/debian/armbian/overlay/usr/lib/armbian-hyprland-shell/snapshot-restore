@@ -16,7 +16,8 @@
 #                       mv @.old-<date>/.snapshots @/.snapshots
 #                       If "btrfs subvolume get-default /mnt" names
 #                       @.old-<date>: btrfs subvolume set-default /mnt/@
-# When @ exists, run this script again: it moves .snapshots back.
+# When @ exists, run this script again: it moves .snapshots back and
+# points the default subvolume to @.
 set -euo pipefail
 
 with_home=no
@@ -24,15 +25,6 @@ if [[ ${1:-} == --with-home ]]; then
 	with_home=yes
 	shift
 fi
-n="${1:-}"
-[[ -n $n ]] || n="$(sed -n 's/.*armbian\.snapshot=\([0-9]*\).*/\1/p' /proc/cmdline)"
-if [[ ! $n =~ ^[0-9]+$ ]]; then
-	echo "Usage: omarchy-snapshot restore [--with-home] [number]" >&2
-	echo "Boot a snapshot from the GRUB menu, or give its number:" >&2
-	snapper -c root list >&2 || true
-	exit 1
-fi
-
 # The btrfs device and the root subvolume. A snapshot boot has an overlay
 # root: read them from the snapshot below it.
 lower=/
@@ -48,6 +40,15 @@ base="${fsroot%%/*}"
 if [[ -z $base || $base == .snapshots ]]; then
 	echo "The root is the top level of the btrfs volume, not a subvolume: cannot restore." >&2
 	exit 1
+fi
+
+# A restore that stopped before the default subvolume moved: U-Boot boots
+# the old root. Repair the restored root below, and do not restore again.
+repair_default=no
+if [[ $base =~ \.old-[0-9]{8}-[0-9]{6}$ ]]; then
+	repair_default=yes
+	booted="$base"
+	base="${base%.old-*}"
 fi
 
 top="$(mktemp -d)"
@@ -72,6 +73,27 @@ if [[ ! -e $top/$base/.snapshots || $(stat -c %i "$top/$base/.snapshots") != 256
 	fi
 fi
 
+if [[ $repair_default == yes ]]; then
+	booted_id="$(btrfs subvolume show "$top/$booted" | awk '/Subvolume ID:/ { print $3 }')"
+	default_id="$(btrfs subvolume get-default "$top" | awk '{ print $2 }')"
+	if [[ $booted_id == "$default_id" ]]; then
+		btrfs subvolume set-default "$top/$base"
+		echo "The default subvolume was $booted. It is $base now. Reboot to use the restored root." >&2
+	else
+		echo "The root is $booted, not $base. Boot $base, then run the restore again." >&2
+	fi
+	exit 0
+fi
+
+n="${1:-}"
+[[ -n $n ]] || n="$(sed -n 's/.*armbian\.snapshot=\([0-9]*\).*/\1/p' /proc/cmdline)"
+if [[ ! $n =~ ^[0-9]+$ ]]; then
+	echo "Usage: omarchy-snapshot restore [--with-home] [number]" >&2
+	echo "Boot a snapshot from the GRUB menu, or give its number:" >&2
+	snapper -c root list >&2 || true
+	exit 1
+fi
+
 src="$top/$base/.snapshots/$n/snapshot"
 if [[ ! -d $src ]]; then
 	echo "Snapshot $n does not exist." >&2
@@ -92,7 +114,7 @@ rmdir "$new/.snapshots" 2> /dev/null || true
 # /home in the root subvolume (no own subvolume): take the current one.
 # The reflink copy shares the data blocks, so it is fast and takes no space.
 if [[ $with_home == no && -d $top/$base/home && $(stat -c %i "$top/$base/home") != 256 ]]; then
-	rm -rf "$new/home"
+	rm -rf "${new:?}/home"
 	cp -a --reflink=always "$top/$base/home" "$new/home"
 fi
 
@@ -103,13 +125,21 @@ default_id="$(btrfs subvolume get-default "$top" | awk '{ print $2 }')"
 # Swap the subvolumes. On a failure, put the old root back.
 step=0
 rollback() {
+	set +e
 	echo "Restore failed. Putting the old root back." >&2
-	if [[ $step -ge 3 ]]; then mv "$top/$base/.snapshots" "$old/.snapshots"; fi
-	if [[ $step -ge 2 ]]; then mv "$top/$base" "$new"; fi
-	if [[ $step -ge 1 ]]; then mv "$old" "$top/$base"; fi
-	btrfs subvolume delete "$new" > /dev/null 2>&1 || true
+	ok=yes
+	if [[ $step -ge 3 ]]; then mv "$top/$base/.snapshots" "$old/.snapshots" || ok=no; fi
+	if [[ $ok == yes && $step -ge 2 ]]; then mv "$top/$base" "$new" || ok=no; fi
+	if [[ $ok == yes && $step -ge 1 ]]; then mv "$old" "$top/$base" || ok=no; fi
+	if [[ $ok == yes ]]; then
+		btrfs subvolume delete "$new" > /dev/null 2>&1
+		return
+	fi
+	echo "Putting the old root back failed. Subvolumes on the top level of $dev:" >&2
+	ls -1d "$top/$base" "$top/$base".* 2> /dev/null | sed "s|^$top/|  |" >&2
+	echo "The old root is ${old#"$top"/}. See the rescue steps at the top of $0." >&2
 }
-trap 'rollback; umount "$top" 2> /dev/null || true; rmdir "$top"' ERR
+trap 'rollback; exit 1' ERR
 mv "$top/$base" "$old"
 step=1
 mv "$new" "$top/$base"
