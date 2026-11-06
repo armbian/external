@@ -142,7 +142,7 @@ For developers who maintain a PPA:
 | Releases | Ubuntu | Debian and Ubuntu, from one config |
 | In git | The full `debian/` for each series | A reference to a Debian or Ubuntu source package, and our patches |
 | Upload | A signed source package. Launchpad builds it | Nothing by hand. GitHub runners build binary packages. The Armbian repository signs them when it publishes |
-| Architectures | All that Launchpad builds | `amd64`, `arm64` |
+| Architectures | All that Launchpad builds | `amd64`, `arm64`, `riscv64` |
 | Trigger | Each upload | Daily. Only builds whose sources, patches or config changed |
 | Version | Set by hand or by a script | Automatic: `<upstream>-<revision>+armbian<n>~<release>` |
 | Build dependencies | Other PPAs or the archive | `build_depends`: built in the same run |
@@ -192,7 +192,7 @@ install: [fastfetch]
 | `revision` | Armbian revision. Default 1. Increase it when the patches or the build keys change, but the sources do not. A live run fails when changed inputs give a version that is already uploaded: the upload never replaces a file. A dry run warns. |
 | `build_depends` | Other build configs whose packages this build needs, for example `libdrm` for `mesa`. One level only. |
 
-Architectures: `amd64` and `arm64`, on native GitHub runners.
+Architectures: `amd64`, `arm64` and `riscv64`, on native runners.
 
 Version of the built packages:
 
@@ -296,7 +296,7 @@ Pull requests are always dry runs. Scheduled runs are dry runs until the reposit
 
 1. **plan**: resolve the sources. List the builds whose identity is not in the manifest of the last live run. Dry runs and pull requests also use that manifest.
 2. **deps**: the configs that others name in `build_depends`.
-3. **build**: the other configs, with the deps outputs. Both stages: one job per config, release and architecture. Container `debian:<release>` or `ubuntu:<release>`, runner `ubuntu-24.04` (amd64) or `ubuntu-24.04-arm` (arm64). `apt-get build-dep`, then `dpkg-buildpackage`. Tests are not run (`nocheck`).
+3. **build**: the other configs, with the deps outputs. Both stages: one job per config, release and architecture. Container `debian:<release>` or `ubuntu:<release>`, runner `ubuntu-24.04` (amd64), `ubuntu-24.04-arm` (arm64) or `ubuntu-24.04-riscv` (riscv64). `apt-get build-dep`, then `dpkg-buildpackage`. Tests are not run (`nocheck`).
 4. **publish**: place the built files in the Sync layout, upload, and remove old versions. Status and manifest go to `.sync/shard-build.json` and `.sync/manifest-shard-build.json`, next to the Sync shards.
 
 A failed build skips only its own release and architecture. Its old files stay.

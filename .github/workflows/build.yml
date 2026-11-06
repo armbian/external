@@ -7,7 +7,8 @@ name: "Build packages"
 #   deps     configs that others name in build_depends (libdrm for mesa)
 #   build    the other configs; build_depends come from the deps stage
 #            Both: one job per config, release and architecture, in a
-#            container of the release, on a native runner (amd64, arm64).
+#            container of the release, on a native runner (amd64, arm64,
+#            riscv64).
 #   publish  place the built files, upload, remove old versions
 #
 # Dry run is the default. Pull requests are always dry runs. Scheduled runs

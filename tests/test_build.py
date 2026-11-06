@@ -89,6 +89,11 @@ class Config(unittest.TestCase):
             with self.subTest(bad=bad), self.assertRaises(config.ConfigError):
                 self.load(self.base(upstream=bad))
 
+    def test_build_arches(self):
+        self.load(self.base(architectures=["amd64", "arm64", "riscv64"],
+                            upstream={"url": "https://example.com/x.git"}, packaging={"url": "u", "suite": "sid", "package": "x"}))
+        self.assertEqual(config.RUNNERS["riscv64"], "ubuntu-24.04-riscv")
+
     def test_mirror_rejects_build_keys(self):
         with self.assertRaises(config.ConfigError):
             self.load({"name": "x", "method": "github", "source": {"url": "https://github.com/a/b"},
