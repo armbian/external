@@ -7,6 +7,16 @@
 # into the restored root. --with-home restores /home from the snapshot too.
 # GRUB boots the root with rootflags=subvol=@. U-Boot boards boot the btrfs
 # default subvolume, which the build sets to @: move the default too.
+#
+# Rescue when a restore stopped and @ is missing, from a rescue system:
+#   mount -o subvolid=5 /dev/<root device> /mnt; cd /mnt
+#   Keep the old root:  mv @.old-<date> @  (.snapshots is still inside it)
+#                       btrfs subvolume delete @.new-<date>
+#   Keep the new root:  mv @.new-<date> @; rmdir @/.snapshots 2>/dev/null
+#                       mv @.old-<date>/.snapshots @/.snapshots
+#                       If "btrfs subvolume get-default /mnt" names
+#                       @.old-<date>: btrfs subvolume set-default /mnt/@
+# When @ exists, run this script again: it moves .snapshots back.
 set -euo pipefail
 
 with_home=no
