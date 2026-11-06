@@ -4,9 +4,16 @@ method: build
 # Upstream releases have no riscv64 build, and Debian forky has no gh.
 # The other architectures come from mirror/gh.yaml.
 # Local packaging in build/gh-riscv64/debian/.
+# No jammy: the riscv64 runner's node24 needs glibc 2.38.
+# Jammy has gh in Ubuntu universe.
 upstream:
   url: https://github.com/cli/cli
-releases: all
+releases:
+- noble
+- resolute
+- trixie
+- forky
+- sid
 architectures:
 - riscv64
 target: utils
