@@ -1,0 +1,13 @@
+#!/bin/bash
+
+# Armbian: apt history. Print the time of the last package upgrade. Use
+# the installation time when apt has not upgraded a package yet.
+
+upgraded=$(zcat -f /var/log/apt/history.log* 2>/dev/null |
+  awk '/^Start-Date:/ { date = $2 " " $3 } /^Upgrade:/ { print date }' | sort | tail -1)
+[[ -n $upgraded ]] || upgraded="@$(stat -c %W /var/log)"
+
+locale=$(omarchy-language locale)
+omarchy-i18n about.updatedAt \
+  "$(LC_TIME=$locale date -d "$upgraded" +"%A %d %B %Y")" \
+  "$(date -d "$upgraded" +"%H:%M")"
