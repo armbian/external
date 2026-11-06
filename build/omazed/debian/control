@@ -1,0 +1,19 @@
+Source: omazed
+Section: editors
+Priority: optional
+Maintainer: Armbian <info@armbian.com>
+Build-Depends: debhelper-compat (= 13)
+Standards-Version: 4.7.0
+Homepage: https://github.com/aps6/omazed
+
+Package: omazed
+Architecture: all
+Depends: ${misc:Depends},
+ bash,
+ jq,
+ perl
+Description: Sync the Zed editor theme with the Omarchy theme
+ Omarchy add-on, for the armbian-hyprland-shell desktop.
+ Run "omazed setup" once per user.
+ .
+ Upstream: https://github.com/aps6/omazed (MIT).
