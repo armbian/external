@@ -3,3 +3,6 @@ usr/share/fontconfig/conf.avail/50-omarchy.conf etc/fonts/conf.d/50-omarchy.conf
 # Arch command names for Debian renames (on the PATH from uwsm env.d).
 usr/bin/batcat usr/lib/armbian-hyprland-shell/compat/bat
 usr/lib/cargo/bin/fd usr/lib/armbian-hyprland-shell/compat/fd
+# man finds these from the compat PATH entry (../man): man bat, man fd.
+usr/share/man/man1/batcat.1.gz usr/lib/armbian-hyprland-shell/man/man1/bat.1.gz
+usr/share/man/man1/fdfind.1.gz usr/lib/armbian-hyprland-shell/man/man1/fd.1.gz
