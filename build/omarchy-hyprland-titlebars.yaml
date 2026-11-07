@@ -7,6 +7,7 @@ method: build
 upstream:
   url: https://github.com/omacom/omarchy-hyprland-titlebars
   ref: v0.3.0
+revision: 2
 releases:
 - forky
 - sid
