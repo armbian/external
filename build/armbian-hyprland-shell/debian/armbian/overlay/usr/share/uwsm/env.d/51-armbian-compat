@@ -1,0 +1,6 @@
+# Armbian: Debian renames bat to batcat and fd to fdfind. Omarchy calls bat
+# (MANPAGER, fzf previews) and fd. Links with the Arch names.
+case ":$PATH:" in
+  *:/usr/lib/armbian-hyprland-shell/compat:*) ;;
+  *) export PATH="$PATH:/usr/lib/armbian-hyprland-shell/compat" ;;
+esac
