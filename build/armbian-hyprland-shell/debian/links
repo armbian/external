@@ -1,2 +1,5 @@
 # Omarchy font configuration, active system-wide as in upstream.
 usr/share/fontconfig/conf.avail/50-omarchy.conf etc/fonts/conf.d/50-omarchy.conf
+# Arch command names for Debian renames (on the PATH from uwsm env.d).
+usr/bin/batcat usr/lib/armbian-hyprland-shell/compat/bat
+usr/lib/cargo/bin/fd usr/lib/armbian-hyprland-shell/compat/fd
