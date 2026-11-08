@@ -7,6 +7,7 @@ packaging:
   suite: sid
   components: [main]
   package: fastfetch
+revision: 2
 upstream:
   url: https://github.com/fastfetch-cli/fastfetch
 releases: all
