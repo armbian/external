@@ -8,7 +8,10 @@ state=/var/lib/armbian-hyprland-shell
 mkdir -p "$state"
 
 # Firewall, as upstream. Keep the rules of an admin who already enabled ufw.
-if [ ! -e "$state/firewall-done" ] && command -v ufw >/dev/null && command -v ufw-docker >/dev/null; then
+# ufw-docker install needs the docker command (package docker-cli, which
+# docker.io only recommends). Without it, wait for a later boot, not fail.
+if [ ! -e "$state/firewall-done" ] && command -v ufw >/dev/null && command -v ufw-docker >/dev/null &&
+	command -v docker >/dev/null; then
 	if ! grep -q '^ENABLED=yes' /etc/ufw/ufw.conf; then
 		# Armbian images enable SSH: keep it reachable.
 		ufw allow 22/tcp comment 'ssh' >/dev/null
