@@ -1,0 +1,26 @@
+name: profile-sync-daemon
+method: build
+# Debian packaging on the newest upstream release. The distributions ship 6.34 to 7.04.
+# Before 7.02, psd-resync.service stops the profile overlays before psd.service copies back
+# (configng#1072). 8.0 also fixes crash recovery (graysky2/profile-sync-daemon#438).
+# Patch: debhelper compat 13, for older debhelper.
+# trixie ships 6.50 (kernel overlayfs); upgrade a running session to 8.0 with care.
+packaging:
+  url: https://deb.debian.org/debian
+  suite: sid
+  components: [main]
+  package: profile-sync-daemon
+upstream:
+  url: https://github.com/graysky2/profile-sync-daemon
+releases:
+- trixie
+- forky
+- resolute
+architectures:
+- amd64
+- arm64
+target: desktop
+repositories:
+- beta
+install:
+- profile-sync-daemon
