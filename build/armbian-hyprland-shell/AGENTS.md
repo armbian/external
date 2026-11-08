@@ -63,7 +63,7 @@ Change these. Nothing more.
 
 | Item | Upstream | Armbian |
 |---|---|---|
-| Name in visible text | `Omarchy` | `Armbian` (catalog values, notifications, menu titles) |
+| Name in visible text | `Omarchy` | `Armbian` (catalog values, notifications, menu titles, messages of the commands in `bin/`) |
 | Bar menu logo | glyph `U+E900` in font `omarchy` | glyph `U+E900` in font `armbian`: the "A" of the Armbian wordmark, because the bar fits icons into a square. Make it with `debian/armbian/tools/mkfont.py`. Keep `omarchy.ttf` installed: its other glyphs are agent logos. |
 | Default theme | Tokyo Night | `armbian` theme: palette, wallpapers, lock artwork, Papirus-Dark. Its wallpapers are copies of the armbian-config desktop branding wallpapers (configng `tools/modules/desktops/branding/wallpapers/`). Ship real files: Omarchy copies the theme into the user state, which breaks symlinks. |
 | Lock artwork | `themes/*/unlock.png` | Armbian wordmark, Armbian orange glow |
