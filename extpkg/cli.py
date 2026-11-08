@@ -3,6 +3,7 @@
 import argparse
 import json
 import os
+import re
 import sys
 
 from . import builder, config, depcheck, net, pipeline, published, site, status, upload
@@ -170,6 +171,22 @@ def cmd_depcheck(args):
     return 1 if args.strict and any(x["ok"] is False for x in m["depcheck"]) else 0
 
 
+def next_build_version(version, uploaded):
+    """The planned version, or the next build number when it is uploaded.
+
+    2.71.0-1+armbian1~forky -> 2.71.0-1+armbian1.1~forky -> ...armbian1.2~forky.
+    dpkg sorts armbian1 < armbian1.1 < armbian2: a new revision still wins.
+    """
+    base, sep, rel = version.rpartition("~")
+    if not sep:
+        base, rel = version, ""
+    numbered = re.compile(re.escape(base) + r"\.(\d+)" + re.escape(sep + rel) + "$")
+    used = [int(m.group(1)) for m in map(numbered.match, uploaded) if m]
+    if version not in uploaded and not used:
+        return version
+    return f"{base}.{max(used, default=0) + 1}{sep}{rel}"
+
+
 def cmd_build_matrix(args):
     """Builds that the plan needs, as {"deps": [...], "builds": [...]}.
 
@@ -190,19 +207,26 @@ def cmd_build_matrix(args):
         elif e["config"] in by_name:
             entries[(e["config"], e["release"], e["arch"])] = e
     needed = {k for k, e in entries.items() if not pipeline.previous_of(prev, e, e["candidates"][0])}
-    # Same version, other inputs: same file names. The upload never replaces a
-    # file, so the server would keep the old build. Live runs fail; a dry run
-    # uploaded nothing, so it only warns.
-    uploaded = {(x["config"], x["release"], x["arch"], x["version"])
-                for xs in prev.values() for x in xs}
-    stale = sorted(k for k in needed if (*k, entries[k]["candidates"][0]["build"]["version"]) in uploaded)
-    report = net.error if args.live else net.warn
-    for name, rel, arch in stale:
-        report(f"{name} {rel}/{arch}: the build inputs changed, but version "
-               f"{entries[(name, rel, arch)]['candidates'][0]['build']['version']} is in the last manifest. "
-               f"Increase revision in build/{name}.yaml.")
-    if stale and args.live:
-        return 1
+    # Same version, other inputs (a new Debian packaging, a moved tag): same
+    # file names. The upload never replaces a file. Give the build the next
+    # build number: <base>.<n>~<release>. The identity keeps the planned
+    # version, so the next run finds this build in the manifest.
+    uploaded = {}
+    for xs in prev.values():
+        for x in xs:
+            uploaded.setdefault((x["config"], x["release"], x["arch"]), set()).add(x["version"])
+    renumbered = False
+    for key in sorted(needed):
+        b = entries[key]["candidates"][0]["build"]
+        new = next_build_version(b["version"], uploaded.get(key, set()))
+        if new != b["version"]:
+            net.warn(f"{key[0]} {key[1]}/{key[2]}: the build inputs changed, but version {b['version']} "
+                     f"is in the last manifest. Build {new}.")
+            b["version"] = new
+            renumbered = True
+    if renumbered:
+        with open(args.plan, "w") as f:
+            json.dump(doc, f, indent=1)
     for name, rel, arch in list(needed):
         for dep in by_name[name].get("build_depends", []):
             if (dep, rel, arch) not in entries:

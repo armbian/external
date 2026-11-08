@@ -321,15 +321,38 @@ class Matrix(unittest.TestCase):
     def test_nothing_changed(self):
         self.assertEqual(self.matrix(["libdrm", "mesa"]), ([], []))
 
-    def test_changed_inputs_need_a_new_version(self):
-        # mesa-1 is planned; mesa-0 with the same version "1" is uploaded.
-        r = self.run_matrix([("libdrm", "libdrm-1"), ("mesa", "mesa-0")], version="1")
-        self.assertEqual(r.returncode, 1)
-        self.assertIn("Increase revision in build/mesa.yaml", r.stderr + r.stdout)
-        # A dry run warns and builds.
-        r = self.run_matrix([("libdrm", "libdrm-1"), ("mesa", "mesa-0")], version="1", live=False)
-        self.assertEqual(r.returncode, 0)
-        self.assertEqual(json.loads(r.stdout)["builds"][0]["config"], "mesa")
+    def plan_version(self, name):
+        with open(self.plan) as f:
+            doc = json.load(f)
+        return next(e for e in doc["entries"] if e["config"] == name)["candidates"][0]["build"]["version"]
+
+    def test_changed_inputs_get_the_next_build_number(self):
+        # mesa-1 is planned; mesa-0 with the same version "1~resolute" is uploaded.
+        for live in (True, False):
+            self.setUp()
+            with open(self.plan) as f:
+                doc = json.load(f)
+            for e in doc["entries"]:
+                e["candidates"][0]["build"]["version"] = "1+armbian1~resolute"
+            with open(self.plan, "w") as f:
+                json.dump(doc, f)
+            r = self.run_matrix([("libdrm", "libdrm-1"), ("mesa", "mesa-0")], version="1+armbian1~resolute", live=live)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            builds = json.loads(r.stdout)["builds"]
+            self.assertEqual([(j["config"], j["version"]) for j in builds], [("mesa", "1+armbian1.1~resolute")])
+            # The build jobs read the version from the plan.
+            self.assertEqual(self.plan_version("mesa"), "1+armbian1.1~resolute")
+            self.assertEqual(self.plan_version("libdrm"), "1+armbian1~resolute")
+
+    def test_next_build_version(self):
+        from extpkg.cli import next_build_version as nbv
+        v = "2.71.0-1+armbian1~forky"
+        self.assertEqual(nbv(v, set()), v)
+        self.assertEqual(nbv(v, {"2.70.0-1+armbian1~forky"}), v)
+        self.assertEqual(nbv(v, {v}), "2.71.0-1+armbian1.1~forky")
+        # Only the newest build is kept: continue after it, never go back to v.
+        self.assertEqual(nbv(v, {"2.71.0-1+armbian1.1~forky"}), "2.71.0-1+armbian1.2~forky")
+        self.assertEqual(nbv("1:2.0~rc1-0+armbian1~sid", {"1:2.0~rc1-0+armbian1~sid"}), "1:2.0~rc1-0+armbian1.1~sid")
 
     def test_dependency_with_dependencies_is_rejected(self):
         with open(os.path.join(self.tmp, "libdrm.yaml")) as f:

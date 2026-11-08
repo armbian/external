@@ -189,7 +189,7 @@ install: [fastfetch]
 | `upstream.version_url` | Instead of `url`: a vendor release without a git repository. The URL returns the version, for example `1.0.70`. Nothing is cloned. `debian/rules` downloads the release and checks it (`grok`). |
 | `upstream.submodules` | `true`: also clone the git submodules, at the commits that the upstream commit pins. Default `false`. |
 | `upstream.meson_subprojects` | Meson wraps to download before the build: names or globs, for example `*-rs`. Debian packaging builds with `--wrap-mode=nodownload`. Meson uses a wrap only when the system has no copy. |
-| `revision` | Armbian revision. Default 1. Increase it when the patches or the build keys change, but the sources do not. A live run fails when changed inputs give a version that is already uploaded: the upload never replaces a file. A dry run warns. |
+| `revision` | Armbian revision. Default 1. Increase it when the patches or the build keys change, but the sources do not. If you do not, the build gets the next build number (see below). |
 | `build_depends` | Other build configs whose packages this build needs, for example `libdrm` for `mesa`. One level only. |
 
 Architectures: `amd64`, `arm64` and `riscv64`, on native runners.
@@ -205,6 +205,8 @@ Version of the built packages:
 `~<release>` gives each release its own file name. One repository pool holds all releases.
 
 A build runs again only when its identity changes: the source package hash, the upstream commits, the files under `build/<name>/`, the build keys of the config (`packaging`, `upstream`, `revision`, `build_depends`, `include_debug`), or the version.
+
+Changed inputs can give a version that is already uploaded, for example a new Debian packaging with the same Debian revision. The upload never replaces a file. Then the plan adds the next build number: `2.71.0-1+armbian1.1~forky`, then `.2`. dpkg sorts it after the old build and before the next `revision`.
 Architecture-independent packages (`_all.deb`) come from the first architecture only.
 
 `build_depends`: the dependency builds first, in the same run. Its packages go into a local apt repository in the container, and they win over the release's own versions. A dependency always builds again with a config that needs it. When the dependency has no build for a release, the release's own version is used.
