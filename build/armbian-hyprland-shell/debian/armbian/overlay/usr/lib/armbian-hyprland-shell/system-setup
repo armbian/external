@@ -8,19 +8,20 @@ state=/var/lib/armbian-hyprland-shell
 mkdir -p "$state"
 
 # Firewall, as upstream. Keep the rules of an admin who already enabled ufw.
-# ufw-docker install needs the docker command (package docker-cli, which
-# docker.io only recommends). Without it, wait for a later boot, not fail.
-if [ ! -e "$state/firewall-done" ] && command -v ufw >/dev/null && command -v ufw-docker >/dev/null &&
-	command -v docker >/dev/null; then
-	if ! grep -q '^ENABLED=yes' /etc/ufw/ufw.conf; then
+if [ ! -e "$state/firewall-done" ] && command -v ufw >/dev/null; then
+	if grep -q '^ENABLED=yes' /etc/ufw/ufw.conf; then
+		touch "$state/firewall-done"
+	# ufw-docker install needs the docker command (package docker-cli, which
+	# docker.io only recommends). Without it, wait for a later boot, not fail.
+	elif command -v ufw-docker >/dev/null && command -v docker >/dev/null; then
 		# Armbian images enable SSH: keep it reachable.
 		ufw allow 22/tcp comment 'ssh' >/dev/null
 		# -e: a failed rule install, such as ufw-docker, stops the setup.
 		# Then firewall-done is not written and the next boot tries again.
 		bash -e /usr/share/omarchy/install/config/firewall.sh
 		ufw --force enable
+		touch "$state/firewall-done"
 	fi
-	touch "$state/firewall-done"
 fi
 
 # Docker starts on first use, as upstream: the socket, not the daemon at boot.
