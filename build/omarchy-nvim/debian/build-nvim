@@ -44,10 +44,6 @@ build)
   git -C "$XDG_CONFIG_HOME/nvim" fetch -q --depth 1 https://github.com/LazyVim/starter "$2"
   git -C "$XDG_CONFIG_HOME/nvim" checkout -q FETCH_HEAD
   rm -rf "$XDG_CONFIG_HOME/nvim/.git"
-  # Debian ships the neovim tree-sitter parsers in /usr/lib/nvim.
-  # lazy.nvim adds /usr/lib64/nvim instead, because /usr/lib64 exists.
-  sed -i 's|^    rtp = {$|&\n      paths = { "/usr/lib/nvim" },|' "$XDG_CONFIG_HOME/nvim/lua/config/lazy.lua"
-  grep -q '"/usr/lib/nvim"' "$XDG_CONFIG_HOME/nvim/lua/config/lazy.lua"
   cp -r $SRC/lua $SRC/plugin $SRC/lazyvim.json "$XDG_CONFIG_HOME/nvim/"
   nvim --headless "+Lazy! sync" "+qa!" || true
   # Fail here, not on first use, when the plugin sync did not work.
@@ -71,5 +67,9 @@ install)
   rm -rf "$S/data"
   install -m755 $SRC/omarchy-nvim-setup "$P/usr/bin/omarchy-nvim-setup"
   ln -s omarchy-nvim-setup "$P/usr/bin/omarchy-nvim-refresh"
+  # Debian ships the neovim tree-sitter parsers in /usr/lib/nvim.
+  # lazy.nvim looks in /usr/lib64/nvim when /usr/lib64 exists (amd64).
+  install -d "$P/usr/lib64"
+  ln -s ../lib/nvim "$P/usr/lib64/nvim"
   ;;
 esac
