@@ -22,7 +22,6 @@ override_dh_auto_build:
 
 override_dh_auto_install:
 	install -D -m755 omarchy-speedtest $(PKG)/usr/lib/omarchy/speedtest
-	install -D -m644 LICENSE $(PKG)/usr/share/doc/omarchy-speedtest/copyright
 
 override_dh_auto_test:
 	go test ./...
