@@ -1,0 +1,31 @@
+#!/usr/bin/make -f
+# Upstream omarchy-speedtest built with Go. No module dependencies.
+# Install steps follow the upstream Arch PKGBUILD
+# (omacom/omarchy-pkgs, pkgbuilds/omarchy-speedtest).
+include /usr/share/dpkg/pkg-info.mk
+PKG = debian/omarchy-speedtest
+export GOPATH = $(CURDIR)/debian/go
+export GOCACHE = $(CURDIR)/debian/go-cache
+# The CI build tree is inside a git checkout: no VCS stamp.
+export GOFLAGS = -modcacherw -buildvcs=false
+export GOTOOLCHAIN = local
+export CGO_ENABLED = 1
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+
+override_dh_auto_build:
+	go build -trimpath -buildmode=pie \
+		-ldflags="-s -w -X main.version=$(DEB_VERSION_UPSTREAM) -linkmode=external" -o omarchy-speedtest .
+
+override_dh_auto_install:
+	install -D -m755 omarchy-speedtest $(PKG)/usr/lib/omarchy/speedtest
+	install -D -m644 LICENSE $(PKG)/usr/share/doc/omarchy-speedtest/LICENSE
+
+override_dh_auto_test:
+	go test ./...
+
+override_dh_auto_clean:
+	rm -rf omarchy-speedtest debian/go debian/go-cache

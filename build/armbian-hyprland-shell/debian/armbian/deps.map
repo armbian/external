@@ -153,6 +153,7 @@ omacalc omacalc
 omacut omacut
 omarchy-hyprland-titlebars omarchy-hyprland-titlebars
 omarchy-nvim omarchy-nvim
+omarchy-speedtest omarchy-speedtest
 omarchy-power-profiles-daemon power-profiles-daemon
 omasnap omasnap
 omawrite omawrite

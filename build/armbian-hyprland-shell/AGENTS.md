@@ -191,7 +191,7 @@ to the package name in `deps.map`.
 
 | Kind | Configs |
 |---|---|
-| Omarchy apps and tools | `owe`, `omasnap`, `omacut`, `hype`, `signed`, `gliff`, `ttfx`, `monologue`, `omawrite`, `omacalc`, `aether`, `omarchy-nvim`, `omarchy-hyprland-titlebars` |
+| Omarchy apps and tools | `owe`, `omasnap`, `omacut`, `hype`, `signed`, `gliff`, `ttfx`, `monologue`, `omawrite`, `omacalc`, `aether`, `omarchy-nvim`, `omarchy-speedtest`, `omarchy-hyprland-titlebars` |
 | AUR and vendor tools | `mise`, `usage`, `herdr`, `cliamp`, `tobi-try`, `disktree`, `hyprland-preview-share-picker`, `gpu-screen-recorder`, `tzupdate`, `ufw-docker` |
 | Preinstalled apps without a Debian package | `pinta` (self-contained .NET), `moonlight-qt` (`upstream.submodules`) |
 | Fonts | `fonts-jetbrains-mono-nerd`, `fonts-ia-writer` |

@@ -1,0 +1,17 @@
+Source: omarchy-speedtest
+Section: net
+Priority: optional
+Maintainer: Armbian <info@armbian.com>
+Build-Depends: debhelper-compat (= 13),
+ golang-go (>= 2:1.27~)
+Standards-Version: 4.7.0
+Homepage: https://github.com/omacom/omarchy-speedtest
+
+Package: omarchy-speedtest
+Architecture: any
+Depends: ${shlibs:Depends},
+ ${misc:Depends}
+Description: Network speed test client
+ Part of the armbian-hyprland-shell desktop.
+ .
+ Upstream: https://github.com/omacom/omarchy-speedtest (MIT).

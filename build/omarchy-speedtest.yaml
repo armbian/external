@@ -1,0 +1,19 @@
+name: omarchy-speedtest
+method: build
+# Network speed test client (MIT), part of the armbian-hyprland-shell desktop.
+# Local packaging in build/omarchy-speedtest/debian/, after the upstream Arch
+# PKGBUILD (omacom/omarchy-pkgs, pkgbuilds/omarchy-speedtest).
+upstream:
+  url: https://github.com/omacom/omarchy-speedtest
+  ref: v0.2.1
+releases:
+- forky
+- sid
+architectures:
+- amd64
+- arm64
+target: desktop
+repositories:
+- beta
+install:
+- omarchy-speedtest
