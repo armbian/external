@@ -68,8 +68,11 @@ install)
   install -m755 $SRC/omarchy-nvim-setup "$P/usr/bin/omarchy-nvim-setup"
   ln -s omarchy-nvim-setup "$P/usr/bin/omarchy-nvim-refresh"
   # Debian ships the neovim tree-sitter parsers in /usr/lib/nvim.
-  # lazy.nvim looks in /usr/lib64/nvim when /usr/lib64 exists (amd64).
-  install -d "$P/usr/lib64"
-  ln -s ../lib/nvim "$P/usr/lib64/nvim"
+  # lazy.nvim looks in /usr/lib64/nvim when /usr/lib64 exists.
+  # Only amd64 has /usr/lib64 (libc6 owns it).
+  if [ "$(dpkg-architecture -qDEB_HOST_ARCH)" = amd64 ]; then
+    install -d "$P/usr/lib64"
+    ln -s ../lib/nvim "$P/usr/lib64/nvim"
+  fi
   ;;
 esac
