@@ -8,6 +8,18 @@ set -e
 state=/var/lib/armbian-hyprland-shell
 mkdir -p "$state"
 
+# Lock screen PAM, as upstream (install/config/lockscreen-pam.sh).
+# Without /etc/pam.d/omarchy-lock-password the shell never locks.
+# First, so that a failure of a later step cannot block it.
+# Keep an existing file: an admin can have changed it. Fingerprint setup
+# also writes it, so a missing file means no fingerprint setup to keep.
+if [ ! -e "$state/lock-done" ]; then
+	if [ ! -e /etc/pam.d/omarchy-lock-password ]; then
+		OMARCHY_PATH=/usr/share/omarchy /usr/share/omarchy/bin/omarchy-apply-lock
+	fi
+	touch "$state/lock-done"
+fi
+
 # Firewall, as upstream. Keep the rules of an admin who already enabled ufw.
 if [ ! -e "$state/firewall-done" ] && command -v ufw >/dev/null; then
 	if grep -q '^ENABLED=yes' /etc/ufw/ufw.conf; then
@@ -40,11 +52,4 @@ if [ ! -e "$state/snapper-done" ] && command -v snapper >/dev/null && [ "$(findm
 		bash -e /usr/share/omarchy/install/config/snapper.sh
 	fi
 	touch "$state/snapper-done"
-fi
-
-# Lock screen PAM, as upstream (install/config/lockscreen-pam.sh).
-# Without /etc/pam.d/omarchy-lock-password the shell never locks.
-if [ ! -e "$state/lock-done" ]; then
-	OMARCHY_PATH=/usr/share/omarchy /usr/share/omarchy/bin/omarchy-apply-lock
-	touch "$state/lock-done"
 fi
