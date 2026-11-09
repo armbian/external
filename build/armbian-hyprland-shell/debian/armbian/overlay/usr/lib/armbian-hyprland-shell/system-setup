@@ -1,6 +1,7 @@
 #!/bin/sh
 # Armbian: system setup that upstream does at install time
 # (install/config/firewall.sh, install/config/snapper.sh,
+# install/config/lockscreen-pam.sh,
 # install/config/enable-services.sh). Each part
 # runs once. armbian-hyprland-shell-setup.service starts it at boot.
 set -e
@@ -39,4 +40,11 @@ if [ ! -e "$state/snapper-done" ] && command -v snapper >/dev/null && [ "$(findm
 		bash -e /usr/share/omarchy/install/config/snapper.sh
 	fi
 	touch "$state/snapper-done"
+fi
+
+# Lock screen PAM, as upstream (install/config/lockscreen-pam.sh).
+# Without /etc/pam.d/omarchy-lock-password the shell never locks.
+if [ ! -e "$state/lock-done" ]; then
+	OMARCHY_PATH=/usr/share/omarchy /usr/share/omarchy/bin/omarchy-apply-lock
+	touch "$state/lock-done"
 fi
