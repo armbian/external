@@ -59,6 +59,7 @@ etc/docker, etc/gnupg | todo | Files that Debian packages or users own: install 
 etc/plymouth | todo | Upstream plymouthd.conf selects the Omarchy theme: keep the Armbian theme.
 etc/mkinitcpio.conf.d, etc/limine-entry-tool.d | todo | Arch boot: adapt to initramfs-tools and GRUB or U-Boot.
 default/snapper, install/config/snapper.sh | done | system-setup runs snapper.sh once on a btrfs root. Debian keeps SNAPPER_CONFIGS in /etc/default/snapper (transform 82-snapper-debian).
+install/config/lockscreen-pam.sh | done | system-setup runs omarchy-apply-lock once. Without /etc/pam.d/omarchy-lock-password the shell refused every lock (missing-pam).
 default/limine, limine-snapper-sync, limine-snapper-restore | done | GRUB: etc/grub.d/42_armbian-snapshots lists the snapshots, snapper plugin 50-armbian-grub refreshes it. A snapshot boots with a RAM overlay (initramfs armbian-snapshot-overlay). usr/lib/armbian-hyprland-shell/snapshot-restore swaps the root subvolume (transform 82-snapper-debian). Boards without GRUB: no boot menu, restore by number.
 migrations | todo | Migrations that call pacman: check each one. New users start with all migrations done.
 pinta, moonlight-qt | done | Built in armbian/external from source (build/pinta.yaml, build/moonlight-qt.yaml).
