@@ -11,6 +11,7 @@ packaging:
   suite: resolute
   components: [main]
   package: update-manager
+revision: 2
 releases:
 - resolute
 - noble
@@ -23,7 +24,5 @@ architectures:
 - amd64
 - arm64
 target: desktop
-repositories:
-- beta
 install:
 - update-manager

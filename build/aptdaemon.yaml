@@ -9,6 +9,7 @@ packaging:
   package: aptdaemon
 build_depends:
 - python-defer
+revision: 2
 releases:
 - bookworm
 - trixie
@@ -18,7 +19,5 @@ architectures:
 - amd64
 - arm64
 target: desktop
-repositories:
-- beta
 install:
 - python3-aptdaemon.gtk3widgets
