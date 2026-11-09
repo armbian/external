@@ -5,3 +5,4 @@ release-upgrade-with-armbian-config.patch
 drop-ubuntu-only-dependencies.patch
 optional-update-notifier.patch
 armbian-update-notifier.patch
+hicolor-icon.patch

@@ -5,6 +5,7 @@ method: build
 # Patches: no Ubuntu Pro, Livepatch, OEM, HWE or snap. Release upgrades with armbian-config.
 # armbian-update-notifier: a notification for updates and a pending restart.
 # Debian changelogs and security updates.
+# A hicolor icon: Numix (Xfce) has no system-software-update.
 # Debian needs python3-distupgrade (ubuntu-release-upgrader) and aptdaemon (aptdaemon, python-defer).
 packaging:
   url: http://archive.ubuntu.com/ubuntu
