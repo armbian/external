@@ -1,0 +1,180 @@
+Ship a hicolor system-software-update icon. Numix (Xfce) shows no icon without it.
+The icon is from adwaita-icon-theme-legacy, in base64: patch -p1 takes text only.
+
+diff -Naur a/debian/armbian/icons/system-software-update-16.png.b64 b/debian/armbian/icons/system-software-update-16.png.b64
+--- a/debian/armbian/icons/system-software-update-16.png.b64
++++ b/debian/armbian/icons/system-software-update-16.png.b64
+@@ -0,0 +1,12 @@
++iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAACUUlEQVR4AZ2SA89cQQBFX20bP6EN
++qrgKG6dRbds21vZn27Zt27bN25lXrqqbnMXDGdxh5Cfmd6rOLoX67DKTaM6vhOzUwiHFEWYRAMYQ
++Rn5qIYZ76jHUXoKBpiz01yahtzICvSV+6C5wAU/w2SysQHp8Lkb6mtGZoUN7stgI+qCp6At6m9CR
++pvx/wXBvA4Y6KzHUVYnhripCNaEGw921RoKhoSGIJHx9QVu6FnWBtwi3URd0l3CPcB91wff1BB0d
++HaAJDQsm1z+9/yFoSeCjwvmoKfQEAYF+oGltbSHXOXE/BM2xHwmf0BLPZWUUy6vrQOrV23WNVgma
++gcEB8HjvIDu9cJQ9B/KTC0Dq1EN1ZrFevU1F0VBp5KAZGh6CXMaB7fVNE8y9h7fLbe2tEB0TCUtr
++C3zmfrgCgFGcnD/2a73RnnwEBgeAprm5CfaWAtje2jrBPHh0jyORCZGYFI/UtGQIxfxBgYBzgBV8
++qzc7SAi5XEg2sf3HJoa4y2F3e/sE8+jFox2v376YooLa2hqUlJZAoZLOCl9fmAkJ8YajoyVUajka
++GutBMzg4CKVaiq7mcni+2TfJnufX717ekcrFqKquxMTEBKanp1FRWY78gjxUVlZgZmbmx9otrLSI
++dHyO9nQd2ehN41TA8pn7Sa3RKVFdU4XZ2Vn8GiooryiDJXnZX3sL5aRe2pzmwkpW8AOu8ONB0m8x
++3e2w8BCW4NBA0P8aJQe5QTxaNVs5Kzi/Ql9A8fT0nMfjfdgpvbW7W3z/MCS390B2foNRzbR62Yl5
++o18Ag530IceB7y0AAAAASUVORK5CYII=
+diff -Naur a/debian/armbian/icons/system-software-update-22.png.b64 b/debian/armbian/icons/system-software-update-22.png.b64
+--- a/debian/armbian/icons/system-software-update-22.png.b64
++++ b/debian/armbian/icons/system-software-update-22.png.b64
+@@ -0,0 +1,21 @@
++iVBORw0KGgoAAAANSUhEUgAAABYAAAAWCAYAAADEtGw7AAAESUlEQVR4AZWUA5QcWxCG++3ENp5t
++27YVrOJRbGP9dpTpMWPbztrejZO1be/O7P/u7bDj1DnfoKrO19116zQD4IHRuAuaCs6eRPzOZW2r
++ZzzdrHXvVKnz6LRHPVrg6eXFuNCeuwoM4/uxGvfODrWrC26mra0VDdXFaKrKRVVWJC6ekOOg7Hvo
++xnTLuKeYde/kLC8tQFNTIxwOxzWuisuyYlCUuAGFUSxKY3SoPLMDrJsA9xRTQU1NFaqqKniQp0Br
++cyPqy9JRlX4CJbFaFByUojQigF70zuIRI0YIhOKJizhx8QVU5iahMieREI9Auf8dKTky5c5iKp0k
++HB/i4+/FNVWnrkVZlBJ16YfRXl/CCW4XNF8esgQ2Yb/biycKxy/y9l2OhKRYTlwRb0TaelcEG0Zg
++58pxdxWXxptvf8dC4dhXps2c0hoeGYLTZ9O4prIYFpmb/+bI2vLPLeKamhqsZBVcPvf4Er7Y60um
++k9c4pptYPEG9eq0V5y6cRkxsFNdUFCHHpY2/4eL6X3Bh7U88cXFJMWiER4TC7O2KzINz+GLWo1Od
++WdjfMUf6T8exk0eQmZ0O+2oLLJP6wSocAJt4EHRju+Hiup954t17d4JGRmY6jLJZyDm6iC+2Soah
++oTIH8xbMxvkLZ1BYlA+FSoaqM7tRnroRZfEW2EQDkL7hN94WGIxa0GhoaIBC5o38IG9OzDCMCyc2
++CQehsboAixfNQWZWBioqy8Fqlbh4XIGSSBXKE2ywiQcig8z4mPJ7jn2KP/hiuQ+Kw2VXxb0uiyf0
++5cTKgAVITkkkjfXYuXs7grb9h/Uzn4JdOhR6MgqrsC9sV2DnfMEbhUGxAOWx2qviJzmxfmxPTrxp
++gwUnTh5He3s7dzAanQqmyU+hrjANtfmJqMmNRVVGMPJT9oJlZbzD22hahoLgFWBdBR1E/CqB6cS6
++dUJxtA5B1glYqZZxK0QjKSmBzG4F4qKDcSnUiIsnVQjbpYCGDaS16+umDoSv2zD6nnDO+6XrEeJ8
++nsC8SMWFoYE4veZPrJVNxOatG3E1iooKsW//HpitBgr9TXPX6rTXf9qPHb26M6OI60fCu4QBBGY0
++Feed9EZesC/S9i6FQe2Fbds3o7auFncKWqM9FhMLvegJx7OPMI8S10BCb0InAvOVYnSnBta9s/Mq
++y//q4vSSfNWhZmVkfmHc4dCTp9DfNEe3ZpNxKZKPGmERDXaM+JJsAsM8RAHA0OhBGEp4nPDkDTz3
++yScfTfSa8j3M7AqyTl4cBvlsrJYJsVv2B2JNv6IgxB/asT2cjw1hnqF3CoChcB9XruTCh5uTq9/f
++nRC7ZS5CVkkRsmYKYjbPQsqu+cg8shR5x+km+EHr2b2jT09uvj144ttBoicdk9pV4LCIhrZaxMNa
++rZLhPGiO1tRunZx9ezDvkP6u9yOmT9Hjr7eYN0Z+wHz173vMN7eD1lw/YF6n0qvzpfwPoUrkNpFh
++stMAAAAASUVORK5CYII=
+diff -Naur a/debian/armbian/icons/system-software-update-24.png.b64 b/debian/armbian/icons/system-software-update-24.png.b64
+--- a/debian/armbian/icons/system-software-update-24.png.b64
++++ b/debian/armbian/icons/system-software-update-24.png.b64
+@@ -0,0 +1,21 @@
++iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAERElEQVR4Ac2UA3QcWxjH53VrG8+2
++bdsqojqqbcQvs5t0J7Zt27bqNrbtZDf/N3dOg4kPHr5zfouL73dN/W/DQE7QU3UjGpneFwdsDz/e
++ayg3t9lIfq6feJtAQU2NmjPrRCa7VjIGcvMkYpk5GM/AQD+6WmvR01KOlpJk3IkSIpj+GkbbFxbN
++WsDIzZU21lehp6cbEolkhGFBQ0kaarKdUJ3CoD7NCM3XvcDICjBrAUnU1taClpYmHuys0N/bjc6G
++QrQURqEu3RBVwaqoT9Ih8pkFmzdvFigq7znLCWpvo7k8B81l2SyZ0BVqT0ld2P6ZBST5XsVdcRra
++alzj1nx7NKTooaMwFIOddVyiyYKUN8adh5XiyukFexR3nVXXvISsnHRO0JRpigJHGcSabIb3lZ3T
++CuozzaefgaLijhcOHtnfn5gch2s3CrjGDWkMil1/5yhx+2OCoK2tDVcYEVdeHnl+coHap9RctZ3U
++QmXl3WJbe0vcvH0NaekpXOOaJCHuOv+EO44/4Lb9dzxBbV0tSCQmxcNcXQbFwccnFzDyczvMFVdJ
++jqv+MRQRHYbi0kJY21rAYu9KWCquhpXyWhjtWIg7Dt/zBL7+3iBRVFwIU/ooysLPTi6wVNmIruYy
++nDx9DLduX0d1TSVE+jRarvuiMd8ZDZkWsFJajUKnn3inxsTUECS6urogotVRGaM+LODfZjPFtehu
++rcK5s8dRXFKEpuZGMIZ6uBMpQl2yPhqzrNhZrEERuwcRel9zBIh+4QuEGqhNpIcFS/mC3Ss4gZ7O
++aeTmZbMdOuHt64kYj7/geOQxWKtugDG7RJaKK2B1D+b4J7wlMhGdRmO64bDgUZ7AeMcSTuDiZIGo
++6EgMDg5yG2hgpA+zfY+ho7oA7ZXZaCtPR0tRLCrz/MEwNG+Tnc0uoir2MhgZwRCb8sWx+ecysnNR
++m2qEGMvduCKmuaNHIicnCyL6MjJSY3E33hR3ovWR4COCAaNL6kaPqVgXmrIbyTskPfnDgjA259Nj
++Bc8SQXW8Lq7Z/Qp7eg9c3Z0xHDU11QgI9IO5pQmB+03KhoO01T747dDSRdRWNte3LG+yrB4r2EYE
++FdHqqIjVRIH/BZiI1eDh6Yr2jnZMFaSOtLEwY2Cs9IjkyQeoB9lca1iWscwdK/hMtG1uFyM3TzrM
++pd/mS9VUPhsSMzS7vgncJpKTQiC/SRk5ZS6mF5AbbgoLpXWSzZ9yJ+e+e/BiMcsGlofJ7o/hqQ8+
++eG+P2v6vYc5chkioxmEiPAZbWhG+9C9IN/sRVXHaMNyxWPrQeuoJ/sj5Qaxz+HDrKKP1+1yku51A
++nI0q4uz2I831KPJ8TqE47AIqIsnJ0YKhwqKh5Uu49V/MMutYQpZPLCOQWCht6LdQ3thvqbKJBykj
++dWLZudIVi6k32PYLZk7Ln9Xi316jXtnyDvXZn29RX0wGqZN5h3qZS076/JvxN96u3S/mqryIAAAA
++AElFTkSuQmCC
+diff -Naur a/debian/armbian/icons/system-software-update-32.png.b64 b/debian/armbian/icons/system-software-update-32.png.b64
+--- a/debian/armbian/icons/system-software-update-32.png.b64
++++ b/debian/armbian/icons/system-software-update-32.png.b64
+@@ -0,0 +1,33 @@
++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
++AAAAAElFTkSuQmCC
+diff -Naur a/debian/armbian/icons/system-software-update-48.png.b64 b/debian/armbian/icons/system-software-update-48.png.b64
+--- a/debian/armbian/icons/system-software-update-48.png.b64
++++ b/debian/armbian/icons/system-software-update-48.png.b64
+@@ -0,0 +1,42 @@
++iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAJCElEQVR4Ae2ZBVRbyR7GU7Tu+vy9
++dXd3d9/FJVCXda3QBgkRIIoF1wpex921wV0quMuWFPnezD1kLVsXuucw53yxKzO/+5//NxIWgL+0
++ZgDOrxmAGYAZAFdzvaNu7HkdMlPtIM6LLJ2/HIDccj566hJxmPvcWQIRw+GwtG5aANFnrKUiI+2P
++xCY6HLEx6yn6m5v1Eoy0FqOj0Bcxdk/8TCD2kypn3TQAImOdN+XsuW5uVosa3K2XnI31tB4sTfab
++kFvO61cDnO1QoiHMFG35PojYee+I3FQ74KYAcLWclx/FfWmyKtkTvSeLoRrpxdnhPqhUoxAba4F0
++nwGZ+RyMdlehOdIM9fuN0HR8O7w2LJ0Um86RTTuAxEQHw6R7DJ3Mw0BTJnobiU6XQjU6zAAU58TD
++/8tb0Fufiu4cFzTu/xS1+w2Q6vw05GY6k9MOQBs5UHsEXYXe6FIeQHfVMfQ05UL18wAB0EZp+j4U
++Re/BceknGKw+iNbYL9Gw9yNUBbzFAE4bQFhYmLZAwN1OG9Fb4IbOHAm6S4LQW3McA6eLMTrUDQkB
++yPA0RF2YNYK++Adi7J9CR5YT+ELuJem6AtDGy93EoAA9uSJ0ZnDRmilGXYoYpcf4OCYzhvvW/0EZ
+++T26MhxQfXg7Ar6/D75b/qZu3AXLdQXg8+3uc3Lhq47HH4H3+sXozXXGvu0PQGo2G1Kr5XCx+ge4
++lrfAa8ebKAldi464r1AVsRGHRAaQbLp7egEUCoUuX+BQvD8sFKkZiUwEurIEqN5nitowNuoPfoHm
++BAecyvZEZ2kUBpozcbazEkOni9BdHYtT+QGXDCAz1ekhiR4tNtI2Vw9+Vw3AFzrYeijkSElPQGZ2
++KgPQkcFDY9hnaDxggKYwQzSHm6Al0hwtUVZoibZGS8w6NEex0RhBbdTgvADhEft/lwMNxcdQkyDE
++EcHrkFvMrr9qAI6Ms1Dg5HguNvEIMrJSkJOXyQC0ZwhRv/dD1Aa/i5rAN1Hl9xoqfV5CueI5lHo8
++BaXrYyiRPYwiyf0odDl/FxocGgTpmrC3+Royu02oiuOhI0eOnvJwSEy0cdUAQqHjC3J3CdIzk5Gd
++l4GsnDQwEch0Rl3Ie6gJegfVAW+gyvcVAvDiFMAzULo9gRPyR1AsfRBF4vs0AEZGhqEugcH+SDwW
++gcbCaLRmS3H6yGYSYUdaz9UD8ITcr/2DfJGVm468wmwcPXZoCsAF9aEfoJZA1Aa9zUBU+7+OSgJS
++4f0SKryeR5nimaloPK4BUF5eBnWJS4hFiDcfLYVhaC/wR0eqLdqPb71WAI4hkdHhyCvIQlFJPmgi
++MwDZIjTs+4QZoOoISF3I+6hjuhOBIV2KiYr/axSIdi0NgMSkeKhLaakSdj+y4WK5AlKL+Qj+7m50
++peykbnf1AKTiyqTkWBQW5+FEaTG8fDwYgM5sCZoOGJAk/pSZKjQQNVKgfR9TUTASoQ/VcBoDVkho
++INSls7MDIrEQHXWZ6Ks+gvY8d3Tme159BOhChFQ2nleQg5LSIpRXKiGSOENkvgBtmU7EXT4hAJ8R
++FzL4jQynXMkYLRFEkaZEZjB9ahYcv/kYe9gPwMbqMUjlYqjL+Pg4iE2j2Oc9JorVxBBa4ndePQD3
++M50hjs03JIFTUFZxAlU1FfDx9QR/3T1QrFsK740rILeaizOpDmhPd0SbWmm/qjWNy8jxEy3UxDqg
++QPE2wvkfakTA0e57pAsfZpyrWHw/Go58e/UAUutVJLR8HDt+GJXV5airr0FUTDjCA5zRVhRIwqyA
++1/ol8Nmycsxv85TIZ59NK8Z9/yB13tQEf4AgIVsjB3i71iFH8hRKPZ+G0v1xNMduv3oACXsZfLxd
++SeLuRW1dNRqb65GekQp3sQ1akgXoKvCGYsPSifv+yWLfupJldstKlsUtK1iWfxD7fytYVuq8qQz+
++CHLeFxouJN1piCLPV8l48ioqfF7GqSRbBoDFYmldMYDMchFiIvdC4e2BhqY6nDzVjEbyLpE6ITeK
++y8xEvTcuH7/9H6y/k4qWn0criP7JAORKke5jDqnURWMcCLb/EJWB7zOJX0+Svi1doAaYTzTrygAs
++5iE/OxFCZ0em/59pPYWOznYUFOZBLndBd2sdAr+6ZXzDe6y59EmdR7pqgFPpIkiEu1BZVfG7kZje
++P17yARrCTNASZc4kfleuTA3wH3qPywKgxEQ6ZJEO5WEueDusEBwSgPaONvT0dmNgsB9R0REIVvAg
++t146bv46a94F7kUBbhUb608Ge9ji4KFojbmQkLMNykO70ZouQNuUTidz6Npiklx7L9Fs2qbLAdAj
++upMuHetj7RG86wVwOd8hOycL/QN9GCbhHxwcQMzBKPBtv4bT+lt75Rb6Z/4omZme8q1bWfoWVhYf
++cO1+GKaNHx0d/V3y2vy0Fdte04HAQIs+cbXoPGji+3f0j5N23E6kf7kRWExkRAGaEzgoifoJrhxL
++ZrBpb2+jjWC8GwDTHaQyEUIDXZEQ4wNlsh+aMr1RfEwE0XevTfCEdlHk+Dg973eTuMFBiCROY089
++9fg2Ute7f6I3iR4lWkqkdbkA84hecjLSGZaY6k64GOtO7HhPZ+Jz85cmAwJ90dvXqzExI65CrZH6
++Ox2k6Dv9Tn+nxzUaH0QSd/fuHQ40yc+jZUQLiNS7epedAzQxVxH9iyYS1aJFi2756afvhGKp8zka
++/isp9DpyvYrPd9jB4XB0aF0X0lWMA2oQTWexs7N5wGb7NpqAjItcSqHn0fPpyo4uT6dtW0XtUOzn
++9cDd/RW1QOrjdDCiT5dOC2h+0Hf6nf5Oj9NFyzm6sqPL02ndF1I7lMPHOoiQboDd+sdgs/FV2Hz5
++KTg/rYeD3Y/gCezBddiJb7Ya4acd3zjY23Nepiu76dzc1XAosbEO6o7vQdGBr5HitxXRsnXw55pC
++8uNHcPzyHUi3f4oNL+lNLpzHuMnc6d5e13AosgM3rtiwWuW5cY3Kc8Malev61SrZ2tUqifUqlYvl
++KpWYvUrFN9CZWDSX9cj5fHw6c2DuRw+xHjB4gvXSp4+xXvkz0WPGT7Dup42n10wjwGU4lKZmzfxH
++NgNw02oGYAZgBuD/Uxk4Nm3yc3QAAAAASUVORK5CYII=
+diff -Naur a/debian/copyright b/debian/copyright
+--- a/debian/copyright
++++ b/debian/copyright
+@@ -19,3 +19,8 @@
+ With the exception of
+ UpdateManager/SimpleGladeApp.py
+ which is released under the LGPL, see /usr/share/common-licenses/LGPL
++
++debian/armbian/icons/*: the system-software-update icon from
++adwaita-icon-theme-legacy. Copyright GNOME Project <http://www.gnome.org>.
++License: LGPL-3 or CC-BY-SA-3.0. On Debian systems, the LGPL-3 is in
++/usr/share/common-licenses/LGPL-3.
+diff -Naur a/debian/rules b/debian/rules
+--- a/debian/rules
++++ b/debian/rules
+@@ -11,3 +11,12 @@
+ 	python3 ./tests/test_pycodestyle.py
+ 	dh_auto_test
+ endif
++
++# Armbian: hicolor fallback icon. Numix (Xfce) has no system-software-update.
++override_dh_install:
++	dh_install
++	set -e; for f in debian/armbian/icons/system-software-update-*.png.b64; do \
++		s=$$(basename $$f .png.b64); s=$${s##*-}; \
++		d=debian/update-manager/usr/share/icons/hicolor/$${s}x$${s}/apps; \
++		mkdir -p $$d; base64 -d $$f > $$d/system-software-update.png; \
++	done
