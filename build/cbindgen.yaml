@@ -10,7 +10,5 @@ architectures:
 - arm64
 - amd64
 target: desktop
-repositories:
-- beta
 install:
 - cbindgen

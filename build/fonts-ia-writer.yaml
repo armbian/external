@@ -15,7 +15,5 @@ architectures:
 - amd64
 - arm64
 target: desktop
-repositories:
-- beta
 install:
 - fonts-ia-writer
