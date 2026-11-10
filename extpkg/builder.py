@@ -205,7 +205,8 @@ def build(plan_doc, pkgs, packages_dir, name, release, arch, out, jobs=None, dep
 
     # Architecture-independent packages come from the first architecture only:
     # two builds of one _all.deb differ, and one repository pool holds both.
-    first = next(a for a in pkg["architectures"] if f"{release}/{a}" not in pkg.get("skip", []))
+    first = next(a for a in pkg["architectures"]
+                 if f"{release}/{a}" not in pkg.get("skip", []) and (release, a) not in config.NO_RUNNER)
     files = []
     if arch == first or _has_arch_any(tree):
         mode = "-b" if arch == first else "-B"
