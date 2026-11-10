@@ -11,7 +11,5 @@ architectures:
 - amd64
 - arm64
 target: utils
-repositories:
-- beta
 install:
 - once
