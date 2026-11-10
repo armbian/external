@@ -7,6 +7,8 @@ method: build
 upstream:
   version_url: https://raw.githubusercontent.com/armbian/external/main/build/network-manager-config-connectivity-armbian/VERSION
 releases: all
+# desktop: configng installs it with the desktop, before the image adds 'main'.
+target: desktop
 architectures:
 - amd64
 - arm64
