@@ -1,0 +1,14 @@
+name: camera-engine-rkaiq-rk3576
+method: apt
+# Rockchip's 3A server and IQ files for RK3576 boards on the vendor kernel.
+source:
+  url: https://seeed-studio.github.io/seeed_armbian_extension
+  suite: stable
+  components: [main]
+filter: Name (% camera-engine-rkaiq-rk3576)
+releases: all
+architectures:
+- arm64
+target: utils
+install:
+- camera-engine-rkaiq-rk3576
