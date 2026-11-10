@@ -249,6 +249,10 @@ class Fetcher:
         try:
             path = self._download({"url": found[0], "filename": rec["filename"],
                                    "sha256": rec["sha256"], "size": rec.get("size")})
+            # _download checks only new downloads. Check a cached file too.
+            if net.sha256_file(path) != rec["sha256"]:
+                os.unlink(path)
+                raise net.FetchError("cached file: SHA256 does not match")
             rel, _, made = self._place(path, "debs", entry["dir"], rec["filename"])
         except Exception as e:
             net.log(f"{where}: {rec['filename']} not added to stable: {type(e).__name__}: {e}")

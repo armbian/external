@@ -497,6 +497,21 @@ class Publish(unittest.TestCase):
         self.assertEqual(net.sha256_file(os.path.join(g.out, x["stable"])), x["sha256"])
         self.assertEqual([p for p, _ in sent], [x["stable"]])
 
+    def test_unchanged_bad_cache_stays_beta(self):
+        """A cached beta file with other content: not added to stable, removed from the cache."""
+        f = self.beta_only_run()
+        g = self.fetcher({"files": f.files})
+        g.out = os.path.join(self.tmp, "out2")
+        g.built = None
+        g.beta = self.beta_repo(f.files)
+        url, _ = g.beta.file("noble", "utils", "amd64", "fastfetch", f.files[0]["version"])
+        bad = g._download({"url": url, "filename": f.files[0]["filename"]})
+        with open(bad, "wb") as fh:
+            fh.write(b"bad")
+        g.group([(self.entry, self.cand)])
+        self.assertIsNone(g.files[0]["stable"])
+        self.assertFalse(os.path.exists(bad))
+
     def test_unchanged_not_newer_stays_beta(self):
         """Stable has the same version: the file stays in beta only."""
         f = self.beta_only_run()
