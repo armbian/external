@@ -1,0 +1,14 @@
+name: rk-pw-camera-trixie
+method: github
+# One release carries a package per distribution release.
+source:
+  url: https://github.com/gahingwoo/rk-pw-camera
+releases:
+- trixie
+architectures:
+- arm64
+assets:
+- 'rk-pw-camera_trixie_arm64.deb'
+target: desktop
+install:
+- rk-pw-camera

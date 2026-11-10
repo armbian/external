@@ -1,0 +1,14 @@
+name: rk-pw-camera-resolute
+method: github
+# One release carries a package per distribution release.
+source:
+  url: https://github.com/gahingwoo/rk-pw-camera
+releases:
+- resolute
+architectures:
+- arm64
+assets:
+- 'rk-pw-camera_resolute_arm64.deb'
+target: desktop
+install:
+- rk-pw-camera
