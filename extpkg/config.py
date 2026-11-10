@@ -18,6 +18,9 @@ METHODS = MIRROR_METHODS + BUILD_METHODS
 # Runner of each build architecture. Native runners only: no emulation.
 RUNNERS = {"amd64": "ubuntu-24.04", "arm64": "ubuntu-24.04-arm", "riscv64": "ubuntu-24.04-riscv"}
 BUILD_ARCHES = tuple(RUNNERS)
+# Releases that the runner of an architecture cannot run. Ubuntu needs RVA23
+# on riscv64 from 25.10. The riscv64 runners do not have it: SIGILL.
+NO_RUNNER = {("resolute", "riscv64")}
 TARGETS = ("main", "utils", "desktop")
 # Old configs: REPOSITORY=B (beta), S (stable), BS (both).
 REPOSITORIES = ("stable", "beta")

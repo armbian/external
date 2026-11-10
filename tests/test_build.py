@@ -94,6 +94,13 @@ class Config(unittest.TestCase):
                             upstream={"url": "https://example.com/x.git"}, packaging={"url": "u", "suite": "sid", "package": "x"}))
         self.assertEqual(config.RUNNERS["riscv64"], "ubuntu-24.04-riscv")
 
+    def test_no_runner_skips(self):
+        pkg = self.load(self.base(architectures=["riscv64"], releases=["resolute"],
+                                  upstream={"url": "https://example.com/x.git"},
+                                  packaging={"url": "u", "suite": "sid", "package": "x"}))
+        entries = pipeline.plan([pkg], ["resolute"], os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "keys"))["entries"]
+        self.assertEqual([e["skip"] for e in entries], ["no riscv64 runner can run resolute"])
+
     def test_release_arches(self):
         pkg = {"releases": "all", "architectures": ["amd64", "riscv64"]}
         rels = {"bookworm": ("arm64", "armhf", "amd64"), "trixie": ("amd64", "riscv64")}
