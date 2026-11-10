@@ -1,0 +1,15 @@
+name: network-manager-config-connectivity-armbian
+method: build
+# NetworkManager connectivity check for Armbian images (Debian and Ubuntu).
+# It finds captive portals. The endpoint is the Debian one until Armbian
+# runs its own. Local packaging in build/network-manager-config-connectivity-armbian/debian/.
+# The version comes from VERSION in this directory: increase it for a change.
+upstream:
+  version_url: https://raw.githubusercontent.com/armbian/external/main/build/network-manager-config-connectivity-armbian/VERSION
+releases: all
+architectures:
+- amd64
+- arm64
+- riscv64
+install:
+- network-manager-config-connectivity-armbian
