@@ -120,9 +120,10 @@ jobs:
       - name: Build ${{ matrix.version }}
         run: python3 -m extpkg build --plan plan.json --config "${{ matrix.config }}" --release "${{ matrix.release }}" --arch "${{ matrix.arch }}" --out built
 
+      # dep-*, not built-*: the build jobs upload built-* while other build jobs download.
       - uses: actions/upload-artifact@v7
         with:
-          name: built-${{ matrix.config }}-${{ matrix.release }}-${{ matrix.arch }}
+          name: dep-${{ matrix.config }}-${{ matrix.release }}-${{ matrix.arch }}
           path: built/
           compression-level: 0
           retention-days: 7
@@ -158,7 +159,7 @@ jobs:
         if: needs.deps.result != 'skipped'
         uses: actions/download-artifact@v8
         with:
-          pattern: built-*
+          pattern: dep-*
           path: deps
           merge-multiple: true
 
@@ -208,6 +209,13 @@ jobs:
       - uses: actions/download-artifact@v8
         with:
           pattern: built-*
+          path: built
+          merge-multiple: true
+
+      - uses: actions/download-artifact@v8
+        if: needs.deps.result != 'skipped'
+        with:
+          pattern: dep-*
           path: built
           merge-multiple: true
 
