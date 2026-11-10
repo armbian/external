@@ -87,7 +87,8 @@ def cmd_fetch(args):
     pkgs, _ = _load(args)
     with open(args.plan) as f:
         doc = json.load(f)
-    m = pipeline.fetch(doc, pkgs, args.out, args.cache, args.published, args.jobs, args.prune_cache, _previous(args))
+    m = pipeline.fetch(doc, pkgs, args.out, args.cache, args.published, args.jobs, args.prune_cache, _previous(args),
+                       beta_url=args.beta)
     rep = pipeline.report(m)
     net.summary(rep)
     print(rep)
@@ -132,7 +133,7 @@ def _run(args, pkgs, releases, st):
         others = status.other_paths(args.dest, args.shard, args.port, args.known_hosts)
     m = pipeline.fetch(doc, pkgs, args.out, args.cache, args.published, args.jobs, args.prune_cache,
                        _previous(args), sink=up.add if up else None, stop=up.failed if up else None,
-                       others=others, built=args.built)
+                       others=others, built=args.built, beta_url=args.beta)
     if args.depcheck:
         _depcheck(args, pkgs, m)
     rep = pipeline.report(m) + depcheck.report(m.get("depcheck", []))
@@ -312,6 +313,8 @@ def main(argv=None):
         p.add_argument("--out", default="output", help="output tree (debs/, debs-beta/, manifest.json)")
         p.add_argument("--cache", default=".cache/downloads", help="download cache")
         p.add_argument("--published", default=published.DEFAULT_URL, help="Armbian stable repository")
+        p.add_argument("--beta", default=BETA_URL,
+                       help="Armbian beta repository: source of earlier files that stable now allows ('' for none)")
         p.add_argument("--strict", action="store_true", help="exit 1 when a download or check fails")
         p.add_argument("--previous", default="",
                        help="manifest of the last successful upload: skip files it already has")

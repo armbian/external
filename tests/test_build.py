@@ -454,6 +454,72 @@ class Publish(unittest.TestCase):
         self.assertEqual(len(g.files), 2)
         self.assertTrue(all(x["unchanged"] for x in g.files))
 
+    def beta_repo(self, files):
+        """A beta repository with the beta files of a run, as file:// URL."""
+        import gzip
+        from extpkg import published as pub
+        root = os.path.join(self.tmp, "beta")
+        stanzas = []
+        for x in files:
+            pool = os.path.join("pool", x["filename"])
+            os.makedirs(os.path.join(root, "pool"), exist_ok=True)
+            shutil.copy(os.path.join(self.tmp, "out", x["beta"]), os.path.join(root, pool))
+            stanzas.append(f"Package: {x['package']}\nVersion: {x['version']}\nArchitecture: amd64\n"
+                           f"Filename: {pool}\nSHA256: {x['sha256']}\nDescription: test\n")
+        d = os.path.join(root, "dists", "noble", "noble-utils", "binary-amd64")
+        os.makedirs(d, exist_ok=True)
+        with open(os.path.join(d, "Packages.gz"), "wb") as f:
+            f.write(gzip.compress("\n".join(stanzas).encode()))
+        return pub.Published("file://" + root)
+
+    def beta_only_run(self):
+        self.built(self.cand["identity"])
+        self.pkg["repositories"] = ["beta"]
+        f = self.fetcher()
+        f.group([(self.entry, self.cand)])
+        self.assertIsNone(f.files[0]["stable"])
+        self.pkg["repositories"] = ["stable", "beta"]
+        return f
+
+    def test_unchanged_goes_to_stable(self):
+        """A file built for beta only, then the config allows stable: take it from beta."""
+        f = self.beta_only_run()
+        g = self.fetcher({"files": f.files})
+        g.out = os.path.join(self.tmp, "out2")
+        g.built = None
+        g.beta = self.beta_repo(f.files)
+        sent = []
+        g.sink = sent.extend
+        g.group([(self.entry, self.cand)])
+        x = g.files[0]
+        self.assertTrue(x["unchanged"])
+        self.assertEqual(x["stable"], "debs/extra/noble-utils/" + x["filename"])
+        self.assertEqual(net.sha256_file(os.path.join(g.out, x["stable"])), x["sha256"])
+        self.assertEqual([p for p, _ in sent], [x["stable"]])
+
+    def test_unchanged_not_newer_stays_beta(self):
+        """Stable has the same version: the file stays in beta only."""
+        f = self.beta_only_run()
+        g = self.fetcher({"files": f.files})
+        g.built = None
+        g.beta = self.beta_repo(f.files)
+
+        class Same:
+            def version(self, *args):
+                return f.files[0]["version"]
+        g.pub = Same()
+        g.group([(self.entry, self.cand)])
+        self.assertIsNone(g.files[0]["stable"])
+
+    def test_unchanged_other_file_in_beta(self):
+        """The beta repository has another file for this version: do not add it."""
+        f = self.beta_only_run()
+        g = self.fetcher({"files": [{**f.files[0], "sha256": "0" * 64}]})
+        g.built = None
+        g.beta = self.beta_repo(f.files)
+        g.group([(self.entry, self.cand)])
+        self.assertIsNone(g.files[0]["stable"])
+
 
 if __name__ == "__main__":
     unittest.main()

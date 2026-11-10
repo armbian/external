@@ -98,6 +98,7 @@ class Fetcher:
         self.out = out
         self.cache = cache
         self.pub = pub
+        self.beta = None    # Published beta repository: source of files that stable now allows
         self._locks = {}
         self._guard = threading.Lock()
         self.files = []
@@ -195,19 +196,22 @@ class Fetcher:
         if prevs:
             # Uploaded by an earlier run, and the server keeps it.
             repos = pkg.get("repositories", config.REPOSITORIES)
-            with self._guard:
-                for prev in prevs:
-                    rec = {k: v for k, v in prev.items() if k != "carried"}
-                    # repositories changed: drop the paths it no longer allows.
-                    # Retention then removes them from the server.
-                    if "beta" not in repos:
-                        rec["beta"] = None
-                    if "stable" not in repos:
-                        rec["stable"] = None
+            created = []
+            for prev in prevs:
+                rec = {k: v for k, v in prev.items() if k != "carried"}
+                # repositories changed: drop the paths it no longer allows.
+                # Retention then removes them from the server.
+                if "beta" not in repos:
+                    rec["beta"] = None
+                if "stable" not in repos:
+                    rec["stable"] = None
+                elif not rec.get("stable"):
+                    created += self._to_stable(entry, rec, where)
+                with self._guard:
                     self.files.append({**rec, "unchanged": True})
                     self.unchanged += 1
             self.progress.step(f"{where}: unchanged {', '.join(p['filename'] for p in prevs)}")
-            return []
+            return created
         if cand.get("build"):
             return self._built(pkg, entry, cand, base, where)
         try:
@@ -226,6 +230,32 @@ class Fetcher:
             self.skipped.append({**base, "file": cand["filename"], "reason": f"{type(e).__name__}: {e}"})
             self.progress.step(f"{where}: FAILED {cand['filename']}: {type(e).__name__}: {e}")
             return []
+
+    def _to_stable(self, entry, rec, where):
+        """Stable now allows a file of an earlier run: take it from the beta repository.
+
+        Only when its version is newer than the published stable version, as for a new file.
+        Sets rec["stable"]. Returns the new paths.
+        """
+        if not self.beta:
+            return []
+        have = self.pub.version(entry["release"], entry["target"], entry["arch"], rec["package"])
+        if have is not None and debver.compare(rec["version"], have) <= 0:
+            return []
+        found = self.beta.file(entry["release"], entry["target"], entry["arch"], rec["package"], rec["version"])
+        if not found or found[1] != rec["sha256"]:
+            net.log(f"{where}: {rec['filename']} not in the beta repository, not added to stable")
+            return []
+        try:
+            path = self._download({"url": found[0], "filename": rec["filename"],
+                                   "sha256": rec["sha256"], "size": rec.get("size")})
+            rel, _, made = self._place(path, "debs", entry["dir"], rec["filename"])
+        except Exception as e:
+            net.log(f"{where}: {rec['filename']} not added to stable: {type(e).__name__}: {e}")
+            return []
+        rec["stable"], rec["published"] = rel, have
+        net.log(f"{where}: {rec['filename']} from beta -> stable (published {have or 'none'})")
+        return [(rel, rec["size"])] if made else []
 
     def _built(self, pkg, entry, cand, base, where):
         """Place the files of one build (method build)."""
@@ -393,13 +423,14 @@ def prune_cache(cache, used):
 
 
 def fetch(plan_doc, pkgs, out, cache, pub_url=published.DEFAULT_URL, jobs=8, prune=False, previous=None,
-          sink=None, stop=None, others=frozenset(), built=None):
+          sink=None, stop=None, others=frozenset(), built=None, beta_url=None):
     """Download, check and place. sink() gets the new paths of each upstream
     file as soon as they are placed (for upload while downloading)."""
     os.makedirs(out, exist_ok=True)
     os.makedirs(cache, exist_ok=True)
     f = Fetcher(pkgs, out, cache, published.Published(pub_url))
     f.sink, f.stop, f.built = sink, stop, built
+    f.beta = published.Published(beta_url) if beta_url else None
     f.progress = net.Progress("fetch", sum(len(e["candidates"]) for e in plan_doc["entries"]))
     f.previous = index_previous(previous)
     groups = {}
