@@ -6,9 +6,9 @@ name: "Build packages"
 #   plan     resolve sources; list the builds whose identity changed
 #   deps     configs that others name in build_depends (libdrm for mesa)
 #   build    the other configs; build_depends come from the deps stage
-#            Both: one job per config, release and architecture, in a
-#            container of the release, on a native runner (amd64, arm64,
-#            riscv64).
+#            Both: one job per config, release and architecture, on a
+#            native runner (amd64, arm64, riscv64). The build step runs in
+#            a container of the release (docker run).
 #   publish  place the built files, upload, remove old versions
 #
 # Dry run is the default. Pull requests are always dry runs. Scheduled runs
@@ -96,21 +96,12 @@ jobs:
     if: needs.plan.outputs.deps != '[]'
     name: "${{ matrix.config }} ${{ matrix.release }}/${{ matrix.arch }}"
     runs-on: ${{ matrix.runner }}
-    container: ${{ matrix.image }}
     timeout-minutes: 360
     strategy:
       fail-fast: false
       matrix:
         include: ${{ fromJSON(needs.plan.outputs.deps) }}
     steps:
-      - name: Install build tools
-        env:
-          DEBIAN_FRONTEND: noninteractive
-        run: |
-          apt-get update -qq
-          apt-get install -y -qq --no-install-recommends python3 python3-yaml git ca-certificates \
-            dpkg-dev build-essential fakeroot patch xz-utils
-
       - uses: actions/checkout@v7
 
       - uses: actions/download-artifact@v8
@@ -118,7 +109,7 @@ jobs:
           name: plan
 
       - name: Build ${{ matrix.version }}
-        run: python3 -m extpkg build --plan plan.json --config "${{ matrix.config }}" --release "${{ matrix.release }}" --arch "${{ matrix.arch }}" --out built
+        run: tools/build-in-container.sh "${{ matrix.image }}" --plan plan.json --config "${{ matrix.config }}" --release "${{ matrix.release }}" --arch "${{ matrix.arch }}" --out built
 
       # dep-*, not built-*: the build jobs upload built-* while other build jobs download.
       - uses: actions/upload-artifact@v7
@@ -134,21 +125,12 @@ jobs:
     if: ${{ !cancelled() && needs.plan.result == 'success' && needs.plan.outputs.builds != '[]' }}
     name: "${{ matrix.config }} ${{ matrix.release }}/${{ matrix.arch }}"
     runs-on: ${{ matrix.runner }}
-    container: ${{ matrix.image }}
     timeout-minutes: 360
     strategy:
       fail-fast: false
       matrix:
         include: ${{ fromJSON(needs.plan.outputs.builds) }}
     steps:
-      - name: Install build tools
-        env:
-          DEBIAN_FRONTEND: noninteractive
-        run: |
-          apt-get update -qq
-          apt-get install -y -qq --no-install-recommends python3 python3-yaml git ca-certificates \
-            dpkg-dev build-essential fakeroot patch xz-utils
-
       - uses: actions/checkout@v7
 
       - uses: actions/download-artifact@v8
@@ -164,7 +146,7 @@ jobs:
           merge-multiple: true
 
       - name: Build ${{ matrix.version }}
-        run: python3 -m extpkg build --plan plan.json --config "${{ matrix.config }}" --release "${{ matrix.release }}" --arch "${{ matrix.arch }}" --out built --deps deps
+        run: tools/build-in-container.sh "${{ matrix.image }}" --plan plan.json --config "${{ matrix.config }}" --release "${{ matrix.release }}" --arch "${{ matrix.arch }}" --out built --deps deps
 
       - uses: actions/upload-artifact@v7
         with:
