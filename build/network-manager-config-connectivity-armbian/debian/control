@@ -1,0 +1,18 @@
+Source: network-manager-config-connectivity-armbian
+Section: net
+Priority: optional
+Maintainer: Armbian <info@armbian.com>
+Build-Depends: debhelper-compat (= 13)
+Standards-Version: 4.7.0
+Homepage: https://www.armbian.com
+
+Package: network-manager-config-connectivity-armbian
+Architecture: all
+Depends: network-manager, ${misc:Depends}
+Description: NetworkManager connectivity check for Armbian
+ NetworkManager requests a URL every 5 minutes. A failed or redirected
+ request shows a captive portal, for example hotel Wi-Fi, and the desktop
+ opens the login page.
+ .
+ The file is 90-connectivity-armbian.conf. It overrides the Debian and
+ Ubuntu connectivity configs, which use 20-.

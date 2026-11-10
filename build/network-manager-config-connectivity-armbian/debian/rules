@@ -1,0 +1,5 @@
+#!/usr/bin/make -f
+# Config only: install the connectivity check file.
+
+%:
+	dh $@
