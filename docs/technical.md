@@ -32,7 +32,7 @@ The layout is the same as `storage/incoming/external` of the old download workfl
 
 - Beta gets every file.
 - Stable gets a file only when its version is newer than the version of the same binary package in the published stable repository.
-- `repositories: [beta]` or `[stable]` limits a config to one repository. A change takes effect on the next run: files that the config no longer allows are removed. Files for a newly allowed repository come with the next new version.
+- `repositories: [beta]` or `[stable]` limits a config to one repository. A change takes effect on the next run: files that the config no longer allows are removed. A newly allowed stable gets the files of earlier runs from the beta repository, when the SHA256 matches.
   The tool reads `dists/<release>/<component>/binary-<arch>/Packages.gz` from `https://fi.mirror.armbian.de/apt`.
   `<component>` is `main` for target `main`, else `<release>-<target>`.
 - Versions are compared as Debian versions, with epochs (`extpkg/debver.py`, a port of dpkg).
