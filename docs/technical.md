@@ -192,7 +192,7 @@ install: [fastfetch]
 | `revision` | Armbian revision. Default 1. Increase it when the patches or the build keys change, but the sources do not. If you do not, the build gets the next build number (see below). |
 | `build_depends` | Other build configs whose packages this build needs, for example `libdrm` for `mesa`. One level only. |
 
-Architectures: `amd64`, `arm64` and `riscv64`, on native runners.
+Architectures: `amd64`, `arm64` and `riscv64`, on native runners. Ubuntu needs RVA23 on riscv64 from 25.10. The riscv64 runners do not have it, so the plan skips `resolute/riscv64` (`NO_RUNNER` in `extpkg/config.py`).
 
 Version of the built packages:
 

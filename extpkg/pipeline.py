@@ -57,12 +57,16 @@ def plan(pkgs, releases_all, keys_dir, jobs=8, shard=None, full=False, packages_
         entry = {"config": pkg["name"], "method": pkg["method"], "release": rel, "arch": arch,
                  "target": pkg["target"], "dir": config.component_dir(pkg, rel)}
         try:
-            if pkg["method"] == "build":
-                cands = source.resolve(pkg, rel, arch, keyring, packages_dir)
+            if pkg["method"] == "build" and (rel, arch) in config.NO_RUNNER:
+                entry["skip"] = f"no {arch} runner can run {rel}"
+                cands = []
             else:
-                cands = RESOLVERS[pkg["method"]](pkg, rel, arch, keyring)
-            if not cands:
-                entry["skip"] = "no package matched"
+                if pkg["method"] == "build":
+                    cands = source.resolve(pkg, rel, arch, keyring, packages_dir)
+                else:
+                    cands = RESOLVERS[pkg["method"]](pkg, rel, arch, keyring)
+                if not cands:
+                    entry["skip"] = "no package matched"
             entry["candidates"] = cands
         except Exception as e:  # one broken upstream must not stop the run
             entry["skip"] = f"{type(e).__name__}: {e}"
