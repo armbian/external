@@ -3,7 +3,7 @@ method: apt
 # Spotify, offered in the armbian-hyprland-shell Install menu. amd64 only.
 # keys/spotify-2026.gpg: E1096BCBFF6D418796DE78515384CE82BA52C83A (the key
 # URL names its ID), expires 2027-02-14. keys/spotify.gpg is the old key.
-# jammy and bookworm: the client needs a newer libc6 (>= 2.39).
+# bookworm: the client needs a newer libc6 (>= 2.39).
 source:
   url: https://repository.spotify.com
   suite: stable

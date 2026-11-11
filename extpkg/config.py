@@ -28,7 +28,7 @@ ARCHES = ("amd64", "arm64", "armhf", "riscv64", "loong64", "i386")
 # Used when the armbian/build checkout is not available: release -> architectures.
 _ALL = ("arm64", "armhf", "riscv64", "amd64")
 DEFAULT_RELEASES = {"bookworm": ("arm64", "armhf", "amd64"), "trixie": _ALL, "forky": _ALL,
-                    "jammy": _ALL, "noble": _ALL, "resolute": _ALL}
+                    "noble": _ALL, "resolute": _ALL}
 
 
 class ConfigError(ValueError):
