@@ -6,7 +6,6 @@ source:
   components:
   - main
 releases:
-- jammy
 - noble
 - resolute
 - bookworm

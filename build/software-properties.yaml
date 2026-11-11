@@ -2,7 +2,7 @@ name: software-properties
 method: build
 # Software & Updates (software-properties-gtk), from Ubuntu's resolute packaging.
 # update-manager opens it for the settings. Debian trixie, forky and sid have
-# no GTK frontend: Debian's needs libhandy. Bookworm and jammy keep their own.
+# no GTK frontend: Debian's needs libhandy. Bookworm keeps its own.
 # Patches: no Ubuntu Pro. Debian support: no drivers tab, no dh-translations.
 packaging:
   url: http://archive.ubuntu.com/ubuntu

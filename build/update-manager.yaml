@@ -16,7 +16,6 @@ revision: 3
 releases:
 - resolute
 - noble
-- jammy
 - bookworm
 - trixie
 - forky

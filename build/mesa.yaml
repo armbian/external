@@ -2,7 +2,7 @@ name: mesa
 method: build
 # mojyack/mesa t210-develop (Tegra X1) on Debian packaging.
 # Patches: adapt Debian's 26.2 packaging to 27.0 code. trixie: LLVM 19.
-# forky: no llvm-spirv-22 yet. noble, jammy, bookworm: LLVM, SPIR-V tools or meson too old.
+# forky: no llvm-spirv-22 yet. noble, bookworm: LLVM, SPIR-V tools or meson too old.
 packaging:
   url: https://deb.debian.org/debian
   suite: sid
