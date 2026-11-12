@@ -3,6 +3,7 @@ armbian-firstrun-gui (0.1.1) unstable; urgency=medium
   * Keep the desktop after a successful setup: start tty1 only on failure.
   * Show the IP address in the header.
   * Choose the shell: bash or zsh.
+  * Setup page: a progress bar. The log shows after a failure.
 
  -- Armbian <info@armbian.com>  Thu, 12 Nov 2026 21:00:00 +0100
 
