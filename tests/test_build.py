@@ -46,6 +46,9 @@ class Version(unittest.TestCase):
     def test_local_packaging(self):
         self.assertEqual(source.version({}, "sid", None, {"version": "1.0"}), "1.0-0+armbian1~sid")
 
+    def test_local_source(self):
+        self.assertEqual(source.version({"version": "0.1.0", "revision": 2}, "trixie"), "0.1.0+armbian2~trixie")
+
 
 class Config(unittest.TestCase):
     def setUp(self):
@@ -71,6 +74,20 @@ class Config(unittest.TestCase):
         os.makedirs(os.path.join(self.dir, "x", "debian"))
         open(os.path.join(self.dir, "x", "debian", "control"), "w").close()
         self.load(self.base(upstream={"url": "https://example.com/x.git", "ref": "v1"}))
+
+    def test_local_source(self):
+        with self.assertRaises(config.ConfigError):
+            self.load(self.base(version="0.1.0"))
+        os.makedirs(os.path.join(self.dir, "x", "debian"))
+        open(os.path.join(self.dir, "x", "debian", "control"), "w").close()
+        self.load(self.base(version="0.1.0"))
+        for bad in ({"version": "0.1.0-1"}, {"version": "v1"}, {"version": 1},
+                    {"version": "1.0", "upstream": {"url": "https://example.com/x.git"}}):
+            with self.subTest(bad=bad), self.assertRaises(config.ConfigError):
+                self.load(self.base(**bad))
+        pkg = self.load(self.base(version="0.1.0"))
+        cand = source.resolve(pkg, "trixie", "arm64", None, self.dir)[0]
+        self.assertEqual((cand["url"], cand["build"]["version"]), ("build/x", "0.1.0+armbian1~trixie"))
 
     def test_rejects(self):
         pk = {"url": "https://deb.debian.org/debian", "suite": "sid", "package": "x"}
@@ -144,6 +161,19 @@ class Wraps(unittest.TestCase):
                 builder._wraps(tree, ["nothing-*"])
 
 
+class LocalSource(unittest.TestCase):
+    def test_only_top_patches_left_out(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = os.path.join(tmp, "x")
+            for d in ("patches", "debian/patches", "src/patches"):
+                os.makedirs(os.path.join(root, d))
+                open(os.path.join(root, d, "a"), "w").close()
+            builder._local_source(root, os.path.join(tmp, "tree"))
+            self.assertFalse(os.path.exists(os.path.join(tmp, "tree", "patches")))
+            self.assertTrue(os.path.exists(os.path.join(tmp, "tree", "debian", "patches", "a")))
+            self.assertTrue(os.path.exists(os.path.join(tmp, "tree", "src", "patches", "a")))
+
+
 class Changelog(unittest.TestCase):
     def test_entry(self):
         with tempfile.TemporaryDirectory() as tree:
@@ -158,6 +188,16 @@ class Changelog(unittest.TestCase):
             text = open(f"{tree}/debian/changelog").read()
         self.assertTrue(text.startswith("fastfetch (2.70.0-1+armbian1~noble) noble; urgency=medium"))
         self.assertIn("fastfetch (2.69.0+dfsg-1) unstable", text)
+
+    def test_local_source(self):
+        with tempfile.TemporaryDirectory() as tree:
+            os.makedirs(f"{tree}/debian")
+            with open(f"{tree}/debian/control", "w") as f:
+                f.write("Source: x\n")
+            builder._changelog(tree, {"version": "0.1.0+armbian1~trixie", "packaged": None, "upstream": None}, "trixie")
+            text = open(f"{tree}/debian/changelog").read()
+        self.assertTrue(text.startswith("x (0.1.0+armbian1~trixie) trixie; urgency=medium"))
+        self.assertIn("Armbian build: local source.", text)
 
 
 def git(cwd, *args):

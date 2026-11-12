@@ -7,6 +7,7 @@ build/<name>.yaml    packages to build from source (method build), with
 
 import glob
 import os
+import re
 
 import yaml
 
@@ -52,7 +53,7 @@ def _check(pkg, path):
     allowed = {"name", "method", "source", "filter", "with_deps", "releases", "architectures",
                "target", "install", "verify", "repack", "assets", "exclude", "filename",
                "enabled", "notes", "keep", "include_debug", "skip", "depcheck",
-               "packaging", "upstream", "revision", "build_depends", "repositories"}
+               "packaging", "upstream", "revision", "build_depends", "repositories", "version"}
     unknown = set(pkg) - allowed
     need(not unknown, f"unknown keys: {sorted(unknown)}")
     need(pkg.get("name") == os.path.basename(path)[:-5], "name must match the file name")
@@ -73,8 +74,8 @@ def _check(pkg, path):
     if pkg["method"] == "build":
         _check_build(pkg, path, need)
         return
-    need(not {"packaging", "upstream", "revision", "build_depends"} & set(pkg),
-         "packaging, upstream, revision and build_depends are for method build")
+    need(not {"packaging", "upstream", "revision", "build_depends", "version"} & set(pkg),
+         "packaging, upstream, revision, build_depends and version are for method build")
     src = pkg.get("source") or {}
     need(isinstance(src, dict) and src.get("url"), "source.url is required")
     if pkg["method"] == "apt":
@@ -92,12 +93,17 @@ def _check(pkg, path):
 
 
 def _check_build(pkg, path, need):
-    """method build: packaging and/or upstream; build/<name>/debian without packaging."""
+    """method build: packaging and/or upstream; build/<name>/debian without packaging.
+    Local source: no packaging and no upstream, build/<name>/ holds the code and debian/,
+    version gives the version."""
     need("source" not in pkg, "method build uses packaging and upstream, not source")
     need(set(_list(pkg["architectures"])) <= set(BUILD_ARCHES),
          f"method build: architectures must be from {BUILD_ARCHES}")
-    pk, up = pkg.get("packaging"), pkg.get("upstream")
-    need(pk or up, "method build needs packaging, upstream or both")
+    pk, up, ver = pkg.get("packaging"), pkg.get("upstream"), pkg.get("version")
+    need(pk or up or ver, "method build needs packaging, upstream or both, or version for a local source")
+    need(not ver or not (pk or up), "version is for a local source only: no packaging and no upstream")
+    need(ver is None or (isinstance(ver, str) and re.fullmatch(r"[0-9][A-Za-z0-9.+~]*", ver)),
+         "version must be a Debian version without a revision, for example 0.1.0")
     if pk:
         need(isinstance(pk, dict) and pk.get("url") and pk.get("suite") and pk.get("package"),
              "packaging needs url, suite and package")

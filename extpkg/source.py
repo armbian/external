@@ -6,6 +6,8 @@ A build takes:
   upstream   optional: code in place of the packaged code (a tag or a branch),
              optionally rebased onto another branch (a fork)
   patches    optional: build/<name>/patches/series
+  local      no packaging and no upstream: build/<name>/ holds the code and
+             debian/, and the config gives the version
 
 The plan resolves these and gives the build an identity. The build runs later,
 in a container of the release (extpkg/builder.py).
@@ -194,6 +196,7 @@ def version(pkg, release, packaged=None, up=None):
 
     packaging only:          <packaged version>+armbian<revision>~<release>
     upstream code:           <upstream version>-<packaged revision or 0>+armbian<revision>~<release>
+    local source:            <version>+armbian<revision>~<release>
     The release suffix gives each release its own file name: one repository
     pool holds all releases.
     """
@@ -201,8 +204,10 @@ def version(pkg, release, packaged=None, up=None):
     if up:
         epoch, _, debrev = debver.split(packaged) if packaged else (0, "", "")
         base = (f"{epoch}:" if epoch else "") + f"{up['version']}-{debrev or '0'}"
-    else:
+    elif packaged:
         base = packaged
+    else:
+        base = pkg["version"]
     return f"{base}+armbian{rev}~{release}"
 
 
@@ -222,6 +227,9 @@ def resolve(pkg, release, arch, keyring, packages_dir):
     local = local_hash(pkg, packages_dir)
     # Config keys that change the build. releases, notes, install and the like do not.
     keys = {k: pkg.get(k) for k in ("packaging", "upstream", "revision", "build_depends", "include_debug")}
+    if pkg.get("version"):
+        # Only when set: the identity of the other builds stays the same.
+        keys["version"] = pkg["version"]
     local = hashlib.sha256((local + json.dumps(keys, sort_keys=True)).encode()).hexdigest()
     commits = [up["commit"][:12], up["rebase"]["commit"][:12] if up["rebase"] else ""] if up else []
     identity = "|".join([f"build{RECIPE}", dsc["sha256"][:16] if dsc else "-",
@@ -230,7 +238,7 @@ def resolve(pkg, release, arch, keyring, packages_dir):
         "package": None,
         "version": None,          # read from each built .deb
         "arch": arch,
-        "url": dsc["url"] if dsc else f"{up['url']}#{up['ref']}",
+        "url": dsc["url"] if dsc else f"{up['url']}#{up['ref']}" if up else f"build/{pkg['name']}",
         "filename": dsc["name"] if dsc else pkg["name"],
         "sha256": None,
         "size": None,

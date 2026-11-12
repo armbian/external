@@ -91,6 +91,12 @@ def _upstream(up, tree):
     shutil.rmtree(os.path.join(tree, ".git"))
 
 
+def _local_source(root, tree):
+    """Local source: build/<name>/ holds the code and debian/. Its own patches/ is left out,
+    other directories named patches (debian/patches) stay."""
+    shutil.copytree(root, tree, ignore=lambda d, names: ["patches"] if os.path.samefile(d, root) else [])
+
+
 def _replace_debian(tree, debian):
     """Our packaging replaces a debian/ that upstream ships."""
     shutil.rmtree(os.path.join(tree, "debian"), ignore_errors=True)
@@ -124,7 +130,7 @@ def _changelog(tree, b, release):
     if b["packaged"]:
         what.append(f"packaging {b['packaged']}")
     entry = (f"{name} ({b['version']}) {release}; urgency=medium\n\n"
-             f"  * Armbian build: {', '.join(what) or 'local packaging'}.\n\n"
+             f"  * Armbian build: {', '.join(what) or 'local source'}.\n\n"
              f" -- {MAINTAINER}  {email.utils.formatdate(usegmt=False)}\n\n")
     with open(path, "w") as f:
         f.write(entry + old)
@@ -197,9 +203,11 @@ def build(plan_doc, pkgs, packages_dir, name, release, arch, out, jobs=None, dep
             _replace_debian(tree, os.path.join(packaging, "debian"))
         else:
             os.rename(packaging, tree)
-    else:
+    elif b["upstream"]:
         _upstream(b["upstream"], tree)
         _replace_debian(tree, os.path.join(source.local_dir(pkg, packages_dir), "debian"))
+    else:
+        _local_source(source.local_dir(pkg, packages_dir), tree)
     _patches(pkg, packages_dir, tree, release)
     _changelog(tree, b, release)
 
