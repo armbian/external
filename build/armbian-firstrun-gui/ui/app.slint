@@ -1,0 +1,746 @@
+// Armbian first-run wizard. Logic: src/main.rs.
+import { Button, LineEdit, StandardListView, Spinner, ListView } from "std-widgets.slint";
+
+// Colors of the armbian.com dark theme.
+export global Theme {
+    in property <color> accent: #f26522;
+    out property <color> accent-hover: #dc5819;
+    out property <color> purple: #7c3aed;
+    out property <color> bg: #050505;
+    out property <color> card: #121214;
+    out property <color> field: #1c1c1f;
+    out property <color> border: #26262e;
+    out property <color> text: #f0f0f5;
+    out property <color> dim: #a1a1aa;
+    out property <color> faint: #646470;
+    out property <color> error: #ff6568;
+}
+
+export struct WifiNet {
+    ssid: string,
+    signal: int,
+    secure: bool,
+}
+
+component PrimaryButton inherits Rectangle {
+    in property <string> text;
+    in property <bool> enabled: true;
+    callback clicked;
+    horizontal-stretch: 0;
+    min-width: 150px;
+    height: 44px;
+    border-radius: 8px;
+    background: !enabled ? Theme.border : ta.pressed || ta.has-hover ? Theme.accent-hover : Theme.accent;
+    // Tab reaches the button. Enter or Space presses it.
+    border-width: focus.has-focus ? 2px : 0px;
+    border-color: Theme.text;
+    Text {
+        text: root.text;
+        color: white;
+        font-size: 16px;
+        font-weight: 600;
+    }
+
+    focus := FocusScope {
+        enabled: root.enabled;
+        key-pressed(event) => {
+            if event.text == Key.Return || event.text == " " {
+                root.clicked();
+                return accept;
+            }
+            return reject;
+        }
+    }
+
+    ta := TouchArea {
+        enabled: root.enabled;
+        clicked => {
+            focus.focus();
+            root.clicked();
+        }
+    }
+}
+
+component Label inherits Text {
+    color: Theme.dim;
+    font-size: 14px;
+}
+
+component Busy inherits HorizontalLayout {
+    in property <string> text;
+    in property <bool> running: true;
+    spacing: 12px;
+    alignment: start;
+    if root.running: Spinner {
+        width: 22px;
+        height: 22px;
+        indeterminate: true;
+    }
+    Text {
+        text: root.text;
+        color: Theme.text;
+        font-size: 17px;
+        wrap: word-wrap;
+        vertical-alignment: center;
+    }
+}
+
+component SearchList inherits VerticalLayout {
+    in property <string> label;
+    in property <string> value;
+    in property <[StandardListViewItem]> model;
+    // Set by Rust. The list scrolls to it.
+    in property <int> current: -1;
+    callback search(string);
+    callback picked(int);
+    spacing: 8px;
+    // Select the value and put it in the middle of the list.
+    function scroll() {
+        // A search hid the value: no row is selected, so a click on any row counts.
+        if root.current < 0 || root.model.length == 0 {
+            list.current-item = -1;
+            return;
+        }
+        list.set-current-item(root.current);
+        let row = list.viewport-height / root.model.length;
+        list.viewport-y = -max(0px, min(list.viewport-height - list.visible-height, root.current * row - (list.visible-height - row) / 2));
+    }
+    changed current => {
+        scroll();
+    }
+    Label {
+        text: root.label;
+    }
+
+    Text {
+        text: root.value;
+        color: Theme.accent;
+        font-size: 14px;
+        font-weight: 600;
+        overflow: elide;
+    }
+
+    LineEdit {
+        placeholder-text: "Search";
+        edited(t) => {
+            root.search(t);
+        }
+
+    }
+
+    list := StandardListView {
+        min-height: 120px;
+        model: root.model;
+        // Only a pick of the user: scroll() also changes the item.
+        current-item-changed(i) => {
+            if i != root.current {
+                root.picked(i);
+            }
+        }
+    }
+
+    // After the first layout: scroll to the value.
+    Timer {
+        interval: 250ms;
+        running: true;
+        triggered => {
+            self.running = false;
+            scroll();
+        }
+    }
+}
+
+// Signal strength as 4 bars.
+component Bars inherits HorizontalLayout {
+    in property <int> signal;
+    spacing: 2px;
+    for i in 4: VerticalLayout {
+        alignment: end;
+        Rectangle {
+            width: 4px;
+            height: 5px + i * 3px;
+            border-radius: 1px;
+            background: root.signal > i * 25 ? Theme.text : Theme.border;
+        }
+    }
+}
+
+export component AppWindow inherits Window {
+    title: "Armbian setup";
+    preferred-width: 1280px;
+    preferred-height: 800px;
+    background: Theme.bg;
+    default-font-size: 16px;
+    in property <string> font-family;
+    default-font-family: font-family;
+
+    in property <image> logo: @image-url("armbian-logo.svg");
+    in property <image> background-image;
+    in property <bool> has-background;
+    // Empty: the logo.
+    in property <string> product;
+    in property <bool> dry-run;
+
+    // 0 network check, 1 Wi-Fi, 2 account, 3 region, 4 apply.
+    in-out property <int> page: 0;
+    in property <string> status;
+
+    in property <[WifiNet]> wifi-model;
+    in-out property <int> wifi-current: -1;
+    in-out property <string> wifi-password;
+    in property <bool> wifi-busy;
+    in property <string> wifi-status;
+
+    in property <[StandardListViewItem]> tz-model;
+    in property <int> tz-current: -1;
+    in property <string> timezone;
+    in property <[StandardListViewItem]> locale-model;
+    in property <int> locale-current: -1;
+    in property <string> locale;
+    in property <[StandardListViewItem]> kb-model;
+    in property <int> kb-current: -1;
+    in property <string> keyboard;
+
+    in-out property <string> realname;
+    in-out property <string> username;
+    in-out property <string> password;
+    in-out property <string> password2;
+
+    in property <string> error;
+    in property <string> log;
+    in property <bool> busy;
+    in property <bool> failed;
+    in property <bool> finished;
+
+    callback wifi-rescan();
+    callback wifi-connect();
+    callback wifi-skip();
+    callback search-tz(string);
+    callback pick-tz(int);
+    callback search-locale(string);
+    callback pick-locale(int);
+    callback search-kb(string);
+    callback pick-kb(int);
+    callback realname-edited(string);
+    callback username-edited(string);
+    callback change-region();
+    callback region-done();
+    callback region-cancel();
+    callback apply();
+    callback finish();
+    callback text-mode();
+    callback key-down(string);
+    callback key-up(string);
+
+    property <[string]> titles: ["Welcome", "Connect to a wireless network", "Create your account", "Region and keyboard", "Setting up"];
+
+    // Background: the configured image, else a soft brand glow on black.
+    // Only opaque colors on large areas: the software renderer draws into display
+    // memory, and blending reads it back, which is very slow on some GPUs.
+    Rectangle {
+        background: @linear-gradient(180deg, #1d0f08 0%, Theme.bg 55%);
+    }
+
+    if root.has-background: Image {
+        width: 100%;
+        height: 100%;
+        source: root.background-image;
+        image-fit: cover;
+    }
+    // Key repeat on KMS: libinput sends one press only. Rust repeats a held key.
+    keys := FocusScope {
+        capture-key-pressed(event) => {
+            root.key-down(event.text);
+            return reject;
+        }
+        capture-key-released(event) => {
+            root.key-up(event.text);
+            return reject;
+        }
+    Rectangle {
+        width: min(parent.width - 48px, root.page == 3 ? 1000px : 720px);
+        height: min(parent.height - 48px, root.page == 3 || root.page == 1 ? 640px : 560px);
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        border-radius: 16px;
+        // Opaque, no blurred shadow: the software renderer draws it fast on large screens.
+        background: Theme.card;
+        border-width: 1px;
+        border-color: Theme.border;
+
+        VerticalLayout {
+            padding: 32px;
+            spacing: 18px;
+
+            // Header: logo and page title. TITLE in the configuration replaces the logo.
+            HorizontalLayout {
+                vertical-stretch: 0;
+                spacing: 16px;
+                if root.product == "": Image {
+                    source: root.logo;
+                    height: 26px;
+                    image-fit: contain;
+                    horizontal-alignment: left;
+                    width: self.height * self.source.width / max(1, self.source.height);
+                }
+                if root.product != "": Text {
+                    text: root.product;
+                    color: Theme.text;
+                    font-size: 26px;
+                    font-weight: 700;
+                    vertical-alignment: center;
+                }
+                Rectangle {
+                    width: 1px;
+                    background: Theme.border;
+                }
+
+                Text {
+                    text: root.titles[root.page];
+                    color: Theme.dim;
+                    font-size: 17px;
+                    vertical-alignment: center;
+                }
+            }
+
+            Rectangle {
+                height: 1px;
+                background: Theme.border;
+            }
+
+            // 0: network check and location.
+            if root.page == 0: VerticalLayout {
+                vertical-stretch: 1;
+                alignment: center;
+                Busy {
+                    text: root.status;
+                }
+            }
+
+            // 1: Wi-Fi. Optional: Skip continues without a network.
+            // Keys: Up/Down select, Enter password or connect, Escape skip.
+            if root.page == 1: wifi := FocusScope {
+                vertical-stretch: 1;
+                property <length> row-height: 44px;
+                function select(i: int) {
+                    if root.wifi-model.length == 0 {
+                        return;
+                    }
+                    root.wifi-current = max(0, min(root.wifi-model.length - 1, i));
+                    root.wifi-password = "";
+                    // Keep the selected row in view.
+                    if root.wifi-current * wifi.row-height < -nets.viewport-y {
+                        nets.viewport-y = -root.wifi-current * wifi.row-height;
+                    }
+                    if (root.wifi-current + 1) * wifi.row-height > -nets.viewport-y + nets.visible-height {
+                        nets.viewport-y = -((root.wifi-current + 1) * wifi.row-height - nets.visible-height);
+                    }
+                }
+                function needs-password() -> bool {
+                    return root.wifi-current >= 0 && root.wifi-model[root.wifi-current].secure;
+                }
+                capture-key-pressed(event) => {
+                    if root.wifi-busy {
+                        return reject;
+                    }
+                    if event.text == Key.UpArrow {
+                        select(root.wifi-current - 1);
+                        return accept;
+                    }
+                    if event.text == Key.DownArrow {
+                        select(root.wifi-current + 1);
+                        return accept;
+                    }
+                    if event.text == Key.Escape {
+                        root.wifi-skip();
+                        return accept;
+                    }
+                    if event.text == Key.Return {
+                        if needs-password() && root.wifi-password == "" {
+                            password.focus();
+                        } else if root.wifi-current >= 0 {
+                            root.wifi-connect();
+                        }
+                        return accept;
+                    }
+                    return reject;
+                }
+                Timer {
+                    interval: 1ms;
+                    running: true;
+                    triggered => {
+                        self.running = false;
+                        wifi.focus();
+                    }
+                }
+                VerticalLayout {
+                spacing: 12px;
+                HorizontalLayout {
+                    spacing: 12px;
+                    Label {
+                        text: "Not connected yet. Select a wireless network, or connect a cable: the setup then continues.";
+                        wrap: word-wrap;
+                        vertical-alignment: center;
+                    }
+
+                    Button {
+                        text: "Scan";
+                        enabled: !root.wifi-busy;
+                        clicked => {
+                            root.wifi-rescan();
+                        }
+                    }
+                }
+
+                nets := ListView {
+                    vertical-stretch: 1;
+                    for net[i] in root.wifi-model: Rectangle {
+                        height: wifi.row-height;
+                        border-radius: 6px;
+                        background: i == root.wifi-current ? #432417 : ta.has-hover ? Theme.field : transparent;
+                        ta := TouchArea {
+                            clicked => {
+                                root.wifi-current = i;
+                                root.wifi-password = "";
+                                if net.secure {
+                                    password.focus();
+                                }
+                            }
+                        }
+
+                        HorizontalLayout {
+                            padding-left: 12px;
+                            padding-right: 12px;
+                            spacing: 12px;
+                            Text {
+                                horizontal-stretch: 1;
+                                text: net.ssid;
+                                color: Theme.text;
+                                vertical-alignment: center;
+                                overflow: elide;
+                            }
+
+                            Text {
+                                text: net.secure ? "secured" : "open";
+                                color: Theme.dim;
+                                font-size: 13px;
+                                width: 70px;
+                                horizontal-alignment: right;
+                                vertical-alignment: center;
+                            }
+
+                            VerticalLayout {
+                                alignment: center;
+                                horizontal-stretch: 0;
+                                Bars {
+                                    signal: net.signal;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Always in the tree, so that the keys can focus it.
+                password := LineEdit {
+                    visible: needs-password();
+                    height: self.visible ? self.preferred-height : 0px;
+                    text <=> root.wifi-password;
+                    input-type: InputType.password;
+                    placeholder-text: root.wifi-current >= 0 ? "Password for " + root.wifi-model[root.wifi-current].ssid : "";
+                }
+                Busy {
+                    running: root.wifi-busy;
+                    text: root.wifi-status;
+                }
+                }
+            }
+
+            // 2: account, with the region on one line.
+            if root.page == 2: VerticalLayout {
+                vertical-stretch: 1;
+                spacing: 8px;
+                alignment: start;
+                // Focus after the first layout: the name, or the password after a restart.
+                Timer {
+                    interval: 1ms;
+                    running: true;
+                    triggered => {
+                        self.running = false;
+                        if root.realname == "" {
+                            name-field.focus();
+                        } else {
+                            password-field.focus();
+                        }
+                    }
+                }
+                Label {
+                    text: "Your name";
+                }
+
+                name-field := LineEdit {
+                    text <=> root.realname;
+                    edited(t) => {
+                        root.realname-edited(t);
+                    }
+                    accepted => {
+                        root.apply();
+                    }
+                }
+
+                Label {
+                    text: "Username";
+                }
+
+                LineEdit {
+                    text <=> root.username;
+                    edited(t) => {
+                        root.username-edited(t);
+                    }
+                    accepted => {
+                        root.apply();
+                    }
+                }
+
+                HorizontalLayout {
+                    spacing: 12px;
+                    VerticalLayout {
+                        spacing: 8px;
+                        Label {
+                            text: "Password";
+                        }
+
+                        password-field := LineEdit {
+                            text <=> root.password;
+                            input-type: InputType.password;
+                            accepted => {
+                                root.apply();
+                            }
+                        }
+                    }
+
+                    VerticalLayout {
+                        spacing: 8px;
+                        Label {
+                            text: "Confirm password";
+                        }
+
+                        LineEdit {
+                            text <=> root.password2;
+                            input-type: InputType.password;
+                            accepted => {
+                                root.apply();
+                            }
+                        }
+                    }
+                }
+
+                Label {
+                    text: "The root password is the same.";
+                    font-size: 13px;
+                }
+
+                Rectangle {
+                    height: 12px;
+                }
+
+                Rectangle {
+                    border-radius: 8px;
+                    background: Theme.field;
+                    HorizontalLayout {
+                        padding: 10px;
+                        padding-left: 14px;
+                        spacing: 12px;
+                        Text {
+                            horizontal-stretch: 1;
+                            text: root.timezone + "  ·  " + root.locale + "  ·  " + root.keyboard;
+                            color: Theme.dim;
+                            font-size: 14px;
+                            vertical-alignment: center;
+                            overflow: elide;
+                        }
+
+                        Button {
+                            horizontal-stretch: 0;
+                            text: "Change";
+                            clicked => {
+                                root.change-region();
+                            }
+                        }
+                    }
+                }
+
+                if root.dry-run: Label {
+                    text: "Dry run: the settings go to a file only.";
+                    color: Theme.accent;
+                }
+            }
+
+            // 3: region lists. Escape: back without changes.
+            // Enter: Done (a search without a pick takes the best match). Escape: Cancel.
+            if root.page == 3: region := FocusScope {
+                vertical-stretch: 1;
+                // Before the widgets: the lists use Enter themselves.
+                capture-key-pressed(event) => {
+                    if event.text == Key.Escape {
+                        root.region-cancel();
+                        return accept;
+                    }
+                    if event.text == Key.Return {
+                        root.region-done();
+                        return accept;
+                    }
+                    return reject;
+                }
+                // Focus after the first layout: not in init.
+                Timer {
+                    interval: 1ms;
+                    running: true;
+                    triggered => {
+                        self.running = false;
+                        region.focus();
+                    }
+                }
+                HorizontalLayout {
+                spacing: 20px;
+                SearchList {
+                    label: "Time zone";
+                    value: root.timezone;
+                    model: root.tz-model;
+                    current: root.tz-current;
+                    search(t) => {
+                        root.search-tz(t);
+                    }
+                    picked(i) => {
+                        root.pick-tz(i);
+                    }
+                }
+
+                SearchList {
+                    label: "Language";
+                    value: root.locale;
+                    model: root.locale-model;
+                    current: root.locale-current;
+                    search(t) => {
+                        root.search-locale(t);
+                    }
+                    picked(i) => {
+                        root.pick-locale(i);
+                    }
+                }
+
+                SearchList {
+                    label: "Keyboard";
+                    value: root.keyboard;
+                    model: root.kb-model;
+                    current: root.kb-current;
+                    search(t) => {
+                        root.search-kb(t);
+                    }
+                    picked(i) => {
+                        root.pick-kb(i);
+                    }
+                }
+                }
+            }
+
+            // 4: apply. A real setup closes by itself. Enter closes a dry run.
+            if root.page == 4: done := FocusScope {
+                vertical-stretch: 1;
+                key-pressed(event) => {
+                    if event.text == Key.Return && root.finished {
+                        root.finish();
+                        return accept;
+                    }
+                    return reject;
+                }
+                Timer {
+                    interval: 1ms;
+                    running: true;
+                    triggered => {
+                        self.running = false;
+                        done.focus();
+                    }
+                }
+                VerticalLayout {
+                spacing: 14px;
+                Busy {
+                    running: root.busy;
+                    text: root.busy ? "Applying the settings…" : root.failed ? "Setup failed." : root.dry-run ? "Dry run complete. Press Enter to close." : "Setup is complete.";
+                }
+
+                Rectangle {
+                    background: Theme.bg;
+                    border-radius: 8px;
+                    clip: true;
+                    VerticalLayout {
+                        padding: 12px;
+                        Text {
+                            text: root.log;
+                            color: Theme.dim;
+                            font-size: 13px;
+                            font-family: "monospace";
+                            wrap: word-wrap;
+                            vertical-alignment: bottom;
+                        }
+                    }
+                }
+                }
+            }
+
+            // Footer: error and buttons.
+            HorizontalLayout {
+                vertical-stretch: 0;
+                spacing: 12px;
+                Text {
+                    horizontal-stretch: 1;
+                    text: root.error;
+                    color: Theme.error;
+                    font-size: 14px;
+                    wrap: word-wrap;
+                    vertical-alignment: center;
+                }
+
+                if root.page == 1: Button {
+                    text: "Skip";
+                    enabled: !root.wifi-busy;
+                    clicked => {
+                        root.wifi-skip();
+                    }
+                }
+                if root.page == 1: PrimaryButton {
+                    text: "Connect";
+                    enabled: root.wifi-current >= 0 && !root.wifi-busy;
+                    clicked => {
+                        root.wifi-connect();
+                    }
+                }
+                if root.page == 2: PrimaryButton {
+                    text: "Set up";
+                    clicked => {
+                        root.apply();
+                    }
+                }
+                if root.page == 3: Button {
+                    text: "Cancel";
+                    clicked => {
+                        root.region-cancel();
+                    }
+                }
+                if root.page == 3: PrimaryButton {
+                    text: "Done";
+                    clicked => {
+                        root.region-done();
+                    }
+                }
+                if root.page == 4 && root.failed: Button {
+                    text: "Continue in text mode";
+                    clicked => {
+                        root.text-mode();
+                    }
+                }
+
+            }
+        }
+    }
+    }
+}

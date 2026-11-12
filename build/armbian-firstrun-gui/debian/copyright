@@ -1,0 +1,13 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: armbian-firstrun-gui
+Source: https://github.com/armbian/external/tree/main/build/armbian-firstrun-gui
+
+Files: *
+Copyright: Armbian <info@armbian.com>
+License: GPL-3.0-only
+ On Debian systems, the full text is in /usr/share/common-licenses/GPL-3.
+
+Files: ui/armbian-logo.svg
+Copyright: Armbian <info@armbian.com>
+License: GPL-3.0-only
+ The Armbian logo, from armbian/build packages/bsp/common/usr/share/pixmaps/.

@@ -1,0 +1,26 @@
+[package]
+name = "armbian-firstrun-gui"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+# Pick crate versions that build with rust-version (trixie: 1.85).
+resolver = "3"
+license = "GPL-3.0-only"
+description = "Armbian first-run wizard"
+
+[dependencies]
+slint = { version = "~1.13", default-features = false, features = ["std", "compat-1-2", "renderer-software", "software-renderer-systemfonts", "image-default-formats", "backend-linuxkms-noseat"] }
+roxmltree = "0.20"
+serde_json = "1"
+
+[build-dependencies]
+slint-build = "~1.13"
+
+[features]
+# Development only: draw in a window on X11.
+dev = ["slint/backend-winit-x11", "slint/renderer-winit-software"]
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true

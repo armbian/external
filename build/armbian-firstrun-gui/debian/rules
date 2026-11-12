@@ -1,0 +1,31 @@
+#!/usr/bin/make -f
+# Source: build/armbian-firstrun-gui/ in armbian/external.
+# Rust 1.85 or newer. Ubuntu noble has it in /usr/lib/rust-1.85/bin (rustc-1.85,
+# cargo-1.85). Build scripts call "rustc": put that directory first in PATH.
+export CARGO_HOME = $(CURDIR)/debian/cargo-home
+export CARGO_TARGET_DIR = $(CURDIR)/target
+export PATH := $(if $(wildcard /usr/lib/rust-1.85/bin),/usr/lib/rust-1.85/bin:)$(PATH)
+PKG = debian/armbian-firstrun-gui
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+
+override_dh_auto_build:
+	cargo build --release --locked
+
+override_dh_auto_install:
+	install -D -m755 target/release/armbian-firstrun-gui $(PKG)/usr/bin/armbian-firstrun-gui
+	install -D -m644 debian/firstrun-gui.conf $(PKG)/etc/armbian/firstrun-gui.conf
+	install -D -m644 debian/getty-tty1.conf $(PKG)/usr/lib/systemd/system/getty@tty1.service.d/armbian-firstrun-gui.conf
+
+# The wizard starts at boot only. It does nothing on a configured system.
+# An upgrade must not stop a wizard that runs on the screen.
+override_dh_installsystemd:
+	dh_installsystemd --no-start --no-stop-on-upgrade
+
+override_dh_auto_test:
+
+override_dh_auto_clean:
+	rm -rf target debian/cargo-home
