@@ -1,5 +1,5 @@
 // Armbian first-run wizard. Logic: src/main.rs.
-import { Button, ComboBox, LineEdit, StandardListView, Spinner, ListView } from "std-widgets.slint";
+import { Button, ComboBox, LineEdit, ProgressIndicator, StandardListView, Spinner, ListView } from "std-widgets.slint";
 
 // Colors of the armbian.com dark theme.
 export global Theme {
@@ -212,6 +212,8 @@ export component AppWindow inherits Window {
 
     in property <string> error;
     in property <string> log;
+    // Setup progress, 0 to 1.
+    in property <float> progress;
     in property <bool> busy;
     in property <bool> failed;
     in property <bool> finished;
@@ -697,7 +699,17 @@ export component AppWindow inherits Window {
                     text: root.busy ? "Applying the settings…" : root.failed ? "Setup failed." : root.dry-run ? "Dry run complete. Press Enter to close." : "Setup is complete.";
                 }
 
-                Rectangle {
+                // Progress only. The log shows after a failure, and the dry-run result.
+                if !root.failed && !root.dry-run: VerticalLayout {
+                    padding-top: 24px;
+                    alignment: start;
+                    ProgressIndicator {
+                        height: 8px;
+                        progress: root.progress;
+                    }
+                }
+
+                if root.failed || root.dry-run: Rectangle {
                     background: Theme.bg;
                     border-radius: 8px;
                     clip: true;
