@@ -1,5 +1,5 @@
 // Armbian first-run wizard. Logic: src/main.rs.
-import { Button, LineEdit, StandardListView, Spinner, ListView } from "std-widgets.slint";
+import { Button, ComboBox, LineEdit, StandardListView, Spinner, ListView } from "std-widgets.slint";
 
 // Colors of the armbian.com dark theme.
 export global Theme {
@@ -205,6 +205,10 @@ export component AppWindow inherits Window {
     in-out property <string> username;
     in-out property <string> password;
     in-out property <string> password2;
+    in property <bool> has-zsh;
+    in-out property <string> shell: "bash";
+    // IPv4 addresses, for SSH. Empty without a network.
+    in property <string> ip-address;
 
     in property <string> error;
     in property <string> log;
@@ -296,9 +300,19 @@ export component AppWindow inherits Window {
                 }
 
                 Text {
+                    horizontal-stretch: 1;
                     text: root.titles[root.page];
                     color: Theme.dim;
                     font-size: 17px;
+                    vertical-alignment: center;
+                    overflow: elide;
+                }
+
+                if root.ip-address != "": Text {
+                    horizontal-stretch: 0;
+                    text: "IP " + root.ip-address;
+                    color: Theme.faint;
+                    font-size: 14px;
                     vertical-alignment: center;
                 }
             }
@@ -537,6 +551,21 @@ export component AppWindow inherits Window {
                 Label {
                     text: "The root password is the same.";
                     font-size: 13px;
+                }
+
+                if root.has-zsh: HorizontalLayout {
+                    spacing: 12px;
+                    alignment: start;
+                    Label {
+                        text: "Shell";
+                        vertical-alignment: center;
+                    }
+
+                    ComboBox {
+                        width: 140px;
+                        model: ["bash", "zsh"];
+                        current-value <=> root.shell;
+                    }
                 }
 
                 Rectangle {
