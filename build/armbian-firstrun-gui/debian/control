@@ -1,0 +1,27 @@
+Source: armbian-firstrun-gui
+Section: admin
+Priority: optional
+Maintainer: Armbian <info@armbian.com>
+Build-Depends: debhelper-compat (= 13),
+ cargo (>= 1.85) | cargo-1.85,
+ rustc (>= 1.85) | rustc-1.85,
+ pkgconf,
+ libinput-dev,
+ libudev-dev,
+ libxkbcommon-dev
+Standards-Version: 4.7.0
+Homepage: https://github.com/armbian/external
+
+Package: armbian-firstrun-gui
+Architecture: any
+Depends: ${shlibs:Depends},
+ ${misc:Depends},
+ curl,
+ fonts-dejavu-core,
+ libfontconfig1,
+ tzdata,
+ xkb-data
+Description: Armbian first-run wizard
+ Graphical first-run setup on the screen: location, time zone, locale,
+ keyboard and the user account. It writes the answers as presets for
+ armbian-firstlogin, which applies them.
