@@ -4,7 +4,7 @@ method: build
 # first boot. It writes presets for armbian-firstlogin. Local source and
 # packaging in build/armbian-firstrun-gui/. Keyboard presets: armbian/build#11350.
 # Rust 1.85 or newer: not bookworm and jammy. noble uses rustc-1.85.
-version: 0.1.0
+version: 0.1.1
 releases:
 - trixie
 - forky
