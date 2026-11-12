@@ -199,6 +199,38 @@ fn validate_user(ui: &AppWindow) -> Result<(), &'static str> {
     Ok(())
 }
 
+/// True when /etc/shells lists zsh.
+fn has_zsh() -> bool {
+    fs::read_to_string("/etc/shells").unwrap_or_default().lines().any(|l| l.trim().ends_with("/zsh"))
+}
+
+/// IPv4 addresses of the network interfaces, without container and VM bridges.
+fn ip_addresses() -> String {
+    let out = Command::new("ip").args(["-o", "-4", "addr", "show", "scope", "global"]).output();
+    let text = out.map(|o| String::from_utf8_lossy(&o.stdout).into_owned()).unwrap_or_default();
+    parse_ip_addresses(&text)
+}
+
+/// `ip -o -4 addr` lines: "2: eth0    inet 10.0.2.15/24 ...". Returns "10.0.2.15, ...".
+fn parse_ip_addresses(text: &str) -> String {
+    const SKIP: [&str; 6] = ["docker", "br-", "veth", "virbr", "lxc", "cni"];
+    let mut addrs: Vec<&str> = vec![];
+    for line in text.lines() {
+        let f: Vec<&str> = line.split_whitespace().collect();
+        let (Some(iface), Some(addr)) = (f.get(1), f.iter().position(|w| *w == "inet").and_then(|i| f.get(i + 1))) else {
+            continue;
+        };
+        if SKIP.iter().any(|p| iface.starts_with(p)) {
+            continue;
+        }
+        let addr = addr.split('/').next().unwrap_or(addr);
+        if !addrs.contains(&addr) {
+            addrs.push(addr);
+        }
+    }
+    addrs.join(", ")
+}
+
 /// The PRESET_* variables for armbian-firstlogin.
 fn preset_vars(ui: &AppWindow, st: &State) -> Vec<(&'static str, String)> {
     let (layout, variant) = st.kb.value.split_once(':').map_or((st.kb.value.clone(), String::new()), |(l, v)| (l.into(), v.into()));
@@ -213,6 +245,7 @@ fn preset_vars(ui: &AppWindow, st: &State) -> Vec<(&'static str, String)> {
         ("SET_LANG_BASED_ON_LOCATION", "y".into()),
         ("PRESET_KEYBOARD_LAYOUT", layout),
         ("PRESET_KEYBOARD_VARIANT", variant),
+        ("PRESET_USER_SHELL", if ui.get_has_zsh() && ui.get_shell() == "zsh" { "zsh".into() } else { "bash".into() }),
     ]
 }
 
@@ -311,12 +344,13 @@ fn run_firstlogin(ui: &AppWindow, firstlogin: &str) {
 /// Restart with the chosen keyboard layout, so that the passwords use it.
 fn restart_with_layout(ui: &AppWindow, st: &State) {
     let resume = format!(
-        "TZ={}\nLOCALE={}\nKB={}\nNAME={}\nUSER={}\n",
+        "TZ={}\nLOCALE={}\nKB={}\nNAME={}\nUSER={}\nSHELL={}\n",
         st.tz.value,
         st.locale.value,
         st.kb.value,
         ui.get_realname().replace('\n', " "),
-        ui.get_username()
+        ui.get_username(),
+        ui.get_shell()
     );
     if let Err(e) = fs::write(RESUME, resume) {
         ui.set_error(format!("Cannot save the answers: {e}").into());
@@ -539,6 +573,8 @@ fn main() {
 
     let ui = AppWindow::new().expect("cannot create the window");
     ui.set_dry_run(a.dry_run);
+    ui.set_has_zsh(has_zsh());
+    ui.set_ip_address(ip_addresses().into());
     if !font.starts_with('/') {
         ui.set_font_family(font.into());
     }
@@ -853,6 +889,9 @@ fn main() {
     if resumed {
         ui.set_realname(resume.get("NAME").cloned().unwrap_or_default().into());
         ui.set_username(resume.get("USER").cloned().unwrap_or_default().into());
+        if let Some(sh) = resume.get("SHELL").filter(|v| !v.is_empty()) {
+            ui.set_shell(sh.into());
+        }
         ui.set_page(PAGE_ACCOUNT);
     } else {
         ui.set_page(PAGE_CHECK);
@@ -871,6 +910,9 @@ fn main() {
                 handle(&ui, &st2, msg, &*r2);
             }
             ticks += 1;
+            if ticks % 15 == 0 {
+                ui.set_ip_address(ip_addresses().into());
+            }
             if ticks % 25 == 0 && ui.get_page() == PAGE_WIFI && !ui.get_wifi_busy() {
                 start_check(&mut st2.borrow_mut(), true);
             }
@@ -921,5 +963,14 @@ mod tests {
     #[test]
     fn strip() {
         assert_eq!(strip_ansi("\x1b[92mok\x1b[0m\r"), "ok");
+    }
+
+    #[test]
+    fn ip_list() {
+        let text = "2: enp1s0    inet 10.0.2.15/24 brd 10.0.2.255 scope global dynamic enp1s0\n\
+                    3: docker0    inet 172.17.0.1/16 brd 172.17.255.255 scope global docker0\n\
+                    4: wlan0    inet 192.168.1.20/24 brd 192.168.1.255 scope global wlan0\n";
+        assert_eq!(parse_ip_addresses(text), "10.0.2.15, 192.168.1.20");
+        assert_eq!(parse_ip_addresses(""), "");
     }
 }

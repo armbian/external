@@ -2,7 +2,7 @@
 
 Graphical first-run wizard. It runs on the screen at the first boot, without X11 or Wayland (DRM/KMS, else `/dev/fb0`).
 
-It asks for a wireless network (only without a connection), the user account, and the time zone, locale and keyboard. The location preselects the time zone, locale and keyboard. Without a network, the image defaults stay.
+It asks for a wireless network (only without a connection), the user account and shell (bash or zsh, when zsh is installed), and the time zone, locale and keyboard. The header shows the IP address, for SSH. The location preselects the time zone, locale and keyboard. Without a network, the image defaults stay.
 
 The wizard is a frontend. It writes `PRESET_*` variables to `/root/.not_logged_in_yet` and runs `armbian-firstlogin`, which applies them. When presets answer everything, the wizard does not start. Serial console and SSH keep the text setup.
 
