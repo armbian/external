@@ -294,6 +294,21 @@ fn strip_ansi(s: &str) -> String {
 }
 
 /// Run armbian-firstlogin. Its last lines go to the log on the page.
+/// Progress of armbian-firstlogin from its output: known steps, else a small step per line.
+fn setup_progress(line: &str, current: f32) -> f32 {
+    const STEPS: [(&str, f32); 7] = [
+        ("Waiting for system to finish booting", 0.10),
+        ("Waiting for network startup", 0.20),
+        ("Welcome to", 0.30),
+        ("Shell:", 0.40),
+        ("has been created", 0.60),
+        ("Keyboard:", 0.85),
+        ("Now starting desktop", 0.95),
+    ];
+    let step = STEPS.iter().filter(|(s, _)| line.contains(s)).map(|(_, p)| *p).fold(0.0, f32::max);
+    step.max((current + 0.02).min(0.9))
+}
+
 fn run_firstlogin(ui: &AppWindow, firstlogin: &str) {
     let weak = ui.as_weak();
     let firstlogin = firstlogin.to_string();
@@ -319,6 +334,8 @@ fn run_firstlogin(ui: &AppWindow, firstlogin: &str) {
             }
         };
         let mut lines: Vec<String> = Vec::new();
+        let mut progress = 0.05f32;
+        let _ = weak.upgrade_in_event_loop(move |ui| ui.set_progress(progress));
         if let Some(out) = child.stdout.take() {
             // Bytes, not lines(): a line that is not UTF-8 must not stop the reading.
             let mut reader = BufReader::new(out);
@@ -329,13 +346,21 @@ fn run_firstlogin(ui: &AppWindow, firstlogin: &str) {
                 if line.trim().is_empty() {
                     continue;
                 }
+                progress = setup_progress(&line, progress);
                 lines.push(line);
+                // The log shows only after a failure.
                 let text = lines[lines.len().saturating_sub(12)..].join("\n");
-                let _ = weak.upgrade_in_event_loop(move |ui| ui.set_log(text.into()));
+                let _ = weak.upgrade_in_event_loop(move |ui| {
+                    ui.set_log(text.into());
+                    ui.set_progress(progress);
+                });
             }
         }
         let ok = child.wait().map(|s| s.success()).unwrap_or(false);
         let _ = weak.upgrade_in_event_loop(move |ui| {
+            if ok {
+                ui.set_progress(1.0);
+            }
             ui.set_busy(false);
             ui.set_failed(!ok);
             ui.set_finished(ok);
@@ -970,6 +995,15 @@ mod tests {
     #[test]
     fn strip() {
         assert_eq!(strip_ansi("\x1b[92mok\x1b[0m\r"), "ok");
+    }
+
+    #[test]
+    fn progress() {
+        let near = |a: f32, b: f32| (a - b).abs() < 1e-6;
+        assert!(near(setup_progress("Shell: BASH", 0.1), 0.4));
+        assert!(near(setup_progress("some line", 0.4), 0.42));
+        assert!(near(setup_progress("some line", 0.9), 0.9));
+        assert!(near(setup_progress("Now starting desktop environment via sddm...", 0.6), 0.95));
     }
 
     #[test]
