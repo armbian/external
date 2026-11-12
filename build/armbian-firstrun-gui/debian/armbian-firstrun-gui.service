@@ -13,9 +13,10 @@ ExecCondition=/bin/sh -c 'ls /dev/dri/card* > /dev/null 2>&1 || test -e /dev/fb0
 # getty@tty1 does not start while this file exists (drop-in of this package).
 ExecStartPre=/usr/bin/touch /run/armbian-firstrun-gui.active
 ExecStart=/usr/bin/armbian-firstrun-gui
-# Success: tty1 shows the login. Failure: tty1 starts the text setup.
+# Failure: tty1 starts the text setup. Success: armbian-firstlogin starts the
+# display manager. getty@tty1 would stop it (Conflicts= of gdm3 and sddm).
 ExecStopPost=/bin/rm -f /run/armbian-firstrun-gui.active
-ExecStopPost=-/bin/systemctl --no-block start getty@tty1.service
+ExecStopPost=-/bin/sh -c '[ "$SERVICE_RESULT" = success ] || systemctl --no-block start getty@tty1.service'
 
 [Install]
 WantedBy=multi-user.target
