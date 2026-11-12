@@ -159,6 +159,7 @@ To move a package from a PPA:
 |---|---|---|
 | Packaging | `packaging:` a Debian or Ubuntu source package, or `build/<name>/debian/` | `debian/` directory. The source package also gives the code when there is no `upstream`. |
 | Upstream | `upstream:` a git tag or branch | Code in place of the packaged code. Its own `debian/` is replaced. |
+| Local source | `version:`, and `build/<name>/` holds the code and `debian/` | For code that lives in this repository. No packaging and no upstream. A change of a file under `build/<name>/` builds again. |
 | Patches | `build/<name>/patches/series`, then `patches/<release>/series` | Optional. Applied with `patch -p1` after packaging and upstream. For code that we do not control or fork. Release patches apply to that release only, for example `trixie/` for an older LLVM. |
 
 ```yaml
@@ -189,6 +190,7 @@ install: [fastfetch]
 | `upstream.version_url` | Instead of `url`: a vendor release without a git repository. The URL returns the version, for example `1.0.70`. Nothing is cloned. `debian/rules` downloads the release and checks it (`grok`). |
 | `upstream.submodules` | `true`: also clone the git submodules, at the commits that the upstream commit pins. Default `false`. |
 | `upstream.meson_subprojects` | Meson wraps to download before the build: names or globs, for example `*-rs`. Debian packaging builds with `--wrap-mode=nodownload`. Meson uses a wrap only when the system has no copy. |
+| `version` | Local source only: the version, for example `0.1.0`. Packages get `<version>+armbian<revision>~<release>`. |
 | `revision` | Armbian revision. Default 1. Increase it when the patches or the build keys change, but the sources do not. If you do not, the build gets the next build number (see below). |
 | `build_depends` | Other build configs whose packages this build needs, for example `libdrm` for `mesa`. One level only. |
 
@@ -199,6 +201,7 @@ Version of the built packages:
 | Build | Version |
 |---|---|
 | Packaging only | `<packaged version>+armbian<revision>~<release>` |
+| Local source | `<version>+armbian<revision>~<release>` |
 | Upstream tag | `<tag version>-<packaged revision>+armbian<revision>~<release>` |
 | Upstream branch or rebase | `<upstream.version>~git<YYYYMMDDHHMM>.<commit>-<packaged revision>+armbian<revision>~<release>` |
 
