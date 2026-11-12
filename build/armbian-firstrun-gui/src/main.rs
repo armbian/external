@@ -211,16 +211,23 @@ fn ip_addresses() -> String {
     parse_ip_addresses(&text)
 }
 
+/// Container and VM interfaces. Docker networks are "br-" and 12 hex digits;
+/// host bridges such as br-lan stay.
+fn is_container_iface(iface: &str) -> bool {
+    const SKIP: [&str; 5] = ["docker", "veth", "virbr", "lxc", "cni"];
+    let docker_net = iface.strip_prefix("br-").is_some_and(|id| id.len() == 12 && id.bytes().all(|b| b.is_ascii_hexdigit()));
+    docker_net || SKIP.iter().any(|p| iface.starts_with(p))
+}
+
 /// `ip -o -4 addr` lines: "2: eth0    inet 10.0.2.15/24 ...". Returns "10.0.2.15, ...".
 fn parse_ip_addresses(text: &str) -> String {
-    const SKIP: [&str; 6] = ["docker", "br-", "veth", "virbr", "lxc", "cni"];
     let mut addrs: Vec<&str> = vec![];
     for line in text.lines() {
         let f: Vec<&str> = line.split_whitespace().collect();
         let (Some(iface), Some(addr)) = (f.get(1), f.iter().position(|w| *w == "inet").and_then(|i| f.get(i + 1))) else {
             continue;
         };
-        if SKIP.iter().any(|p| iface.starts_with(p)) {
+        if is_container_iface(iface) {
             continue;
         }
         let addr = addr.split('/').next().unwrap_or(addr);
@@ -969,8 +976,10 @@ mod tests {
     fn ip_list() {
         let text = "2: enp1s0    inet 10.0.2.15/24 brd 10.0.2.255 scope global dynamic enp1s0\n\
                     3: docker0    inet 172.17.0.1/16 brd 172.17.255.255 scope global docker0\n\
-                    4: wlan0    inet 192.168.1.20/24 brd 192.168.1.255 scope global wlan0\n";
-        assert_eq!(parse_ip_addresses(text), "10.0.2.15, 192.168.1.20");
+                    4: wlan0    inet 192.168.1.20/24 brd 192.168.1.255 scope global wlan0\n\
+                    5: br-3f2a9c1d8e7b    inet 172.18.0.1/16 brd 172.18.255.255 scope global br-3f2a9c1d8e7b\n\
+                    6: br-lan    inet 192.168.2.1/24 brd 192.168.2.255 scope global br-lan\n";
+        assert_eq!(parse_ip_addresses(text), "10.0.2.15, 192.168.1.20, 192.168.2.1");
         assert_eq!(parse_ip_addresses(""), "");
     }
 }
