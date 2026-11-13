@@ -1,9 +1,7 @@
 name: nvidia-ubuntu2604
 method: apt
 # NVIDIA driver (open kernel modules) for resolute. See nvidia-debian13.yaml.
-# keys/nvidia-cuda-ubuntu2604.gpg holds the vendor file 60DF8A40.pub,
-# fingerprint 14BAFBC7...60DF8A40. No second source; the Armbian
-# maintainers accepted the key (2026-11-13).
+# keys/nvidia-cuda-ubuntu2604.gpg holds the vendor file 60DF8A40.pub.
 source:
   url: https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2604/x86_64
   suite: ./
@@ -19,3 +17,4 @@ with_deps: true
 # The release dkms is new enough (>= 3.1.8). Do not replace it.
 exclude:
 - dkms
+notes: 'Exception to the second-source rule in CLAUDE.md. Key 14BAFBC7562AD710CA04E69905FBB6DA60DF8A40 (Kitmaker (Ubuntu 26.04)) is only on developer.download.nvidia.com: not on keyserver.ubuntu.com, keys.openpgp.org or pgp.mit.edu, and not in the NVIDIA documentation. The Armbian maintainers accepted it on 2026-11-13 (armbian/external#73).'
