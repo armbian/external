@@ -293,7 +293,6 @@ fn strip_ansi(s: &str) -> String {
     out
 }
 
-/// Run armbian-firstlogin. Its last lines go to the log on the page.
 /// Progress of armbian-firstlogin from its output: known steps, else a small step per line.
 fn setup_progress(line: &str, current: f32) -> f32 {
     const STEPS: [(&str, f32); 7] = [
@@ -306,9 +305,10 @@ fn setup_progress(line: &str, current: f32) -> f32 {
         ("Now starting desktop", 0.95),
     ];
     let step = STEPS.iter().filter(|(s, _)| line.contains(s)).map(|(_, p)| *p).fold(0.0, f32::max);
-    step.max((current + 0.02).min(0.9))
+    step.max(current).max((current + 0.02).min(0.9))
 }
 
+/// Run armbian-firstlogin. Its last lines go to the log on the page.
 fn run_firstlogin(ui: &AppWindow, firstlogin: &str) {
     let weak = ui.as_weak();
     let firstlogin = firstlogin.to_string();
@@ -1004,6 +1004,7 @@ mod tests {
         assert!(near(setup_progress("some line", 0.4), 0.42));
         assert!(near(setup_progress("some line", 0.9), 0.9));
         assert!(near(setup_progress("Now starting desktop environment via sddm...", 0.6), 0.95));
+        assert!(near(setup_progress("some line", 0.95), 0.95));
     }
 
     #[test]
