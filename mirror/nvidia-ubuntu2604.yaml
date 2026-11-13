@@ -1,0 +1,21 @@
+name: nvidia-ubuntu2604
+method: apt
+# NVIDIA driver (open kernel modules) for resolute. See nvidia-debian13.yaml.
+# keys/nvidia-cuda-ubuntu2604.gpg holds the vendor file 60DF8A40.pub,
+# fingerprint 14BAFBC7...60DF8A40. No second source; the Armbian
+# maintainers accepted the key (2026-11-13).
+source:
+  url: https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2604/x86_64
+  suite: ./
+releases:
+- resolute
+architectures:
+- amd64
+target: utils
+install:
+- nvidia-open
+filter: Name (= nvidia-open)
+with_deps: true
+# The release dkms is new enough (>= 3.1.8). Do not replace it.
+exclude:
+- dkms
