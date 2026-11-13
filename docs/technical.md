@@ -75,7 +75,7 @@ Signature rules, as apt uses them:
 | `target` | no | `main`, `utils` or `desktop`. Default: `main`. |
 | `install` | no | Main package names. For tests and documentation. |
 | `assets` | no | github: asset name patterns. Default: patterns for the architecture. |
-| `exclude` | no | github: asset name patterns to drop. |
+| `exclude` | no | github: asset name patterns to drop. apt: package name patterns to leave out, also as dependencies with `with_deps`. |
 | `filename` | no | url: fixed output file name. Avoid it: the server then keeps the first version. |
 | `repack` | no | `packages`, `epoch`, `suffix`: rebuild these packages with a new version. |
 | `verify` | no | `signature`, `checksums`. Both default to true. |

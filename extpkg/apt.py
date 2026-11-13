@@ -5,6 +5,7 @@ key in keys/ or a system archive keyring -> SHA256 of the Packages index ->
 SHA256 of each .deb. Every link is checked before a package is offered.
 """
 
+import fnmatch
 import gzip
 import hashlib
 import lzma
@@ -278,33 +279,39 @@ def _dep_names(field):
     return names
 
 
-def select(stanzas, filter_text, arch, with_deps=False):
-    """Apply the filter, add dependencies when asked, keep the newest per name."""
+def select(stanzas, filter_text, arch, with_deps=False, exclude=()):
+    """Apply the filter, add dependencies when asked, keep the newest per name.
+
+    exclude: name patterns to leave out, also as dependencies (and their own
+    dependencies). Example: a vendor dkms that the release already has.
+    """
     pred = query.compile_query(filter_text)
+    excluded = lambda name: any(fnmatch.fnmatchcase(name, p) for p in exclude)
     by_name = {}
     for st in stanzas:
         if st.get("Architecture") not in (arch, "all"):
             continue
         by_name.setdefault(st["Package"], []).append(st)
 
-    chosen = {name for name, sts in by_name.items() if any(pred(s) for s in sts)}
-    if with_deps:
-        todo = list(chosen)
-        while todo:
-            name = todo.pop()
-            for st in by_name.get(name, []):
-                for dep in _dep_names(st.get("Depends", "") + "," + st.get("Pre-Depends", "")):
-                    if dep in by_name and dep not in chosen:
-                        chosen.add(dep)
-                        todo.append(dep)
-
-    result = []
-    for name in sorted(chosen):
+    chosen = {name for name, sts in by_name.items() if not excluded(name) and any(pred(s) for s in sts)}
+    def pick(name):
         # A matched name takes its newest matching version (the filter may cap
         # the version). A name added as a dependency takes its newest version.
         sts = [s for s in by_name[name] if pred(s)] or by_name[name]
-        result.append(max(sts, key=lambda s: debver.Version(s["Version"])))
-    return result
+        return max(sts, key=lambda s: debver.Version(s["Version"]))
+
+    if with_deps:
+        # Follow the dependencies of the picked version only. Older versions in
+        # the index can name packages that the picked one does not need.
+        todo = list(chosen)
+        while todo:
+            st = pick(todo.pop())
+            for dep in _dep_names(st.get("Depends", "") + "," + st.get("Pre-Depends", "")):
+                if dep in by_name and dep not in chosen and not excluded(dep):
+                    chosen.add(dep)
+                    todo.append(dep)
+
+    return [pick(name) for name in sorted(chosen)]
 
 
 _repos = {}
@@ -337,7 +344,7 @@ def resolve(pkg, release, arch, keyring):
         except net.FetchError:
             if i == len(urls) - 1:
                 raise
-    picked = select(stanzas, pkg["filter"], arch, with_deps)
+    picked = select(stanzas, pkg["filter"], arch, with_deps, pkg.get("exclude") or ())
     if not pkg.get("include_debug"):
         picked = [st for st in picked if not config.is_debug(st["Package"])]
     out = []
