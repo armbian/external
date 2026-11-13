@@ -130,7 +130,8 @@ class AptRoot:
 
     def update(self):
         """Distribution and Armbian indexes: the slow part, run early."""
-        return self.apt("update")
+        # Fail on any index error: else apt returns 0 and empty indexes make every dependency fail.
+        return self.apt("update", "--error-on=any")
 
     def add(self, paths):
         """Add .deb files to the local repository and refresh only that source."""
