@@ -1,0 +1,19 @@
+name: nvidia-debian13-arm64
+method: apt
+# arm64 repository of nvidia-debian13.yaml.
+source:
+  url: https://developer.download.nvidia.com/compute/cuda/repos/debian13/sbsa
+  suite: ./
+releases:
+- trixie
+- forky
+architectures:
+- arm64
+target: utils
+install:
+- nvidia-open
+filter: Name (= nvidia-open)
+with_deps: true
+# The release dkms is new enough (>= 3.1.8). Do not replace it.
+exclude:
+- dkms
