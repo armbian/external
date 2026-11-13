@@ -55,7 +55,6 @@ def _gpg(home, *args, data=None):
                           input=data, capture_output=True, check=True).stdout
 
 
-@unittest.skipUnless(shutil.which("gpg") and shutil.which("gpgv"), "needs gpg and gpgv")
 class Select(unittest.TestCase):
     STANZAS = [
         {"Package": "nvidia-open", "Version": "1", "Architecture": "amd64",
@@ -83,6 +82,7 @@ class Select(unittest.TestCase):
         self.assertEqual(self.names(exclude=["nvidia-kernel-*"]), ["nvidia-open"])
 
 
+@unittest.skipUnless(shutil.which("gpg") and shutil.which("gpgv"), "needs gpg and gpgv")
 class Signature(unittest.TestCase):
     def test_more_than_40_key_files(self):
         # gpgv ignores keyring files after the 40th. The signer is the last file.
