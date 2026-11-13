@@ -56,6 +56,33 @@ def _gpg(home, *args, data=None):
 
 
 @unittest.skipUnless(shutil.which("gpg") and shutil.which("gpgv"), "needs gpg and gpgv")
+class Select(unittest.TestCase):
+    STANZAS = [
+        {"Package": "nvidia-open", "Version": "1", "Architecture": "amd64",
+         "Depends": "nvidia-kernel-open-dkms | nvidia-kernel-dkms"},
+        {"Package": "nvidia-kernel-open-dkms", "Version": "1", "Architecture": "amd64", "Depends": "dkms (>= 3)"},
+        {"Package": "nvidia-kernel-dkms", "Version": "1", "Architecture": "amd64", "Depends": "dkms"},
+        {"Package": "dkms", "Version": "3", "Architecture": "all"},
+    ]
+
+    def names(self, **kw):
+        return [st["Package"] for st in apt.select(self.STANZAS, "Name (= nvidia-open)", "amd64", True, **kw)]
+
+    def test_with_deps_takes_the_first_alternative(self):
+        self.assertEqual(self.names(), ["dkms", "nvidia-kernel-open-dkms", "nvidia-open"])
+
+    def test_exclude_leaves_out_dependencies(self):
+        self.assertEqual(self.names(exclude=["dkms"]), ["nvidia-kernel-open-dkms", "nvidia-open"])
+
+    def test_deps_of_the_picked_version_only(self):
+        old = {"Package": "nvidia-open", "Version": "0", "Architecture": "amd64", "Depends": "nvidia-kernel-dkms"}
+        names = [st["Package"] for st in apt.select(self.STANZAS + [old], "Name (= nvidia-open)", "amd64", True)]
+        self.assertNotIn("nvidia-kernel-dkms", names)
+
+    def test_exclude_glob(self):
+        self.assertEqual(self.names(exclude=["nvidia-kernel-*"]), ["nvidia-open"])
+
+
 class Signature(unittest.TestCase):
     def test_more_than_40_key_files(self):
         # gpgv ignores keyring files after the 40th. The signer is the last file.
