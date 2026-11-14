@@ -99,12 +99,21 @@ jobs:
             gh issue create --title "Dependency check failures" --label depcheck --body-file "${RUNNER_TEMP}/issue.md"
           fi
 
+      # A "not checked" result (an index download failed) keeps the old state.
+      # Else the next run sees those files as unchanged and never checks them.
       - name: Save state
+        id: state
         if: success()
-        run: mkdir -p state && cp output/manifest.json state/manifest.json
+        run: |
+          if python3 -c 'import json, sys; sys.exit(any(x["ok"] is None for x in json.load(open("output/manifest.json")).get("depcheck", [])))'; then
+            mkdir -p state && cp output/manifest.json state/manifest.json
+            echo "save=yes" >> "$GITHUB_OUTPUT"
+          else
+            echo "Some checks did not run: keep the previous state."
+          fi
 
       - name: Store state and apt index lists
-        if: success()
+        if: success() && steps.state.outputs.save == 'yes'
         uses: actions/cache/save@v6
         with:
           path: |
