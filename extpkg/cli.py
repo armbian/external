@@ -148,8 +148,8 @@ def _run(args, pkgs, releases, st):
     else:
         net.warn("no --dest: output stays in " + args.out)
     # --strict: the upload is done; a skipped package or a failed dependency
-    # check only sets the exit code.
-    dep_failed = any(x["ok"] is False for x in m.get("depcheck", []))
+    # check only sets the exit code. "Not checked" (ok None) also fails.
+    dep_failed = any(x["ok"] is not True for x in m.get("depcheck", []))
     return 1 if args.strict and (_failed(m) or dep_failed) else 0
 
 
@@ -169,7 +169,8 @@ def cmd_depcheck(args):
     rep = depcheck.report(m["depcheck"])
     net.summary(rep)
     print(rep)
-    return 1 if args.strict and any(x["ok"] is False for x in m["depcheck"]) else 0
+    # "Not checked" (ok None) also fails: the check did not run.
+    return 1 if args.strict and any(x["ok"] is not True for x in m["depcheck"]) else 0
 
 
 def next_build_version(version, uploaded):
