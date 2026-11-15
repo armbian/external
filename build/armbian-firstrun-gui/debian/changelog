@@ -1,11 +1,18 @@
+armbian-firstrun-gui (0.1.2) unstable; urgency=medium
+
+  * New look: one panel with own controls, a light background from the accent
+    color, and the name of the setup step.
+  * The progress bar does not go back after the last step.
+  * No riscv64 build.
+
+ -- Armbian <info@armbian.com>  Sun, 15 Nov 2026 12:00:00 +0100
+
 armbian-firstrun-gui (0.1.1) unstable; urgency=medium
 
   * Keep the desktop after a successful setup: start tty1 only on failure.
   * Show the IP address in the header.
   * Choose the shell: bash or zsh.
   * Setup page: a progress bar. The log shows after a failure.
-  * New look: one panel with own controls, a light background from the accent
-    color, and the name of the setup step.
 
  -- Armbian <info@armbian.com>  Thu, 12 Nov 2026 21:00:00 +0100
 
