@@ -21,9 +21,15 @@ if [ ! -e /etc/snapper/configs/root ]; then
 		NUMBER_LIMIT_IMPORTANT=2-5 \
 		FREE_LIMIT=0.2
 	echo "Snapshots of / are on: a snapshot before and after each package change."
-elif [ ! -d /.snapshots ]; then
+elif [ "$(stat -c %i /.snapshots 2>/dev/null)" != 256 ]; then
 	# The config came with a copy of the system (armbian-install) without
-	# the snapshots.
+	# the snapshots. rsync -x does not go into the subvolume /.snapshots: the
+	# copy has an empty directory in its place, or nothing. Inode 256 is the
+	# root of a btrfs subvolume.
+	if [ -d /.snapshots ] && ! rmdir /.snapshots 2> /dev/null; then
+		echo "/.snapshots is a directory with files, not a btrfs subvolume: no snapshots." >&2
+		exit 1
+	fi
 	btrfs subvolume create /.snapshots > /dev/null
 	chmod 0750 /.snapshots
 	echo "Made the missing subvolume /.snapshots."
