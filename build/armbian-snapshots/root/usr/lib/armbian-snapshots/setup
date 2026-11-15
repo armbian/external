@@ -32,7 +32,9 @@ fi
 # Debian: snapper reads its configs from SNAPPER_CONFIGS in /etc/default/snapper.
 f=/etc/default/snapper
 [ -e "$f" ] || exit 0
-configs="$(sed -n 's/^SNAPPER_CONFIGS="\(.*\)"$/\1/p' "$f")"
+# Accept double quotes, single quotes and a trailing comment.
+configs="$(sed -n 's/^SNAPPER_CONFIGS=//p' "$f" | tail -n 1)"
+configs="$(printf '%s' "${configs%%#*}" | tr -d "\"'" | tr -s ' \t' '  ' | sed 's/^ //;s/ $//')"
 case " $configs " in
 *" root "*) ;;
 *)

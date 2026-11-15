@@ -3,7 +3,7 @@
 # entry, armbian.snapshot=<number>). Changes are lost at reboot.
 n="$(sed -n 's/.*armbian\.snapshot=\([0-9]*\).*/\1/p' /proc/cmdline)"
 [ -n "$n" ] || exit 0
-text="This system runs from snapshot $n. Changes are lost at reboot. To keep this state, run: sudo armbian-snapshot restore"
+text="This system runs from snapshot $n. Changes are lost at reboot. To make snapshot $n the system again, run: sudo armbian-snapshot restore"
 case "$1" in
 --notify)
 	command -v notify-send > /dev/null || exit 0
