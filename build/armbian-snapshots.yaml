@@ -5,7 +5,7 @@ method: build
 # restore command. It does nothing on other root file systems. Local source
 # and packaging in build/armbian-snapshots/. armbian-hyprland-shell had these
 # files before.
-version: 1.0.1
+version: 1.0.2
 releases: all
 # utils: CLI images have it too.
 target: utils

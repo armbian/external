@@ -4,6 +4,8 @@ Documentation=https://github.com/armbian/external/tree/main/build/armbian-snapsh
 # Not on a snapshot boot: its root is a RAM overlay.
 ConditionKernelCommandLine=!armbian.snapshot
 After=local-fs.target
+# snapper-boot needs the config and the subvolume /.snapshots.
+Before=snapper-boot.service snapper-timeline.service snapper-cleanup.service
 
 [Service]
 Type=oneshot
