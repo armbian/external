@@ -29,7 +29,8 @@ Depends: ${misc:Depends},
  libxkbcommon-tools,
  jq,
  fonts-jetbrains-mono-nerd,
- papirus-icon-theme
+ papirus-icon-theme,
+ armbian-snapshots
 Recommends: ${armbian:Recommends}
 Description: Omarchy desktop for Hyprland with Armbian branding
  The Omarchy desktop: Hyprland configuration in Lua, a Quickshell shell

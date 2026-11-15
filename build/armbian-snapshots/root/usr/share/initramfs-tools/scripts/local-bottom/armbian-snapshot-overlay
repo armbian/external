@@ -2,7 +2,9 @@
 # Armbian: boot a snapper snapshot of the root with a writable RAM overlay.
 # The GRUB snapshot entries (/etc/grub.d/42_armbian-snapshots) set
 # armbian.snapshot=<number>.
-PREREQ=""
+# After cryptroot: it finds the LUKS device below the root mount. Below an
+# overlay it finds none and gives a warning.
+PREREQ="cryptroot"
 prereqs() { echo "$PREREQ"; }
 case "$1" in
 prereqs)

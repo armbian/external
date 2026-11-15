@@ -1,0 +1,44 @@
+#!/bin/bash
+# Armbian: snapshots of a btrfs root, made with snapper. The apt hook of the
+# snapper package takes a snapshot before and after each package change.
+set -euo pipefail
+
+usage() {
+	cat >&2 << 'EOT'
+Usage: armbian-snapshot list
+       armbian-snapshot create [description]
+       armbian-snapshot restore [--with-home] [number]
+
+restore makes a snapshot the root again. Without a number, it restores the
+snapshot that is booted (GRUB menu "Armbian snapshots"). /home stays as it
+is now. --with-home restores /home from the snapshot too. Reboot after it.
+EOT
+	exit 1
+}
+
+cmd="${1:-}"
+case "$cmd" in
+list | create | restore) ;;
+*) usage ;;
+esac
+
+if [[ $EUID -ne 0 ]]; then
+	command -v sudo > /dev/null && exec sudo -- "$0" "$@"
+	echo "Run armbian-snapshot as root." >&2
+	exit 1
+fi
+
+if [[ ! -e /etc/snapper/configs/root ]]; then
+	echo "There are no snapshots of /. They need a btrfs root." >&2
+	if [[ $(findmnt -n -o FSTYPE /) == btrfs ]]; then
+		echo "To set them up, run: systemctl start armbian-snapshots.service" >&2
+	fi
+	exit 1
+fi
+
+shift
+case "$cmd" in
+list) snapper -c root list ;;
+create) snapper -c root create -c number -p -d "${*:-armbian-snapshot}" | sed 's/^/Snapshot /' ;;
+restore) exec /usr/lib/armbian-snapshots/restore "$@" ;;
+esac

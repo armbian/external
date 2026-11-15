@@ -1,0 +1,9 @@
+#!/usr/bin/make -f
+# Scripts and configs only: install the files in root/.
+
+%:
+	dh $@
+
+# A boot service: start it on install, do not restart it on upgrade.
+override_dh_installsystemd:
+	dh_installsystemd --no-restart-after-upgrade

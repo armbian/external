@@ -1,0 +1,13 @@
+[Unit]
+Description=Armbian snapshots: snapper config for a btrfs root
+Documentation=https://github.com/armbian/external/tree/main/build/armbian-snapshots
+# Not on a snapshot boot: its root is a RAM overlay.
+ConditionKernelCommandLine=!armbian.snapshot
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/armbian-snapshots/setup
+
+[Install]
+WantedBy=multi-user.target

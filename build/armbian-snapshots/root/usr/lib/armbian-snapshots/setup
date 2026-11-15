@@ -1,0 +1,46 @@
+#!/bin/sh
+# Armbian: a snapper config for a btrfs root. With this config, the apt hook
+# of the snapper package (/etc/apt/apt.conf.d/80snapper) takes a snapshot
+# before and after each package change. armbian-snapshots.service runs this
+# at each boot. It does nothing on other root file systems. It keeps a root
+# config that already exists.
+set -e
+
+[ "$(findmnt -n -o FSTYPE /)" = btrfs ] || exit 0
+
+if [ ! -e /etc/snapper/configs/root ]; then
+	# create-config also makes the subvolume /.snapshots.
+	snapper --no-dbus -c root create-config /
+	# Snapshots for recovery after an update only: no hourly snapshots.
+	# Keep 2 to 10. Above 2, cleanup removes the oldest when less than 20%
+	# of the file system is free: SD cards are small.
+	snapper --no-dbus -c root set-config \
+		TIMELINE_CREATE=no \
+		NUMBER_MIN_AGE=0 \
+		NUMBER_LIMIT=2-10 \
+		NUMBER_LIMIT_IMPORTANT=2-5 \
+		FREE_LIMIT=0.2
+	echo "Snapshots of / are on: a snapshot before and after each package change."
+elif [ ! -d /.snapshots ]; then
+	# The config came with a copy of the system (armbian-install) without
+	# the snapshots.
+	btrfs subvolume create /.snapshots > /dev/null
+	chmod 0750 /.snapshots
+	echo "Made the missing subvolume /.snapshots."
+fi
+
+# Debian: snapper reads its configs from SNAPPER_CONFIGS in /etc/default/snapper.
+f=/etc/default/snapper
+[ -e "$f" ] || exit 0
+configs="$(sed -n 's/^SNAPPER_CONFIGS="\(.*\)"$/\1/p' "$f")"
+case " $configs " in
+*" root "*) ;;
+*)
+	configs="${configs:+$configs }root"
+	if grep -q '^SNAPPER_CONFIGS=' "$f"; then
+		sed -i "s/^SNAPPER_CONFIGS=.*/SNAPPER_CONFIGS=\"$configs\"/" "$f"
+	else
+		printf 'SNAPPER_CONFIGS="%s"\n' "$configs" >> "$f"
+	fi
+	;;
+esac

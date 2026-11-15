@@ -1,0 +1,25 @@
+Source: armbian-snapshots
+Section: admin
+Priority: optional
+Maintainer: Armbian <info@armbian.com>
+Build-Depends: debhelper-compat (= 13)
+Standards-Version: 4.7.0
+Homepage: https://www.armbian.com
+
+Package: armbian-snapshots
+Architecture: all
+Depends: snapper, btrfs-progs, ${misc:Depends}
+Recommends: libnotify-bin
+Breaks: armbian-hyprland-shell (<< 4.5.0-0+armbian8~)
+Replaces: armbian-hyprland-shell (<< 4.5.0-0+armbian8~)
+Description: Snapshots of a btrfs root before and after updates
+ On a btrfs root, this package sets up snapper at boot. The apt hook of
+ snapper then takes a snapshot before and after each package change. The
+ newest snapshots stay, from 2 to 10.
+ .
+ GRUB shows the snapshots in the submenu "Armbian snapshots". A snapshot
+ boots with a RAM overlay: changes are lost at reboot. "armbian-snapshot
+ restore" makes the booted snapshot the root again. Boards without GRUB
+ restore a snapshot by its number.
+ .
+ On other root file systems the package does nothing.

@@ -1,8 +1,8 @@
 #!/bin/bash
-# Armbian: make a snapper snapshot the root again, as limine-snapper-restore
-# does on Arch. Without a number, restore the snapshot that is booted.
+# Armbian: make a snapper snapshot the root again (armbian-snapshot restore),
+# as limine-snapper-restore does on Arch. Without a number, restore the snapshot that is booted.
 # The current root stays as <subvolume>.old-<date>.
-# Upstream keeps /home on its own subvolume (@home), so a restore does not
+# Arch keeps /home on its own subvolume (@home), so a restore does not
 # touch it. Armbian images keep /home in the root: copy the current /home
 # into the restored root. --with-home restores /home from the snapshot too.
 # GRUB boots the root with rootflags=subvol=@. U-Boot boards boot the btrfs
@@ -88,7 +88,7 @@ fi
 n="${1:-}"
 [[ -n $n ]] || n="$(sed -n 's/.*armbian\.snapshot=\([0-9]*\).*/\1/p' /proc/cmdline)"
 if [[ ! $n =~ ^[0-9]+$ ]]; then
-	echo "Usage: omarchy-snapshot restore [--with-home] [number]" >&2
+	echo "Usage: armbian-snapshot restore [--with-home] [number]" >&2
 	echo "Boot a snapshot from the GRUB menu, or give its number:" >&2
 	snapper -c root list >&2 || true
 	exit 1

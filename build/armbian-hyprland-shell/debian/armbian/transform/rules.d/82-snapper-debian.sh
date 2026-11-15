@@ -6,8 +6,8 @@
 # snapshot: return 127 like a missing snapper, so omarchy-update stays quiet.
 # Only for create: restore runs from a snapshot boot, which has an overlay root.
 # Boot entries: GRUB (etc/grub.d/42_armbian-snapshots) instead of limine.
-# Boards without GRUB have no boot menu: say so. Restore: snapshot-restore
-# instead of limine-snapper-restore.
+# Boards without GRUB have no boot menu: say so. Restore: the package
+# armbian-snapshots instead of limine-snapper-restore.
 . "$TRANSFORM_LIB"
 
 replace install/config/snapper.sh 'SNAPPER_CONF_PATH="${OMARCHY_SNAPPER_CONF_PATH:-/etc/conf.d/snapper}"' 'SNAPPER_CONF_PATH="${OMARCHY_SNAPPER_CONF_PATH:-/etc/default/snapper}"' 1
@@ -34,4 +34,4 @@ replace bin/omarchy-snapshot '  echo "Snapshots can be selected during boot."' '
   else
     echo "Snapshots are in /.snapshots. Selecting them during boot needs GRUB."
   fi' 1
-replace bin/omarchy-snapshot '  sudo limine-snapper-restore' '  sudo /usr/lib/armbian-hyprland-shell/snapshot-restore "${@:2}"' 1
+replace bin/omarchy-snapshot '  sudo limine-snapper-restore' '  sudo /usr/lib/armbian-snapshots/restore "${@:2}"' 1

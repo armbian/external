@@ -1,8 +1,8 @@
 #! /bin/sh
 # Armbian: GRUB entries for the snapper snapshots of the root, as upstream
-# Omarchy gets from limine-snapper-sync. An entry boots the snapshot with a
+# limine-snapper-sync gives on Arch. An entry boots the snapshot with a
 # writable RAM overlay (initramfs script armbian-snapshot-overlay). Changes
-# made there are lost at reboot. omarchy-snapshot restore makes it permanent.
+# made there are lost at reboot. armbian-snapshot restore makes it permanent.
 set -e
 
 prefix="/usr"
