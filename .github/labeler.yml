@@ -1,0 +1,41 @@
+# This configures label matching for PR's.
+#
+# The keys are labels, and the values are lists of minimatch patterns
+# to which those labels apply.
+#
+# NOTE: This can only add labels, not remove them.
+# NOTE: Due to YAML syntax limitations, patterns or labels which start
+# with a character that is part of the standard YAML syntax must be
+# quoted.
+#
+# Please keep the labels sorted and deduplicated.
+
+"Needs review":
+- changed-files:
+  - any-glob-to-any-file: '**'
+
+"Mirror":
+- changed-files:
+  - any-glob-to-any-file: ['mirror/**/*','keys/**/*']
+
+"Package build":
+- changed-files:
+  - any-glob-to-any-file: ['build/**/*']
+
+"Framework":
+- changed-files:
+  - any-glob-to-any-file: ['extpkg/**/*','tools/**/*','tests/**/*']
+
+"GitHub Actions":
+- changed-files:
+  - any-glob-to-any-file: ['.github/workflows/**/*']
+
+"GitHub":
+- all:
+  - changed-files:
+    - any-glob-to-any-file: ['.github/**/*']
+    - all-globs-to-any-file: ['!.github/workflows/**/*']
+
+"Documentation":
+- changed-files:
+  - any-glob-to-any-file: ['**/*.md','docs/**/*']
