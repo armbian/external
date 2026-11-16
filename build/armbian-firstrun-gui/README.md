@@ -14,6 +14,10 @@ The wizard is a frontend. It writes `PRESET_*` variables to `/root/.not_logged_i
 
 ## Develop
 
+Run `make -f debian/rules override_dh_auto_configure` before a Cargo build.
+It downloads the LinuxKMS backend, checks its SHA256 and applies the scanout row-pitch fix.
+The patched source stays under `target/`. Other crate dependencies use Cargo as usual.
+
 `cargo build --features dev` draws in an X11 window. `FRG_FAKE_WIFI=1` shows fake wireless networks. Keep `rust-version` at the oldest Rust of the releases (trixie: 1.85): `resolver = "3"` keeps `Cargo.lock` compatible.
 
 Code: `src/main.rs` (pages, presets), `src/data.rs` (lists, location), `src/wifi.rs` (NetworkManager or netplan), `ui/app.slint` (layout).

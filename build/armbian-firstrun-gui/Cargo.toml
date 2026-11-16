@@ -16,6 +16,9 @@ serde_json = "1"
 [build-dependencies]
 slint-build = "~1.13"
 
+[patch.crates-io]
+i-slint-backend-linuxkms = { path = "target/i-slint-backend-linuxkms" }
+
 [features]
 # Development only: draw in a window on X11.
 dev = ["slint/backend-winit-x11", "slint/renderer-winit-software"]

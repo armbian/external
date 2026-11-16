@@ -1,0 +1,35 @@
+Description: Honor scanout row pitch in the Slint software renderer
+ Rows can contain padding beyond the visible width. Derive the pixel stride
+ from the mapped buffer to prevent corrupted rendering.
+Origin: backport, https://github.com/slint-ui/slint/commit/234908a5ee1991ebbd30743c40e8673515ae8150
+Author: retro98boy <retro98boy@qq.com>
+
+--- a/renderer/sw.rs
++++ b/renderer/sw.rs
+@@ -159,16 +159,24 @@
+                 }
+             });
+
++            // Rows may include padding. Derive the pixel stride from the mapped buffer.
++            let stride = |bytes_per_pixel: usize| {
++                let height = (self.size.height as usize).max(1);
++                (pixels.len() / height / bytes_per_pixel).max(self.size.width as usize)
++            };
+             match format {
+                 drm::buffer::DrmFourcc::Xrgb8888 | drm::buffer::DrmFourcc::Argb8888 => {
++                    let stride = stride(std::mem::size_of::<DumbBufferPixelXrgb888>());
+                     let buffer: &mut [DumbBufferPixelXrgb888] =
+                         bytemuck::cast_slice_mut(pixels.as_mut());
+-                    self.renderer.render(buffer, self.size.width as usize);
++                    self.renderer.render(buffer, stride);
+                 }
+                 drm::buffer::DrmFourcc::Rgb565 => {
++                    let stride =
++                        stride(std::mem::size_of::<i_slint_core::software_renderer::Rgb565Pixel>());
+                     let buffer: &mut [i_slint_core::software_renderer::Rgb565Pixel] =
+                         bytemuck::cast_slice_mut(pixels.as_mut());
+-                    self.renderer.render(buffer, self.size.width as usize);
++                    self.renderer.render(buffer, stride);
+                 }
+                 _ => {
+                     return Err(format!(

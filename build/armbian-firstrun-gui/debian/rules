@@ -6,11 +6,21 @@ export CARGO_HOME = $(CURDIR)/debian/cargo-home
 export CARGO_TARGET_DIR = $(CURDIR)/target
 export PATH := $(if $(wildcard /usr/lib/rust-1.85/bin),/usr/lib/rust-1.85/bin:)$(PATH)
 PKG = debian/armbian-firstrun-gui
+SLINT_BACKEND = target/i-slint-backend-linuxkms
 
 %:
 	dh $@
 
 override_dh_auto_configure:
+	# Patch a private copy. Keep the shared Cargo registry unchanged.
+	mkdir -p target
+	curl --fail --location --retry 3 --output $(SLINT_BACKEND).crate \
+		https://static.crates.io/crates/i-slint-backend-linuxkms/i-slint-backend-linuxkms-1.13.1.crate
+	echo 'efe95e5c81a08027a03535d69aa025740275b11fb613abf555441ce074001119  $(SLINT_BACKEND).crate' | sha256sum --check
+	rm -rf $(SLINT_BACKEND)
+	mkdir -p $(SLINT_BACKEND)
+	tar -xzf $(SLINT_BACKEND).crate --strip-components=1 -C $(SLINT_BACKEND)
+	patch --batch --forward --fuzz=0 -p1 -d $(SLINT_BACKEND) < debian/slint-linuxkms-row-pitch.patch
 
 override_dh_auto_build:
 	cargo build --release --locked
