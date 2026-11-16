@@ -31,5 +31,14 @@ mount -n -o move "${rootmnt}" "$d/lower"
 if ! mount -n -t overlay -o "lowerdir=$d/lower,upperdir=$d/rw/upper,workdir=$d/rw/work" overlay "${rootmnt}"; then
 	log_failure_msg "armbian-snapshot: overlay failed, the snapshot stays read-only"
 	mount -n -o move "$d/lower" "${rootmnt}"
+	exit 0
+fi
+# The snapshot shares /boot and /boot/* partitions with the system. Mount them
+# read-only: a kernel or initramfs update here breaks the next normal boot. Below
+# the overlay, cryptsetup finds no LUKS device, so a new initrd does not unlock an
+# encrypted root. Only the fstab in the RAM overlay changes.
+if [ -f "${rootmnt}/etc/fstab" ]; then
+	sed -i -E 's|^([^#[:space:]]+[[:space:]]+/boot(/[^[:space:]]*)?[[:space:]]+[^[:space:]]+[[:space:]]+)([^[:space:]]+)|\1\3,ro|' "${rootmnt}/etc/fstab" ||
+		log_warning_msg "armbian-snapshot: /boot stays writable"
 fi
 exit 0
