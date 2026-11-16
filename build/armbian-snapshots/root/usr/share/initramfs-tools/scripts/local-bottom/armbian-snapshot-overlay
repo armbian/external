@@ -38,7 +38,7 @@ fi
 # the overlay, cryptsetup finds no LUKS device, so a new initrd does not unlock an
 # encrypted root. Only the fstab in the RAM overlay changes.
 if [ -f "${rootmnt}/etc/fstab" ]; then
-	sed -i -E 's|^([^#[:space:]]+[[:space:]]+/boot(/[^[:space:]]*)?[[:space:]]+[^[:space:]]+[[:space:]]+)([^[:space:]]+)|\1\3,ro|' "${rootmnt}/etc/fstab" ||
+	sed -i -E 's|^([[:space:]]*[^#[:space:]]+[[:space:]]+/boot(/[^[:space:]]*)?[[:space:]]+[^[:space:]]+[[:space:]]+)([^[:space:]]+)|\1\3,ro|' "${rootmnt}/etc/fstab" ||
 		log_warning_msg "armbian-snapshot: /boot stays writable"
 fi
 exit 0
