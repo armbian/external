@@ -1,0 +1,188 @@
+// Copyright © SixtyFPS GmbH <info@slint.dev>
+// Copyright © Armbian <info@armbian.com>
+// SPDX-License-Identifier: MIT
+// Adapted from https://github.com/slint-ui/slint/tree/v1.13.1/examples/virtual_keyboard.
+
+struct KeyModel {
+    normal: string,
+    shifted: string,
+}
+
+// Touch keys keep the focus in the text field.
+component KeyboardKey inherits Rectangle {
+    in property <string> label;
+    in property <color> accent;
+    in property <bool> active;
+    in property <length> px: 1px;
+    callback clicked();
+    min-width: 0px;
+    accessible-role: button;
+    accessible-label: root.label == "⌫" ? "Backspace" : root.label;
+    border-radius: 6 * root.px;
+    background: touch.pressed ? root.accent.darker(0.2) : root.active ? root.accent.mix(#1b1b1e, 0.3) : #1b1b1e;
+    border-width: 1px;
+    border-color: root.active ? root.accent : #5c5c6a;
+    Text {
+        text: root.label;
+        color: #f0f0f5;
+        font-size: (root.label.character-count > 1 ? 13 : 19) * root.px;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+        overflow: elide;
+    }
+    touch := TouchArea {
+        clicked => { root.clicked(); }
+    }
+}
+
+export component VirtualKeyboard inherits Rectangle {
+    in property <length> px: 1px;
+    in property <color> accent: #f26522;
+    callback key-pressed(string);
+    callback dismissed();
+    property <bool> shift;
+    property <bool> symbols;
+    property <length> gap: 5 * root.px;
+    property <length> key-width: (rows.width - 9 * self.gap) / 10;
+    background: #121214;
+
+    property <[[KeyModel]]> letters: [
+        [
+            { normal: "q", shifted: "Q" }, { normal: "w", shifted: "W" },
+            { normal: "e", shifted: "E" }, { normal: "r", shifted: "R" },
+            { normal: "t", shifted: "T" }, { normal: "y", shifted: "Y" },
+            { normal: "u", shifted: "U" }, { normal: "i", shifted: "I" },
+            { normal: "o", shifted: "O" }, { normal: "p", shifted: "P" }
+        ],
+        [
+            { normal: "a", shifted: "A" }, { normal: "s", shifted: "S" },
+            { normal: "d", shifted: "D" }, { normal: "f", shifted: "F" },
+            { normal: "g", shifted: "G" }, { normal: "h", shifted: "H" },
+            { normal: "j", shifted: "J" }, { normal: "k", shifted: "K" },
+            { normal: "l", shifted: "L" }
+        ],
+        [
+            { normal: "z", shifted: "Z" }, { normal: "x", shifted: "X" },
+            { normal: "c", shifted: "C" }, { normal: "v", shifted: "V" },
+            { normal: "b", shifted: "B" }, { normal: "n", shifted: "N" },
+            { normal: "m", shifted: "M" }
+        ]
+    ];
+    property <[[KeyModel]]> punctuation: [
+        [
+            { normal: "1", shifted: "!" }, { normal: "2", shifted: "@" },
+            { normal: "3", shifted: "#" }, { normal: "4", shifted: "$" },
+            { normal: "5", shifted: "%" }, { normal: "6", shifted: "^" },
+            { normal: "7", shifted: "&" }, { normal: "8", shifted: "*" },
+            { normal: "9", shifted: "(" }, { normal: "0", shifted: ")" }
+        ],
+        [
+            { normal: "-", shifted: "_" }, { normal: "/", shifted: "\\" },
+            { normal: ";", shifted: "|" }, { normal: ":", shifted: "~" },
+            { normal: "(", shifted: "[" }, { normal: ")", shifted: "]" },
+            { normal: "$", shifted: "{" }, { normal: "&", shifted: "}" },
+            { normal: "@", shifted: "<" }, { normal: "\"", shifted: ">" }
+        ],
+        [
+            { normal: ".", shifted: ">" }, { normal: ",", shifted: "<" },
+            { normal: "?", shifted: "/" }, { normal: "!", shifted: "\\" },
+            { normal: "'", shifted: "\"" }, { normal: "`", shifted: "~" },
+            { normal: "=", shifted: "+" }
+        ]
+    ];
+    property <[[KeyModel]]> keys: root.symbols ? root.punctuation : root.letters;
+    function type-key(key: KeyModel) {
+        root.key-pressed(root.shift ? key.shifted : key.normal);
+        root.shift = false;
+    }
+
+    Rectangle { x: 0px; y: 0px; width: 100%; height: 1px; background: #5c5c6a; }
+    rows := VerticalLayout {
+        x: (parent.width - self.width) / 2;
+        y: 8 * root.px;
+        width: min(parent.width - 16 * root.px, 1000 * root.px);
+        height: parent.height - 16 * root.px;
+        spacing: root.gap;
+        for row in 2: HorizontalLayout {
+            alignment: center;
+            spacing: root.gap;
+            for key in root.keys[row]: KeyboardKey {
+                width: root.key-width;
+                px: root.px;
+                accent: root.accent;
+                label: root.shift ? key.shifted : key.normal;
+                clicked => { root.type-key(key); }
+            }
+        }
+        HorizontalLayout {
+            spacing: root.gap;
+            KeyboardKey {
+                width: root.key-width * 1.5 + root.gap / 2;
+                px: root.px;
+                accent: root.accent;
+                label: "Shift";
+                active: root.shift;
+                clicked => { root.shift = !root.shift; }
+            }
+            for key in root.keys[2]: KeyboardKey {
+                width: root.key-width;
+                px: root.px;
+                accent: root.accent;
+                label: root.shift ? key.shifted : key.normal;
+                clicked => { root.type-key(key); }
+            }
+            KeyboardKey {
+                width: root.key-width * 1.5 + root.gap / 2;
+                px: root.px;
+                accent: root.accent;
+                label: "⌫";
+                clicked => { root.key-pressed(Key.Backspace); }
+            }
+        }
+        HorizontalLayout {
+            spacing: root.gap;
+            KeyboardKey {
+                width: root.key-width * 1.5;
+                px: root.px;
+                accent: root.accent;
+                label: root.symbols ? "ABC" : "123";
+                clicked => { root.symbols = !root.symbols; root.shift = false; }
+            }
+            KeyboardKey {
+                width: root.key-width;
+                px: root.px;
+                accent: root.accent;
+                label: "Next";
+                clicked => { root.key-pressed(Key.Tab); }
+            }
+            KeyboardKey {
+                horizontal-stretch: 1;
+                px: root.px;
+                accent: root.accent;
+                label: "Space";
+                clicked => { root.key-pressed(" "); }
+            }
+            for key in [{ text: Key.LeftArrow, label: "←" }, { text: Key.RightArrow, label: "→" }]: KeyboardKey {
+                width: root.key-width;
+                px: root.px;
+                accent: root.accent;
+                label: key.label;
+                clicked => { root.key-pressed(key.text); }
+            }
+            KeyboardKey {
+                width: root.key-width * 1.5;
+                px: root.px;
+                accent: root.accent;
+                label: "Enter";
+                clicked => { root.key-pressed(Key.Return); }
+            }
+            KeyboardKey {
+                width: root.key-width;
+                px: root.px;
+                accent: root.accent;
+                label: "Hide";
+                clicked => { root.dismissed(); }
+            }
+        }
+    }
+}
