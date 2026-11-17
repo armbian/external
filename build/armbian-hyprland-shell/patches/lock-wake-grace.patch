@@ -1,0 +1,56 @@
+Keep the lock screen lit after a wake from DPMS off.
+
+The lock screen blanks the display after 5 s without input. Input wakes
+the display and arms the same 5 s timer. A monitor can need longer than
+5 s to sync to the new signal, so the display is blanked again before it
+shows a picture. The display then seems not to wake at all.
+
+After a wake from a blank, keep the display on for resumeMs (15 s), the
+run-up that the timer already uses after a system resume. Input in that
+time does not shorten it.
+
+Upstream file: shell/plugins/lock/Service.qml (v4.5.0, same on quattro).
+
+--- a/shell/plugins/lock/Service.qml	2026-11-17 10:13:06.583390476 +0100
++++ b/shell/plugins/lock/Service.qml	2026-11-17 10:13:28.643606183 +0100
+@@ -249,12 +249,20 @@
+   }
+ 
+   function armBlankTimer(delayMs) {
+-    idleBlankTimer.interval = delayMs || idleBlankTimer.idleMs
++    var delay = delayMs || idleBlankTimer.idleMs
++    // Keep the wake grace: a monitor can take seconds to sync after DPMS.
++    var grace = idleBlankTimer.wakeGraceUntil - Date.now()
++    if (grace > delay) delay = grace
++    idleBlankTimer.interval = delay
+     idleBlankTimer.armedAt = Date.now()
+     idleBlankTimer.restart()
+   }
+ 
+   function runWake() {
++    if (idleBlankTimer.displayBlanked) {
++      idleBlankTimer.displayBlanked = false
++      idleBlankTimer.wakeGraceUntil = Date.now() + idleBlankTimer.resumeMs
++    }
+     if (!wakeProcess.running) wakeProcess.running = true
+     if (lockRequested) armBlankTimer()
+     resumeFingerprint()
+@@ -349,6 +357,7 @@
+   }
+ 
+   function runBlank() {
++    idleBlankTimer.displayBlanked = true
+     pauseFingerprint()
+     if (!blankProcess.running) blankProcess.running = true
+   }
+@@ -771,6 +780,10 @@
+     // panel lights (on NVIDIA it waits out a VT switch and a modeset), so the
+     // idle run-up blanked the lock just as it appeared.
+     readonly property int resumeMs: 15000
++    // Waking from DPMS off needs the same run-up: the monitor syncs to the
++    // new signal before it shows a picture.
++    property bool displayBlanked: false
++    property double wakeGraceUntil: 0
+     interval: idleMs
+     repeat: false
+     property double armedAt: 0
