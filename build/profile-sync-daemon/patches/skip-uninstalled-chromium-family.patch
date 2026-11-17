@@ -1,0 +1,63 @@
+Description: skip Chromium-family browsers that are not installed
+Omarchy (armbian-hyprland-shell) creates ~/.config/google-chrome*
+and ~/.config/chromium for its native messaging hosts, also for browsers
+that are not installed. psd then synced these directories to tmpfs.
+Use a browser only when its program is installed, or when psd still holds
+its directory, so that psd restores it.
+Forwarded: no
+
+diff -ruN a/common/browsers/chromium b/common/browsers/chromium
+--- a/common/browsers/chromium	2026-11-17 19:46:14.138859492 +0100
++++ b/common/browsers/chromium	2026-11-17 19:46:14.373623855 +0100
+@@ -1,2 +1,9 @@
+ DIRArr[0]="$XDG_CONFIG_HOME/$browser"
+ PSNAME="$browser"
++
++# Armbian: skip the browser when it is not installed, unless psd holds its
++# directory (symlink or backup), so that psd still restores it. Omarchy creates
++# these directories for its extension hosts, for browsers that are not installed.
++if ! command -v chromium >/dev/null 2>&1 && ! command -v chromium-browser >/dev/null 2>&1 && [[ ! -h "${DIRArr[0]}" && ! -d "${DIRArr[0]}-backup" ]]; then
++    DIRArr=()
++fi
+diff -ruN a/common/browsers/google-chrome b/common/browsers/google-chrome
+--- a/common/browsers/google-chrome	2026-11-17 19:46:14.235522824 +0100
++++ b/common/browsers/google-chrome	2026-11-17 19:46:14.376887457 +0100
+@@ -4,3 +4,10 @@
+     DIRArr[0]="$XDG_CONFIG_HOME/$browser"
+ fi
+ PSNAME="chrome"
++
++# Armbian: skip the browser when it is not installed, unless psd holds its
++# directory (symlink or backup), so that psd still restores it. Omarchy creates
++# these directories for its extension hosts, for browsers that are not installed.
++if ! command -v google-chrome-stable >/dev/null 2>&1 && ! command -v google-chrome >/dev/null 2>&1 && [[ ! -h "${DIRArr[0]}" && ! -d "${DIRArr[0]}-backup" ]]; then
++    DIRArr=()
++fi
+diff -ruN a/common/browsers/google-chrome-beta b/common/browsers/google-chrome-beta
+--- a/common/browsers/google-chrome-beta	2026-11-17 19:46:14.316725746 +0100
++++ b/common/browsers/google-chrome-beta	2026-11-17 19:46:14.379657739 +0100
+@@ -4,3 +4,10 @@
+     DIRArr[0]="$XDG_CONFIG_HOME/$browser"
+ fi
+ PSNAME="chrome"
++
++# Armbian: skip the browser when it is not installed, unless psd holds its
++# directory (symlink or backup), so that psd still restores it. Omarchy creates
++# these directories for its extension hosts, for browsers that are not installed.
++if ! command -v google-chrome-beta >/dev/null 2>&1 && [[ ! -h "${DIRArr[0]}" && ! -d "${DIRArr[0]}-backup" ]]; then
++    DIRArr=()
++fi
+diff -ruN a/common/browsers/google-chrome-unstable b/common/browsers/google-chrome-unstable
+--- a/common/browsers/google-chrome-unstable	2026-11-17 19:46:14.370567995 +0100
++++ b/common/browsers/google-chrome-unstable	2026-11-17 19:46:14.379657739 +0100
+@@ -4,3 +4,10 @@
+     DIRArr[0]="$XDG_CONFIG_HOME/$browser"
+ fi
+ PSNAME="chrome"
++
++# Armbian: skip the browser when it is not installed, unless psd holds its
++# directory (symlink or backup), so that psd still restores it. Omarchy creates
++# these directories for its extension hosts, for browsers that are not installed.
++if ! command -v google-chrome-unstable >/dev/null 2>&1 && [[ ! -h "${DIRArr[0]}" && ! -d "${DIRArr[0]}-backup" ]]; then
++    DIRArr=()
++fi

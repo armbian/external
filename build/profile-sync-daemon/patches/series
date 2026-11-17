@@ -1,1 +1,2 @@
 debhelper-compat-13.patch
+skip-uninstalled-chromium-family.patch
