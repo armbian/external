@@ -2,7 +2,7 @@ name: rpi-eeprom
 method: apt
 source:
   url: http://ports.ubuntu.com/ubuntu-ports
-  suite: noble
+  suite: noble-updates
   components:
   - main
   - restricted
