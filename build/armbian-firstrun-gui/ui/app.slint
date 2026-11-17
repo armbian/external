@@ -1,7 +1,8 @@
 // Armbian first-run wizard. Logic: src/main.rs.
-// All widgets are drawn here: the look does not come from a Slint style.
+// Widgets are drawn here: the look does not come from a Slint style.
 // Sizes use "px", one unit that grows on large screens.
 import { ListView } from "std-widgets.slint";
+import { VirtualKeyboard } from "virtual-keyboard.slint";
 
 // Colors of the armbian.com dark theme. All tints come from the accent,
 // so that ACCENT in the configuration changes them together.
@@ -27,6 +28,10 @@ export global Theme {
     out property <color> faint: #82828f;
     out property <color> error: #e36d6e;
     out property <color> warning: #f59e0b;
+}
+
+export global InputCapabilities {
+    in-out property <bool> has-touchscreen;
 }
 
 export struct WifiNet {
@@ -108,7 +113,6 @@ component Field inherits VerticalLayout {
     in property <bool> invalid;
     in property <bool> dense;
     in property <length> px: 1px;
-    out property <bool> has-focus: ti.has-focus;
     callback edited(string);
     callback accepted();
     property <bool> reveal;
@@ -196,6 +200,11 @@ component Field inherits VerticalLayout {
                             self.shift = parent.width - pos.x - root.margin - self.text-cursor-width;
                         }
                     }
+                }
+                // Reopen a dismissed keyboard without changing the text selection.
+                TouchArea {
+                    enabled: InputCapabilities.has-touchscreen && ti.has-focus && !TextInputInterface.text-input-focused;
+                    clicked => { TextInputInterface.text-input-focused = true; }
                 }
             }
 
@@ -503,6 +512,8 @@ component PickList inherits VerticalLayout {
     callback search(string);
     callback picked(int);
     property <length> row-h: (root.dense ? 40 : 48) * root.px;
+    property <bool> layout-ready;
+    property <length> available-height: root.layout-ready ? list.visible-height : 0px;
     spacing: (root.dense ? 8 : 12) * root.px;
     // Put the value in the middle of the list.
     function scroll() {
@@ -510,7 +521,8 @@ component PickList inherits VerticalLayout {
             return;
         }
         // Whole rows at the top: no row is cut there.
-        list.viewport-y = -max(0px, min(root.model.length * root.row-h - list.visible-height, root.row-h * max(0, root.current - floor((list.visible-height / root.row-h - 1) / 2))));
+        let rows-before = max(0, floor((list.visible-height / root.row-h - 1) / 2));
+        list.viewport-y = -max(0px, min(root.model.length * root.row-h - list.visible-height, root.row-h * max(0, root.current - rows-before)));
     }
     function pick(i: int) {
         if root.model.length == 0 {
@@ -521,6 +533,8 @@ component PickList inherits VerticalLayout {
     changed current => {
         scroll();
     }
+    // Keep the selection in view when the keyboard changes the list height.
+    changed available-height => { scroll(); }
     Field {
         px: root.px;
         dense: root.dense;
@@ -533,11 +547,13 @@ component PickList inherits VerticalLayout {
 
     Rectangle {
         vertical-stretch: 1;
-        min-height: 2 * root.row-h;
+        // The keyboard can leave less than two rows. Scroll within that space.
+        min-height: 0px;
         border-radius: 12 * root.px;
         border-width: keys.has-focus ? 2px : 1px;
         border-color: keys.has-focus ? Theme.accent : Theme.border;
         keys := FocusScope {
+            focus-on-click: false;
             key-pressed(event) => {
                 if event.text == Key.UpArrow {
                     root.pick(root.current - 1);
@@ -563,7 +579,7 @@ component PickList inherits VerticalLayout {
             x: 4 * root.px;
             y: 4 * root.px;
             width: parent.width - 8 * root.px;
-            height: parent.height - 8 * root.px;
+            height: max(0px, parent.height - 8 * root.px);
             for item[i] in root.model: Rectangle {
                 height: root.row-h;
                 Rectangle {
@@ -614,7 +630,7 @@ component PickList inherits VerticalLayout {
         running: true;
         triggered => {
             self.running = false;
-            scroll();
+            root.layout-ready = true;
         }
     }
 }
@@ -730,6 +746,11 @@ export component AppWindow inherits Window {
     callback text-mode();
     callback key-down(string);
     callback key-up(string);
+    callback screen-key(string);
+    in-out property <bool> screen-key-active;
+    property <bool> screen-keyboard-visible: InputCapabilities.has-touchscreen && TextInputInterface.text-input-focused && root.page >= 1 && root.page <= 3 && !root.wifi-busy;
+    property <length> screen-keyboard-height: min(280 * root.px, root.height * 0.4);
+    property <length> content-height: root.height - (root.screen-keyboard-visible ? root.screen-keyboard-height : 0px);
 
     property <[string]> titles: ["Welcome", "Connect to a wireless network", "Create your account", "Region and keyboard", "Applying settings"];
 
@@ -738,16 +759,16 @@ export component AppWindow inherits Window {
     property <length> px: 1px * self.scale;
     // Narrow screens have no side part. Low screens use less space between rows.
     property <bool> compact: self.width < 940px;
-    property <bool> dense: self.height < 560px;
+    property <bool> dense: self.content-height < 560px;
     // Pages without input have no side part: the text is in the middle.
     property <bool> stage: self.page == 0 || self.page == 4;
     property <bool> with-log: self.page == 4 && (self.failed || self.dry-run);
-    property <bool> rail: !self.compact && !self.stage;
-    property <length> edge: self.compact ? 12px : 32 * self.px;
+    property <bool> rail: !self.compact && !self.stage && !self.screen-keyboard-visible;
+    property <length> edge: self.screen-keyboard-visible ? 8 * self.px : self.compact ? 12px : 32 * self.px;
     property <length> free-w: self.width - 2 * self.edge;
-    property <length> free-h: self.height - 2 * self.edge;
-    property <length> pad: self.compact ? 18px : 40 * self.px;
-    // One box for all pages. Its size does not change from page to page.
+    property <length> free-h: self.content-height - 2 * self.edge;
+    property <length> pad: self.screen-keyboard-visible ? 8 * self.px : self.compact ? 18px : 40 * self.px;
+    // One box for all pages.
     property <length> box-w: self.compact ? min(self.free-w, 760px) : min(self.free-w, 1000 * self.px);
     property <length> box-h: min(self.free-h, self.compact ? 560px : 600 * self.px);
     property <length> radius: self.compact ? 18px : 24 * self.px;
@@ -781,11 +802,17 @@ export component AppWindow inherits Window {
     }
     // Key repeat on KMS: libinput sends one press only. Rust repeats a held key.
     keys := FocusScope {
+        // Blank areas must not take focus from the text input.
+        focus-on-click: false;
         capture-key-pressed(event) => {
             root.key-down(event.text);
             return reject;
         }
         capture-key-released(event) => {
+            // Physical typing keeps the full form visible.
+            if !root.screen-key-active {
+                TextInputInterface.text-input-focused = false;
+            }
             root.key-up(event.text);
             return reject;
         }
@@ -793,7 +820,7 @@ export component AppWindow inherits Window {
         // The box. Opaque, no blurred shadow: the software renderer draws it fast on large screens.
         Rectangle {
             x: (root.width - root.box-w) / 2;
-            y: (root.height - root.box-h) / 2;
+            y: (root.content-height - root.box-h) / 2;
             width: root.box-w;
             height: root.box-h;
             border-radius: root.radius;
@@ -913,10 +940,10 @@ export component AppWindow inherits Window {
                 width: parent.width - root.rail-w;
                 height: parent.height;
                 padding: root.pad;
-                spacing: (root.dense ? 12 : 24) * root.px;
+                spacing: (root.screen-keyboard-visible ? 8 : root.dense ? 12 : 24) * root.px;
 
                 // Narrow screens: logo, page title and step in one line.
-                if root.compact && !root.stage: HorizontalLayout {
+                if root.compact && !root.stage && !root.screen-keyboard-visible: HorizontalLayout {
                     vertical-stretch: 0;
                     height: 30px;
                     spacing: 14px;
@@ -957,6 +984,16 @@ export component AppWindow inherits Window {
                         horizontal-stretch: 0;
                         current: root.phase;
                     }
+                }
+
+                // Keep the page title visible while typing.
+                if root.screen-keyboard-visible: Text {
+                    vertical-stretch: 0;
+                    text: root.titles[root.page];
+                    color: Theme.text;
+                    font-size: 22 * root.px;
+                    font-weight: 600;
+                    overflow: elide;
                 }
 
                 // 0: network check and location.
@@ -1011,7 +1048,7 @@ export component AppWindow inherits Window {
 
                 // 1: Wi-Fi. Optional: Skip continues without a network.
                 // The name of the list, and a new search. Not in the key scope below: Enter must press Scan.
-                if root.page == 1: HorizontalLayout {
+                if root.page == 1 && !root.screen-keyboard-visible: HorizontalLayout {
                     vertical-stretch: 0;
                     spacing: 16 * root.px;
                     Text {
@@ -1036,17 +1073,27 @@ export component AppWindow inherits Window {
                 }
                 // Keys: Up/Down select, Enter password or connect, Escape skip.
                 if root.page == 1: wifi := FocusScope {
+                    focus-on-click: false;
                     vertical-stretch: 1;
-                    // The rows fill the list: no row is cut at the bottom.
+                    // Fill the list, but do not squeeze a row below its text height.
                     property <length> row-min: (root.dense ? 44 : 52) * root.px;
-                    property <length> row-height: nets-box.height / max(1, floor(nets-box.height / self.row-min));
+                    property <length> row-height: max(self.row-min, nets-box.height / max(1, floor(nets-box.height / self.row-min)));
+                    // Defer geometry observation to avoid recursive layout during page creation.
+                    property <bool> layout-ready;
+                    property <length> available-height: self.layout-ready ? nets.visible-height : 0px;
+                    property <length> list-height: self.layout-ready ? nets.viewport-height : 0px;
                     function select(i: int) {
                         if root.wifi-model.length == 0 {
                             return;
                         }
                         root.wifi-current = max(0, min(root.wifi-model.length - 1, i));
                         root.wifi-password = "";
-                        // Keep the selected row in view.
+                        scroll();
+                    }
+                    function scroll() {
+                        if root.wifi-current < 0 {
+                            return;
+                        }
                         if root.wifi-current * wifi.row-height < -nets.viewport-y {
                             nets.viewport-y = -root.wifi-current * wifi.row-height;
                         }
@@ -1054,6 +1101,9 @@ export component AppWindow inherits Window {
                             nets.viewport-y = -((root.wifi-current + 1) * wifi.row-height - nets.visible-height);
                         }
                     }
+                    // Keep the selected network visible when the keyboard resizes the list.
+                    changed available-height => { scroll(); }
+                    changed list-height => { scroll(); }
                     function needs-password() -> bool {
                         return root.wifi-current >= 0 && root.wifi-model[root.wifi-current].secure;
                     }
@@ -1088,6 +1138,7 @@ export component AppWindow inherits Window {
                         running: true;
                         triggered => {
                             self.running = false;
+                            wifi.layout-ready = true;
                             wifi.focus();
                         }
                     }
@@ -1154,6 +1205,8 @@ export component AppWindow inherits Window {
                                             root.wifi-password = "";
                                             if net.secure {
                                                 password.focus();
+                                            } else {
+                                                wifi.focus();
                                             }
                                         }
                                     }
@@ -1191,7 +1244,7 @@ export component AppWindow inherits Window {
                             }
                         }
 
-                        // The place of the password is always there: the list does not change its size.
+                        // Reserve this row for a password or an open-network notice.
                         Rectangle {
                             vertical-stretch: 0;
                             height: (root.dense ? 46 : 52) * root.px;
@@ -1220,7 +1273,8 @@ export component AppWindow inherits Window {
                         }
 
                         HorizontalLayout {
-                            height: 22 * root.px;
+                            min-height: 22 * root.px;
+                            vertical-stretch: 0;
                             spacing: 16 * root.px;
                             Note {
                                 px: root.px;
@@ -1317,18 +1371,18 @@ export component AppWindow inherits Window {
                         }
                     }
 
-                    if !root.dense: Rectangle {
+                    if !root.dense && !root.screen-keyboard-visible: Rectangle {
                         height: (root.roomy ? 12 : 4) * root.px;
                     }
-                    if root.has-zsh && !root.dense: ShellChoice {
+                    if root.has-zsh && !root.dense && !root.screen-keyboard-visible: ShellChoice {
                         px: root.px;
                         value <=> root.shell;
                     }
-                    if root.has-zsh && !root.dense: Rectangle {
+                    if root.has-zsh && !root.dense && !root.screen-keyboard-visible: Rectangle {
                         height: (root.roomy ? 12 : 4) * root.px;
                     }
-                    // Low screens: shell and region in one row.
-                    HorizontalLayout {
+                    // Leave room for the account fields while the keyboard is open.
+                    if !root.screen-keyboard-visible: HorizontalLayout {
                         spacing: 24 * root.px;
                         if root.has-zsh && root.dense: ShellChoice {
                             px: root.px;
@@ -1374,10 +1428,11 @@ export component AppWindow inherits Window {
                 // 3: region. One list shows at a time. The three values stay in view.
                 // Enter: Done (a search without a pick takes the best match). Escape: Cancel.
                 if root.page == 3: region := FocusScope {
+                    focus-on-click: false;
                     vertical-stretch: 1;
-                    property <bool> side: root.dense;
-                    property <length> gap: (root.dense ? 12 : 16) * root.px;
-                    property <length> tab-h: (root.dense ? 54 : 72) * root.px;
+                    property <bool> side: root.dense && (!root.screen-keyboard-visible || !root.compact);
+                    property <length> gap: (root.screen-keyboard-visible ? 8 : root.dense ? 12 : 16) * root.px;
+                    property <length> tab-h: (root.screen-keyboard-visible ? 44 : root.dense ? 54 : 72) * root.px;
                     property <length> tab-w: self.side ? 220 * root.px : (self.width - 2 * self.gap) / 3;
                     property <length> list-x: self.side ? self.tab-w + self.gap : 0px;
                     property <length> list-y: self.side ? 0px : self.tab-h + self.gap;
@@ -1418,10 +1473,11 @@ export component AppWindow inherits Window {
                         }
                     }
 
-                    // Low screens: the values at the side. Else: in a row above the list.
+                    // Keep the tabs above the list on narrow screens while the keyboard is open.
                     Rectangle {
                         // Up and Down, or Left and Right, change the list.
                         tabs := FocusScope {
+                            focus-on-click: false;
                             x: 0px;
                             y: 0px;
                             width: region.side ? region.tab-w : parent.width;
@@ -1441,6 +1497,7 @@ export component AppWindow inherits Window {
                                 x: region.side ? 0px : 0 * (region.tab-w + region.gap);
                                 y: region.side ? 0 * (region.tab-h + 6 * root.px) : 0px;
                                 width: region.tab-w;
+                                height: region.tab-h;
                                 px: root.px;
                                 dense: root.dense;
                                 label: "Time zone";
@@ -1457,6 +1514,7 @@ export component AppWindow inherits Window {
                                 x: region.side ? 0px : 1 * (region.tab-w + region.gap);
                                 y: region.side ? 1 * (region.tab-h + 6 * root.px) : 0px;
                                 width: region.tab-w;
+                                height: region.tab-h;
                                 px: root.px;
                                 dense: root.dense;
                                 label: "Language";
@@ -1473,6 +1531,7 @@ export component AppWindow inherits Window {
                                 x: region.side ? 0px : 2 * (region.tab-w + region.gap);
                                 y: region.side ? 2 * (region.tab-h + 6 * root.px) : 0px;
                                 width: region.tab-w;
+                                height: region.tab-h;
                                 px: root.px;
                                 dense: root.dense;
                                 label: "Keyboard";
@@ -1695,5 +1754,15 @@ export component AppWindow inherits Window {
                 }
             }
         }
+    }
+
+    if root.screen-keyboard-visible: VirtualKeyboard {
+        y: root.content-height;
+        width: root.width;
+        height: root.screen-keyboard-height;
+        px: root.px;
+        accent: Theme.accent;
+        key-pressed(key) => { root.screen-key(key); }
+        dismissed => { TextInputInterface.text-input-focused = false; }
     }
 }

@@ -112,12 +112,14 @@ dependencies = [
 
 [[package]]
 name = "armbian-firstrun-gui"
-version = "0.1.3"
+version = "0.1.5"
 dependencies = [
+ "nix",
  "roxmltree",
  "serde_json",
  "slint",
  "slint-build",
+ "udev",
 ]
 
 [[package]]

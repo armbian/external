@@ -11,6 +11,12 @@ The wizard is a frontend. It writes `PRESET_*` variables to `/root/.not_logged_i
 - Image: install the package, for example in the package list of a desktop. The service starts only while `/root/.not_logged_in_yet` exists.
 - Test without changes: `armbian-firstrun-gui --dry-run` as root on a free console (`chvt 8; systemd-run armbian-firstrun-gui --dry-run`). The answers go to `/tmp/armbian-firstrun-gui.preset`.
 - Theme: `/etc/armbian/firstrun-gui.conf` (`BACKGROUND`, `LOGO`, `TITLE`, `FONT`, `ACCENT`).
+- Screen keyboard: available when a touchscreen is detected. A mouse or touchpad alone does not enable it.
+  Device detection follows udev events, including touchscreens that become available after the wizard starts.
+  Tap a text field to type. Use Shift for capitals and 123 for numbers and symbols.
+  Hide closes it; tapping the field opens it again. Physical typing also hides it.
+  Hide the keyboard to change the shell or region settings on the account page.
+  The screen keyboard uses a fixed US layout. The keyboard layout setting controls the physical keyboard.
 
 ## Develop
 
