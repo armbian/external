@@ -71,6 +71,7 @@ Change these. Nothing more.
 | Logo in menu entries | glyph `U+E900` in font `omarchy` | font `armbian`, as the bar button |
 | Links | Omarchy manual, release notes, Discord, `ping.omacom.io` | `docs.armbian.com`, `docs.armbian.com/releases/`, Armbian Discord, `network-test.debian.org`. Learn > Arch is removed. |
 | Fonts | Arch Nerd Font packages | `fonts-jetbrains-mono-nerd` package. Upstream `50-omarchy.conf` is active system-wide, as in upstream. |
+| Num Lock at start | on (`numlock_by_default = true`) | off: compact keyboards without a keypad (Raspberry Pi 400) map letter keys to a keypad. Maintainer decision. |
 
 Keep these unchanged, so that upstream updates apply cleanly:
 
