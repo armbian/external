@@ -5,7 +5,9 @@ language_file=${XDG_CONFIG_HOME:-$HOME/.config}/omarchy/language
 locales_json=$OMARCHY_PATH/default/i18n/locales.json
 locale=${LANG%%.*}
 # The exact locale first (pt_BR is pt-BR), then the language alone (de_AT is de).
-code=$(jq -r --arg l "$locale" 'to_entries[] | select((.value.locale | split(".")[0]) == $l) | .key' "$locales_json" | head -n 1)
-[[ -n $code ]] || code=$(jq -r --arg c "${locale%%_*}" 'if has($c) then $c else empty end' "$locales_json")
+[[ -r $locales_json ]] || { echo "Cannot read $locales_json" >&2; exit 1; }
+code=$(jq -r --arg l "$locale" 'to_entries[] | select((.value.locale | split(".")[0]) == $l) | .key' "$locales_json") || exit 1
+code=${code%%$'\n'*}
+[[ -n $code ]] || code=$(jq -r --arg c "${locale%%_*}" 'if has($c) then $c else empty end' "$locales_json") || exit 1
 [[ -n $code && $code != en ]] || exit 0
 omarchy-language "$code"
