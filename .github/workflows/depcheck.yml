@@ -2,7 +2,8 @@ name: "Dependency check"
 
 # Daily: can apt install the packages that changed upstream since the last
 # check? Report only. Failures go to one open issue with the label
-# "depcheck". Configs that a person changes are checked in pull requests.
+# "depcheck". The check closes that issue when all checks pass again.
+# Configs that a person changes are checked in pull requests.
 
 on:
   schedule:
@@ -70,12 +71,17 @@ jobs:
           [ -f state/manifest.json ] && args+=(--previous state/manifest.json)
           python3 -m extpkg run "${args[@]}"
 
+      # Earlier failures are checked again (extpkg depcheck: previous), so an
+      # empty list means that they are fixed. "Not checked" keeps the issue open.
       - name: Report failures in an issue
         run: |
           python3 - > "${RUNNER_TEMP}/issue.md" <<'EOF'
           import json
           m = json.load(open("output/manifest.json"))
-          bad = [x for x in m.get("depcheck", []) if x["ok"] is False]
+          results = m.get("depcheck", [])
+          bad = [x for x in results if x["ok"] is False]
+          if not any(x["ok"] is None for x in results):
+              open("${{ runner.temp }}/depcheck-clean", "w").close()
           if bad:
               print("Packages that apt cannot install on an Armbian release.")
               print("Found by the daily dependency check. Fix the package config, then close this issue.")
@@ -87,12 +93,15 @@ jobs:
               print()
               print(f"Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}")
           EOF
+          num=$(gh issue list --label depcheck --state open --json number --jq '.[0].number // empty')
           if [ ! -s "${RUNNER_TEMP}/issue.md" ]; then
             echo "No dependency failures."
+            if [ -n "$num" ] && [ -f "${RUNNER_TEMP}/depcheck-clean" ]; then
+              gh issue close "$num" --reason completed --comment "All dependency checks pass again, including the earlier failures. Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            fi
             exit 0
           fi
           gh label create depcheck --color B60205 --description "Daily dependency check" 2>/dev/null || true
-          num=$(gh issue list --label depcheck --state open --json number --jq '.[0].number // empty')
           if [ -n "$num" ]; then
             gh issue comment "$num" --body-file "${RUNNER_TEMP}/issue.md"
           else

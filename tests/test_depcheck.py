@@ -36,3 +36,37 @@ class Depcheck(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RetryFailures(unittest.TestCase):
+    """Earlier failures with unchanged files: check again, or keep."""
+
+    def files(self, stable):
+        return {"files": [{"config": "ff", "release": "resolute", "arch": "arm64",
+                           "stable": "pool/ff.deb" if stable else None, "beta": "pool/ff.deb"}]}
+
+    PREV = {"depcheck": [
+        {"config": "ff", "release": "resolute", "arch": "arm64", "ok": False, "packages": ["ff=1"], "message": "x"},
+        {"config": "ok", "release": "resolute", "arch": "arm64", "ok": True, "packages": ["ok=1"], "message": ""},
+    ]}
+
+    def test_stable_files_are_checked_again(self):
+        retry, carried = depcheck.retry_failures(self.files(True), self.PREV, {}, set())
+        self.assertEqual([x["packages"] for x in retry], [["ff=1"]])
+        self.assertEqual(carried, [])
+
+    def test_beta_only_files_stay_failed(self):
+        retry, carried = depcheck.retry_failures(self.files(False), self.PREV, {}, set())
+        self.assertEqual(retry, [])
+        self.assertEqual([(x["config"], x["ok"]) for x in carried], [("ff", False)])
+
+    def test_new_files_replace_the_old_failure(self):
+        groups = {("ff", "resolute", "arm64"): [{}]}
+        self.assertEqual(depcheck.retry_failures(self.files(True), self.PREV, groups, set()), ([], []))
+
+    def test_config_gone_or_skipped(self):
+        self.assertEqual(depcheck.retry_failures({"files": []}, self.PREV, {}, set()), ([], []))
+        self.assertEqual(depcheck.retry_failures(self.files(True), self.PREV, {}, {"ff"}), ([], []))
+
+    def test_no_previous(self):
+        self.assertEqual(depcheck.retry_failures(self.files(True), None, {}, set()), ([], []))
