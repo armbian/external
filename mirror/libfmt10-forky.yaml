@@ -1,0 +1,17 @@
+name: libfmt10-forky
+method: apt
+source:
+  url: http://deb.debian.org/debian
+  suite: trixie
+  components:
+  - main
+releases:
+- forky
+architectures:
+- arm64
+- armhf
+target: utils
+install:
+- libfmt10
+filter: Name (% libfmt10)
+notes: kms++ from the Raspberry Pi trixie repository needs libfmt10. Forky has only libfmt11.

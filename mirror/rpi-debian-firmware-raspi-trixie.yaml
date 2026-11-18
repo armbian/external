@@ -15,5 +15,7 @@ architectures:
 target: utils
 install:
 - raspi-firmware
+- rpi-eeprom
 filter: Name (% raspi-firmware) | Name (% firmware-brcm80211) | Name (% raspberrypi-sys-mods) | Name (% bluez-firmware) | Name (% bluez) | Name (% raspi-utils) | Name (% raspi-utils-core) | Name (% raspi-utils-otp)
   | Name (% raspi-utils-dt) | Name (% raspi-utils-eeprom) | Name (% raspinfo) | Name (% rpi-eeprom)
+  | Name (% libgpiolib0) | Name (% libdtovl0) | Name (% kms++-utils) | Name (% libkms++0)
