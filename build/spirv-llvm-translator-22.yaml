@@ -1,8 +1,8 @@
 name: spirv-llvm-translator-22
 method: build
-# Debian packaging. llvm-spirv-22 for mesa-libclc on trixie: trixie has LLVM 22,
-# but not the translator. patches/trixie: SPIRV-Headers at the pinned upstream
-# commit, because trixie's spirv-headers is too old.
+# Debian packaging. llvm-spirv-22 for mesa-libclc: trixie has LLVM 22, but not
+# the translator. forky and resolute have it. patches/trixie: SPIRV-Headers at
+# the pinned upstream commit, because trixie's spirv-headers is too old.
 packaging:
   url: https://deb.debian.org/debian
   suite: sid
