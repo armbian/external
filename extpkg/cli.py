@@ -193,8 +193,10 @@ def cmd_build_matrix(args):
     """Builds that the plan needs, as {"deps": [...], "builds": [...]}.
 
     A build is needed when its identity is not in the previous manifest.
-    deps: the configs that other configs name in build_depends. They build
-    first, and always together with a config that needs them.
+    base: the build_depends of configs that are build_depends themselves.
+    deps: the other configs that other configs name in build_depends.
+    base builds first, then deps, then builds. A dependency always builds
+    together with a config that needs it.
     """
     pkgs, _ = _load(args)
     with open(args.plan) as f:
@@ -202,6 +204,8 @@ def cmd_build_matrix(args):
     prev = pipeline.index_previous(_previous(args))
     by_name = {p["name"]: p for p in pkgs}
     dep_names = {d for p in pkgs for d in p.get("build_depends", [])}
+    base_names = {d2 for d in dep_names if d in by_name for d2 in by_name[d].get("build_depends", [])}
+    dep_names -= base_names
     entries = {}
     for e in doc["entries"]:
         if e.get("skip"):
@@ -229,12 +233,16 @@ def cmd_build_matrix(args):
     if renumbered:
         with open(args.plan, "w") as f:
             json.dump(doc, f, indent=1)
-    for name, rel, arch in list(needed):
+    # Two levels: the dependencies of the added dependencies too.
+    todo = sorted(needed)
+    while todo:
+        name, rel, arch = todo.pop()
         for dep in by_name[name].get("build_depends", []):
             if (dep, rel, arch) not in entries:
                 net.warn(f"{name} {rel}/{arch}: build_depends {dep} has no build for {rel}/{arch}")
-                continue
-            needed.add((dep, rel, arch))
+            elif (dep, rel, arch) not in needed:
+                needed.add((dep, rel, arch))
+                todo.append((dep, rel, arch))
 
     def job(key):
         e = entries[key]
@@ -242,10 +250,12 @@ def cmd_build_matrix(args):
                 "version": e["candidates"][0]["build"]["version"],
                 "runner": config.RUNNERS[e["arch"]],
                 "image": f"{depcheck.distro_of(e['release'], args.build_dir)}:{e['release']}"}
-    out = {"deps": [job(k) for k in sorted(needed) if k[0] in dep_names],
-           "builds": [job(k) for k in sorted(needed) if k[0] not in dep_names]}
+    out = {"base": [job(k) for k in sorted(needed) if k[0] in base_names],
+           "deps": [job(k) for k in sorted(needed) if k[0] in dep_names],
+           "builds": [job(k) for k in sorted(needed) if k[0] not in dep_names | base_names]}
     print(json.dumps(out))
-    net.log(f"build-matrix: {len(out['deps'])} dependency builds, {len(out['builds'])} builds")
+    net.log(f"build-matrix: {len(out['base'])} base builds, {len(out['deps'])} dependency builds, "
+            f"{len(out['builds'])} builds")
     return 0
 
 

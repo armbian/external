@@ -4,9 +4,11 @@ name: "Build packages"
 # patches) and add them to the Armbian repository, next to the Sync files.
 #
 #   plan     resolve sources; list the builds whose identity changed
-#   deps     configs that others name in build_depends (libdrm for mesa)
-#   build    the other configs; build_depends come from the deps stage
-#            Both: one job per config, release and architecture, on a
+#   base     build_depends of build_depends (spirv-llvm-translator-22 for
+#            mesa-libclc, which mesa needs)
+#   deps     the other configs that others name in build_depends (libdrm for mesa)
+#   build    the other configs; build_depends come from the earlier stages
+#            All three: one job per config, release and architecture, on a
 #            native runner (amd64, arm64, riscv64). The build step runs in
 #            a container of the release (docker run).
 #   publish  place the built files, upload, remove old versions
@@ -49,6 +51,7 @@ jobs:
   plan:
     runs-on: ubuntu-latest
     outputs:
+      base: ${{ steps.matrix.outputs.base }}
       deps: ${{ steps.matrix.outputs.deps }}
       builds: ${{ steps.matrix.outputs.builds }}
     env:
@@ -82,6 +85,7 @@ jobs:
           prev=(); [ -f state/manifest.json ] && prev=(--previous state/manifest.json)
           [ "$DRY_RUN" = "true" ] || prev+=(--live)
           python3 -m extpkg build-matrix "${args[@]}" --plan plan.json "${prev[@]}" > matrix.json
+          echo "base=$(jq -c .base matrix.json)" >> "$GITHUB_OUTPUT"
           echo "deps=$(jq -c .deps matrix.json)" >> "$GITHUB_OUTPUT"
           echo "builds=$(jq -c .builds matrix.json)" >> "$GITHUB_OUTPUT"
 
@@ -91,9 +95,37 @@ jobs:
           path: plan.json
           retention-days: 30
 
-  deps:
+  base:
     needs: plan
-    if: needs.plan.outputs.deps != '[]'
+    if: needs.plan.outputs.base != '[]'
+    name: "${{ matrix.config }} ${{ matrix.release }}/${{ matrix.arch }}"
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.base) }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: plan
+
+      - name: Build ${{ matrix.version }}
+        run: tools/build-in-container.sh "${{ matrix.image }}" --plan plan.json --config "${{ matrix.config }}" --release "${{ matrix.release }}" --arch "${{ matrix.arch }}" --out built
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: base-${{ matrix.config }}-${{ matrix.release }}-${{ matrix.arch }}
+          path: built/
+          compression-level: 0
+          retention-days: 7
+
+  deps:
+    needs: [plan, base]
+    # A failed base build fails only the dependency builds that need it. A cancelled run stops.
+    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.plan.outputs.deps != '[]' }}
     name: "${{ matrix.config }} ${{ matrix.release }}/${{ matrix.arch }}"
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 360
@@ -108,8 +140,16 @@ jobs:
         with:
           name: plan
 
+      - name: Base builds
+        if: needs.base.result != 'skipped'
+        uses: actions/download-artifact@v8
+        with:
+          pattern: base-*
+          path: deps
+          merge-multiple: true
+
       - name: Build ${{ matrix.version }}
-        run: tools/build-in-container.sh "${{ matrix.image }}" --plan plan.json --config "${{ matrix.config }}" --release "${{ matrix.release }}" --arch "${{ matrix.arch }}" --out built
+        run: tools/build-in-container.sh "${{ matrix.image }}" --plan plan.json --config "${{ matrix.config }}" --release "${{ matrix.release }}" --arch "${{ matrix.arch }}" --out built --deps deps
 
       # dep-*, not built-*: the build jobs upload built-* while other build jobs download.
       - uses: actions/upload-artifact@v7
@@ -120,7 +160,7 @@ jobs:
           retention-days: 7
 
   build:
-    needs: [plan, deps]
+    needs: [plan, base, deps]
     # A failed dependency build fails only the builds that need it. A cancelled run stops.
     if: ${{ !cancelled() && needs.plan.result == 'success' && needs.plan.outputs.builds != '[]' }}
     name: "${{ matrix.config }} ${{ matrix.release }}/${{ matrix.arch }}"
@@ -136,6 +176,14 @@ jobs:
       - uses: actions/download-artifact@v8
         with:
           name: plan
+
+      - name: Base builds
+        if: needs.base.result != 'skipped'
+        uses: actions/download-artifact@v8
+        with:
+          pattern: base-*
+          path: deps
+          merge-multiple: true
 
       - name: Dependency builds
         if: needs.deps.result != 'skipped'
@@ -156,7 +204,7 @@ jobs:
           retention-days: 7
 
   publish:
-    needs: [plan, deps, build]
+    needs: [plan, base, deps, build]
     # A failed build skips only its own files. The others go out. A cancelled run publishes nothing.
     if: ${{ !cancelled() && needs.plan.result == 'success' }}
     runs-on: ubuntu-latest
@@ -191,6 +239,13 @@ jobs:
       - uses: actions/download-artifact@v8
         with:
           pattern: built-*
+          path: built
+          merge-multiple: true
+
+      - uses: actions/download-artifact@v8
+        if: needs.base.result != 'skipped'
+        with:
+          pattern: base-*
           path: built
           merge-multiple: true
 
