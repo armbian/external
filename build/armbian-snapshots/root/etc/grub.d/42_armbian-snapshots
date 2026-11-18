@@ -47,15 +47,21 @@ for n in $(ls -1 "$snapdir" 2> /dev/null | grep -E '^[0-9]+$' | sort -n -r | hea
 	[ -f "$info" ] && [ -d "$snapdir/$n/snapshot" ] || continue
 	v="$(snapshot_kernel "$snapdir/$n/snapshot")"
 	[ -n "$v" ] || continue
+	# The same for every snapshot, and each lookup runs grub-probe: do it once.
+	if [ -z "${boot_access+set}" ]; then
+		boot_access="$(prepare_grub_to_access_device "${GRUB_DEVICE_BOOT}" | grub_add_tab | grub_add_tab)"
+		bootdir="$(make_system_path_relative_to_its_root /boot)"
+		bootdir="${bootdir%/}"
+	fi
 	# snapper writes the date in UTC.
 	when="$(date -d "$(xml date "$info") UTC" "+%F %R" 2> /dev/null || xml date "$info")"
 	title="Snapshot $n: ${when} $(xml description "$info")"
 	echo "Found snapshot: $n" >&2
 	entries="${entries}
 	menuentry '${title}' --class armbian --class gnu-linux --class os {
-$(prepare_grub_to_access_device "${GRUB_DEVICE_BOOT}" | grub_add_tab | grub_add_tab)
-		linux	$(make_system_path_relative_to_its_root "/boot/vmlinuz-$v") root=UUID=${GRUB_DEVICE_UUID} ro rootflags=subvol=${snappath}/${n}/snapshot armbian.snapshot=${n} ${masks} ${GRUB_CMDLINE_LINUX} ${GRUB_CMDLINE_LINUX_DEFAULT}
-		initrd	$(make_system_path_relative_to_its_root "/boot/initrd.img-$v")
+${boot_access}
+		linux	${bootdir}/vmlinuz-$v root=UUID=${GRUB_DEVICE_UUID} ro rootflags=subvol=${snappath}/${n}/snapshot armbian.snapshot=${n} ${masks} ${GRUB_CMDLINE_LINUX} ${GRUB_CMDLINE_LINUX_DEFAULT}
+		initrd	${bootdir}/initrd.img-$v
 	}"
 done
 
