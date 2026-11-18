@@ -1,0 +1,21 @@
+name: mesa-libclc
+method: build
+# Local packaging: libclc for Mesa (rusticl), built from source with clang-22
+# and llvm-spirv-22. Karol Herbst's fork of LLVM libclc, pinned to a known good
+# state, with fixes that upstream libclc does not have.
+# For trixie: the trixie mesa build uses LLVM 19, and libclc-19 lacks the fixes.
+upstream:
+  url: https://gitlab.freedesktop.org/karolherbst/mesa-libclc.git
+  ref: 22.1.8.3
+build_depends:
+- spirv-llvm-translator-22
+releases:
+- trixie
+architectures:
+- arm64
+- amd64
+target: desktop
+repositories:
+- beta
+install:
+- mesa-libclc
