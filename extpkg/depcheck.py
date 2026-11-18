@@ -196,12 +196,13 @@ class Checker:
             self.ready[(release, arch)] = self.pool.submit(root.update)
         net.log(f"depcheck: indexes for {len(self.roots)} release/arch pairs started")
 
-    def submit(self, config, release, arch, files):
-        """files: manifest entries of one config, release and architecture."""
-        if (release, arch) in self.roots and files:
-            self.futures.append(self.pool.submit(self._check, config, release, arch, files))
+    def submit(self, config, release, arch, files, packages=None):
+        """files: manifest entries of one config, release and architecture.
+        packages: check these package=version from the repositories, without files."""
+        if (release, arch) in self.roots and (files or packages):
+            self.futures.append(self.pool.submit(self._check, config, release, arch, files, packages))
 
-    def _check(self, config, release, arch, files):
+    def _check(self, config, release, arch, files, packages=None):
         key = (release, arch)
         res = {"config": config, "release": release, "arch": arch, "ok": None, "packages": [], "message": ""}
         try:
@@ -211,12 +212,14 @@ class Checker:
             else:
                 with self.locks[key]:
                     root = self.roots[key]
-                    r = root.add([os.path.join(self.out, x["beta"] or x["stable"]) for x in files
-                                  if x["beta"] or x["stable"]])
-                    if r.returncode != 0:
+                    r = None
+                    if files:
+                        r = root.add([os.path.join(self.out, x["beta"] or x["stable"]) for x in files
+                                      if x["beta"] or x["stable"]])
+                    if r is not None and r.returncode != 0:
                         res["message"] = "local repository: " + (r.stderr or r.stdout).strip()[-300:]
                     else:
-                        res["packages"] = _targets(files, self.install.get(config, []))
+                        res["packages"] = packages or _targets(files, self.install.get(config, []))
                         r = root.apt("install", "--simulate", *res["packages"])
                         res["ok"] = r.returncode == 0
                         res["message"] = "" if res["ok"] else _why(r)
@@ -238,19 +241,48 @@ class Checker:
         return sorted(self.results, key=lambda x: (x["config"], x["release"], x["arch"]))
 
 
-def check(manifest, out, pkgs, build_dir, lists_cache, keys_dir, jobs=4, extra_keyrings=()):
-    """Check the new files of a finished output tree (no download running)."""
+def check(manifest, out, pkgs, build_dir, lists_cache, keys_dir, jobs=4, extra_keyrings=(), previous=None):
+    """Check the new files of a finished output tree (no download running).
+
+    previous: the manifest of the last check. Its failures whose files did not
+    change are checked again from the Armbian repository (apt.armbian.com), so
+    a fix outside the package (a distribution update) shows. A failure whose
+    files are not in that repository (beta only) cannot be checked again: it
+    stays in the result until its files change.
+    """
     skip = {p["name"] for p in pkgs if p.get("depcheck") is False}
     new = [x for x in manifest["files"] if not x.get("carried") and not x.get("unchanged")
            and x["config"] not in skip]
     groups = {}
     for x in new:
         groups.setdefault((x["config"], x["release"], x["arch"]), []).append(x)
+    retry, carried = retry_failures(manifest, previous, groups, skip)
     c = Checker(pkgs, out, build_dir, lists_cache, keys_dir, extra_keyrings, jobs)
-    c.prepare({(r, a) for _, r, a in groups})
+    c.prepare({(r, a) for _, r, a in groups} | {(x["release"], x["arch"]) for x in retry})
     for (cfg, rel, arch), files in sorted(groups.items()):
         c.submit(cfg, rel, arch, files)
-    return c.finish()
+    for x in retry:
+        c.submit(x["config"], x["release"], x["arch"], [], packages=x["packages"])
+    results = c.finish() + carried
+    return sorted(results, key=lambda x: (x["config"], x["release"], x["arch"]))
+
+
+def retry_failures(manifest, previous, groups, skip):
+    """Earlier failures whose files did not change: (check again, keep as they are)."""
+    files = {}
+    for x in manifest["files"]:
+        files.setdefault((x["config"], x["release"], x["arch"]), []).append(x)
+    retry, carried = [], []
+    for x in (previous or {}).get("depcheck", []):
+        key = (x["config"], x["release"], x["arch"])
+        # Fixed, new files (checked above), config gone or no depcheck: nothing to keep.
+        if x["ok"] is not False or key in groups or key not in files or x["config"] in skip:
+            continue
+        if x["packages"] and all(f.get("stable") for f in files[key]):
+            retry.append(x)
+        else:
+            carried.append({**x, "message": "not checked again (files not in apt.armbian.com): " + x["message"]})
+    return retry, carried
 
 
 def report(results):

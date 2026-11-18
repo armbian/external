@@ -45,9 +45,10 @@ def _failed(manifest):
 
 def _previous(args):
     """Manifest of the last successful upload, if given and readable."""
-    if not args.previous or not os.path.exists(args.previous):
+    path = getattr(args, "previous", "")
+    if not path or not os.path.exists(path):
         return None
-    with open(args.previous) as f:
+    with open(path) as f:
         doc = json.load(f)
     net.log(f"previous: {len(doc.get('files', []))} files from {doc.get('generated', '?')}")
     return doc
@@ -156,7 +157,7 @@ def _run(args, pkgs, releases, st):
 def _depcheck(args, pkgs, m):
     """Report only: results go into the manifest and the summary."""
     m["depcheck"] = depcheck.check(m, args.out, pkgs, args.build_dir, args.lists_cache, args.keys,
-                                   extra_keyrings=[k for k in args.keyring if k])
+                                   extra_keyrings=[k for k in args.keyring if k], previous=_previous(args))
     with open(os.path.join(args.out, "manifest.json"), "w") as f:
         json.dump(m, f, indent=1)
 
