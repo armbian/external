@@ -16,6 +16,10 @@ target: desktop
 install:
 - firefox
 filter: Name (% firefox*)
+# firefox-geckodriver depends on firefox (= <PPA version>). The repack changes
+# that version, so apt cannot install it.
+exclude:
+- firefox-geckodriver
 repack:
   packages:
   - firefox
