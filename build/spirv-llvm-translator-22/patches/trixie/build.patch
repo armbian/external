@@ -1,0 +1,35 @@
+trixie: build llvm-spirv-22 with trixie's tools.
+- spirv-headers: trixie has 1.4.309, the translator needs 1.4.335 or newer.
+  Do not use the system headers: the translator's CMake fetches SPIRV-Headers
+  at the commit in spirv-headers-tag.conf. debhelper disables FetchContent
+  downloads: enable them again for this one fetch. The fetch runs git.
+- gcc 14 (trixie) builds it: drop the gcc 15 build dependency.
+- trixie ships the SPIRV-Tools development files in spirv-tools.
+
+--- a/debian/control
++++ b/debian/control
+@@ -7,11 +7,9 @@
+ Build-Depends: debhelper-compat (= 13),
+  dh-sequence-pkgkde-symbolshelper,
+  cmake,
+- gcc (>= 4:15),
++ git,
+  pkgconf,
+- spirv-headers (>= 1.6.1+1.4.335.0),
+- spirv-tools <!nocheck>,
+- spirv-tools-dev,
++ spirv-tools,
+ # keep the clang/llvm version in sync, don't forget debian/tests/control
+  libclang-22-dev,
+  llvm-22-dev,
+--- a/debian/rules
++++ b/debian/rules
+@@ -23,7 +23,7 @@
+ override_dh_auto_configure: autogen
+ 	dh_auto_configure -- \
+ 		-DCMAKE_SKIP_RPATH=ON \
+-		-DLLVM_EXTERNAL_SPIRV_HEADERS_SOURCE_DIR=/usr/include \
++		-DFETCHCONTENT_FULLY_DISCONNECTED=OFF \
+ 		-DBUILD_SHARED_LIBS=ON \
+ 		-DLLVM_SPIRV_INCLUDE_TESTS=ON \
+ 		-DLLVM_EXTERNAL_LIT=$(LIT) \
