@@ -17,7 +17,7 @@ timezone at first login | done | armbian-firstlogin sets it from the public IP, 
 shell language at first login | done | Upstream seeds ~/.config/omarchy/language in its installer; Armbian has none, so the shell stayed English. First-run sets it from the system locale that armbian-firstlogin chose, unless the user picked one (overlay install/user/first-run/armbian-language.sh, transform 92-first-run-language).
 install/config/firewall.sh | done | Runs once at boot (overlay usr/lib/armbian-hyprland-shell/system-setup, armbian-hyprland-shell-setup.service), after allowing SSH 22, which Armbian enables. Kept when the admin already enabled ufw. Waits for the docker command (docker-cli): ufw-docker needs it.
 install/user/first-run/wifi.sh (update notice) | done | Waits for the Armbian first-boot LUKS re-key and root resize: omarchy-update needs 10 GiB free (transform 79-first-run-update-waits-for-disk).
-install/config/enable-services.sh (docker) | done | Docker starts on first use: docker.socket enabled, docker.service disabled once (system-setup).
+install/config/enable-services.sh (docker) | done | Docker starts on first use: docker.socket enabled, docker.service and containerd.service disabled once (system-setup). docker.service wants containerd, so it starts with Docker.
 localsend command | done | The LocalSend .deb installs localsend_app; Arch installs localsend. Menu, share helper and Nautilus extension call localsend_app (transform 92-localsend-command).
 default/wayland-sessions/omarchy.desktop | done | Session name "Armbian (Hyprland uwsm)" (transform 40-session-name).
 default/plymouth | done | Not installed: Armbian ships its own Plymouth theme (armbian-plymouth-theme).
