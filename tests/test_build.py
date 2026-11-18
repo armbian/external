@@ -401,12 +401,69 @@ class Matrix(unittest.TestCase):
         self.assertEqual(nbv(v, {"2.71.0-1+armbian1.1~forky"}), "2.71.0-1+armbian1.2~forky")
         self.assertEqual(nbv("1:2.0~rc1-0+armbian1~sid", {"1:2.0~rc1-0+armbian1~sid"}), "1:2.0~rc1-0+armbian1.1~sid")
 
-    def test_dependency_with_dependencies_is_rejected(self):
+    def test_dependency_cycle_is_rejected(self):
         with open(os.path.join(self.tmp, "libdrm.yaml")) as f:
             doc = yaml.safe_load(f)
         doc["build_depends"] = ["mesa"]
         with open(os.path.join(self.tmp, "libdrm.yaml"), "w") as f:
             yaml.safe_dump(doc, f)
+        with self.assertRaises(config.ConfigError):
+            config.load_all(self.tmp)
+
+
+class MatrixTwoLevels(unittest.TestCase):
+    """build-matrix: mesa -> libclc -> translator. translator builds in base, libclc in deps."""
+
+    NAMES = ("translator", "libclc", "mesa")
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tmp)
+        self.write({"translator": [], "libclc": ["translator"], "mesa": ["libclc"]})
+        self.plan = os.path.join(self.tmp, "plan.json")
+        entries = [{"config": n, "release": "trixie", "arch": "amd64", "target": "main",
+                    "candidates": [{"url": n, "identity": f"{n}-1", "build": {"version": "1"}}]}
+                   for n in self.NAMES]
+        with open(self.plan, "w") as f:
+            json.dump({"entries": entries}, f)
+
+    def write(self, deps):
+        pk = {"url": "https://deb.debian.org/debian", "suite": "sid", "package": "x"}
+        for name, d in deps.items():
+            extra = {"build_depends": d} if d else {}
+            with open(os.path.join(self.tmp, f"{name}.yaml"), "w") as f:
+                yaml.safe_dump({"name": name, "method": "build", "packaging": pk, "releases": ["trixie"],
+                                "architectures": ["amd64"], **extra}, f)
+
+    def matrix(self, previous):
+        prev = os.path.join(self.tmp, "prev.json")
+        with open(prev, "w") as f:
+            json.dump({"files": [{"config": n, "release": "trixie", "arch": "amd64", "source": n,
+                                  "upstream_id": f"{n}-1", "filename": f"{n}.deb", "version": "0"}
+                                 for n in previous]}, f)
+        r = subprocess.run(["python3", "-m", "extpkg", "build-matrix", "--configs", self.tmp, "--plan", self.plan,
+                            "--previous", prev, "--live"], capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        doc = json.loads(r.stdout)
+        return tuple([j["config"] for j in doc[k]] for k in ("base", "deps", "builds"))
+
+    def test_all_new(self):
+        self.assertEqual(self.matrix([]), (["translator"], ["libclc"], ["mesa"]))
+
+    def test_mesa_changed_builds_both_levels(self):
+        self.assertEqual(self.matrix(["translator", "libclc"]), (["translator"], ["libclc"], ["mesa"]))
+
+    def test_libclc_changed_builds_translator(self):
+        self.assertEqual(self.matrix(["translator", "mesa"]), (["translator"], ["libclc"], []))
+
+    def test_nothing_changed(self):
+        self.assertEqual(self.matrix(list(self.NAMES)), ([], [], []))
+
+    def test_two_levels_are_accepted(self):
+        self.assertEqual(len(config.load_all(self.tmp)), 3)
+
+    def test_three_levels_are_rejected(self):
+        self.write({"translator": ["headers"], "headers": []})
         with self.assertRaises(config.ConfigError):
             config.load_all(self.tmp)
 

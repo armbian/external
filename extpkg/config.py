@@ -176,15 +176,25 @@ def load_all(directory, names=None):
 
 
 def _check_build_depends(directory, pkgs):
-    """build_depends: other build configs, one level deep (the Build workflow has two stages)."""
+    """build_depends: other build configs, two levels deep. The Build workflow has
+    three stages: base (dependencies of dependencies), deps, build."""
     for pkg in pkgs:
         for dep in pkg.get("build_depends", []):
-            path = os.path.join(directory, f"{dep}.yaml")
-            if not os.path.exists(path):
-                raise ConfigError(f"{pkg['name']}: build_depends: no config {dep}")
-            d = load_one(path)
-            if d["method"] != "build" or d.get("build_depends"):
-                raise ConfigError(f"{pkg['name']}: build_depends: {dep} must be a build config without build_depends")
+            d = _build_dep(directory, pkg["name"], dep)
+            for dep2 in d.get("build_depends", []):
+                if _build_dep(directory, dep, dep2).get("build_depends"):
+                    raise ConfigError(f"{pkg['name']}: build_depends: {dep} -> {dep2}: "
+                                      f"{dep2} must be a build config without build_depends (two levels at most)")
+
+
+def _build_dep(directory, name, dep):
+    path = os.path.join(directory, f"{dep}.yaml")
+    if not os.path.exists(path):
+        raise ConfigError(f"{name}: build_depends: no config {dep}")
+    d = load_one(path)
+    if d["method"] != "build":
+        raise ConfigError(f"{name}: build_depends: {dep} must be a build config")
+    return d
 
 
 def supported_releases(build_dir):

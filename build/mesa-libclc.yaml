@@ -4,13 +4,14 @@ method: build
 # and llvm-spirv-22. Karol Herbst's fork of LLVM libclc, pinned to a known good
 # state, with fixes that upstream libclc does not have.
 # Needs LLVM 22: noble has LLVM 20 only. trixie gets llvm-spirv-22 from
-# spirv-llvm-translator-22.
+# spirv-llvm-translator-22. mesa builds with it on every release.
 upstream:
   url: https://gitlab.freedesktop.org/karolherbst/mesa-libclc.git
   ref: 22.1.8.3
 build_depends:
 - spirv-llvm-translator-22
 releases:
+- sid
 - trixie
 - forky
 - resolute

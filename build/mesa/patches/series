@@ -1,2 +1,3 @@
 drop-lp2143073.patch
 mesa-27-packaging.patch
+mesa-libclc.patch
