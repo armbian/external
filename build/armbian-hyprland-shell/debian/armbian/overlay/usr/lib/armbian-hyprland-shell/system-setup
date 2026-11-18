@@ -43,6 +43,14 @@ if [ ! -e "$state/docker-done" ] && [ -e /usr/lib/systemd/system/docker.socket ]
 	systemctl enable docker.socket
 	touch "$state/docker-done"
 fi
+# docker.service wants containerd, so containerd starts with Docker too. It
+# does not need to start at boot, where multi-user.target waits for it (2.5 s).
+# Own state file: systems that passed the Docker step get it too.
+if [ ! -e "$state/containerd-done" ] && [ -e "$state/docker-done" ] &&
+	[ -e /usr/lib/systemd/system/containerd.service ]; then
+	systemctl disable containerd.service
+	touch "$state/containerd-done"
+fi
 
 # Snapshots: the package armbian-snapshots makes the snapper config for a
 # btrfs root (upstream: install/config/snapper.sh).
