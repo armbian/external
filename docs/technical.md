@@ -192,7 +192,7 @@ install: [fastfetch]
 | `upstream.meson_subprojects` | Meson wraps to download before the build: names or globs, for example `*-rs`. Debian packaging builds with `--wrap-mode=nodownload`. Meson uses a wrap only when the system has no copy. |
 | `version` | Local source only: the version, for example `0.1.0`. Packages get `<version>+armbian<revision>~<release>`. |
 | `revision` | Armbian revision. Default 1. Increase it when the patches or the build keys change, but the sources do not. If you do not, the build gets the next build number (see below). |
-| `build_depends` | Other build configs whose packages this build needs, for example `libdrm` for `mesa`. One level only. |
+| `build_depends` | Other build configs whose packages this build needs, for example `libdrm` for `mesa`. Two levels at most: `mesa` → `mesa-libclc` → `spirv-llvm-translator-22`. |
 
 Architectures: `amd64`, `arm64` and `riscv64`, on native runners. Ubuntu needs RVA23 on riscv64 from 25.10. The riscv64 runners do not have it, so the plan skips `resolute/riscv64` (`NO_RUNNER` in `extpkg/config.py`).
 
@@ -252,7 +252,7 @@ upstream:
   # rebase:                       # switch: uncomment to rebase before each build
   #   url: https://gitlab.freedesktop.org/mesa/mesa.git
   #   ref: main
-build_depends: [libdrm, directx-headers, cbindgen]
+build_depends: [libdrm, directx-headers, cbindgen, mesa-libclc]
 repositories: [beta]
 ```
 
@@ -300,9 +300,10 @@ Runs daily, by hand, and on pull requests that change `build/`, `extpkg/` or the
 Pull requests are always dry runs. Scheduled runs are dry runs until the repository variable `BUILD_LIVE` is `true`.
 
 1. **plan**: resolve the sources. List the builds whose identity is not in the manifest of the last live run. Dry runs and pull requests also use that manifest.
-2. **deps**: the configs that others name in `build_depends`.
-3. **build**: the other configs, with the deps outputs. Both stages: one job per config, release and architecture. Container `debian:<release>` or `ubuntu:<release>`, runner `ubuntu-24.04` (amd64), `ubuntu-24.04-arm` (arm64) or `ubuntu-24.04-riscv` (riscv64). `apt-get build-dep`, then `dpkg-buildpackage`. Tests are not run (`nocheck`).
-4. **publish**: place the built files in the Sync layout, upload, and remove old versions. Status and manifest go to `.sync/shard-build.json` and `.sync/manifest-shard-build.json`, next to the Sync shards.
+2. **base**: the `build_depends` of configs that are `build_depends` themselves.
+3. **deps**: the other configs that others name in `build_depends`, with the base outputs.
+4. **build**: the other configs, with the base and deps outputs. All three stages: one job per config, release and architecture. Container `debian:<release>` or `ubuntu:<release>`, runner `ubuntu-24.04` (amd64), `ubuntu-24.04-arm` (arm64) or `ubuntu-24.04-riscv` (riscv64). `apt-get build-dep`, then `dpkg-buildpackage`. Tests are not run (`nocheck`).
+5. **publish**: place the built files in the Sync layout, upload, and remove old versions. Status and manifest go to `.sync/shard-build.json` and `.sync/manifest-shard-build.json`, next to the Sync shards.
 
 A failed build skips only its own release and architecture. Its old files stay.
 
@@ -517,7 +518,7 @@ Keys added or replaced during the port, each checked against the signer of its r
 - Old versions are removed only for files that this tool uploaded. Files from the old pipeline need a one-time cleanup.
 - Method build: `amd64` and `arm64` only, on native runners. No emulation.
 - Method build: one packaging source for all releases. Differences between releases go into `patches/<release>/`.
-- Method build: `build_depends` is one level deep. A dependency cannot have dependencies.
+- Method build: `build_depends` is two levels deep at most. A dependency of a dependency cannot have dependencies.
 - Method build: tests do not run (`nocheck`).
 - Method build: a cargo build in local packaging (`cbindgen`) downloads its crates at build time, pinned by `Cargo.lock`.
 - Method build: GitHub-hosted runners only. Self-hosted runners need runner labels, a cleanup of root-owned files, and no pull request builds.
