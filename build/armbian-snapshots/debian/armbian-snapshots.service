@@ -5,7 +5,8 @@ Documentation=https://github.com/armbian/external/tree/main/build/armbian-snapsh
 ConditionKernelCommandLine=!armbian.snapshot
 After=local-fs.target
 # snapper-boot needs the config and the subvolume /.snapshots.
-Before=snapper-boot.service snapper-timeline.service snapper-cleanup.service
+# snapperd reads the config list only at start.
+Before=snapperd.service snapper-boot.service snapper-timeline.service snapper-cleanup.service
 
 [Service]
 Type=oneshot

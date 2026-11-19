@@ -8,6 +8,17 @@ set -e
 
 [ "$(findmnt -n -o FSTYPE /)" = btrfs ] || exit 0
 
+# snapperd reads the config list only at start. A running snapperd does not
+# see a new root config: snapper-boot and the apt hook then fail.
+changed=
+restart_snapperd() {
+	[ -n "$changed" ] || return 0
+	# --no-block: at boot, the start of snapperd waits for this service.
+	systemctl -q is-active snapperd.service 2> /dev/null &&
+		systemctl --no-block try-restart snapperd.service || true
+}
+trap restart_snapperd EXIT
+
 if [ ! -e /etc/snapper/configs/root ]; then
 	# create-config also makes the subvolume /.snapshots.
 	snapper --no-dbus -c root create-config /
@@ -20,6 +31,7 @@ if [ ! -e /etc/snapper/configs/root ]; then
 		NUMBER_LIMIT=2-10 \
 		NUMBER_LIMIT_IMPORTANT=2-5 \
 		FREE_LIMIT=0.2
+	changed=1
 	echo "Snapshots of / are on: a snapshot before and after each package change."
 elif [ "$(stat -c %i /.snapshots 2>/dev/null)" != 256 ]; then
 	# The config came with a copy of the system (armbian-install) without
@@ -45,6 +57,7 @@ case " $configs " in
 *" root "*) ;;
 *)
 	configs="${configs:+$configs }root"
+	changed=1
 	if grep -q '^SNAPPER_CONFIGS=' "$f"; then
 		sed -i "s/^SNAPPER_CONFIGS=.*/SNAPPER_CONFIGS=\"$configs\"/" "$f"
 	else
