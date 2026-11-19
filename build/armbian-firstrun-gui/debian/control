@@ -21,10 +21,12 @@ Depends: ${shlibs:Depends},
  ${misc:Depends},
  curl,
  fonts-dejavu-core,
+ git,
  libfontconfig1,
  tzdata,
  xkb-data
 Description: Armbian first-run wizard
  Graphical first-run setup on the screen: location, time zone, locale,
- keyboard and the user account. It writes the answers as presets for
- armbian-firstlogin, which applies them.
+ keyboard and the user account, optionally with SSH keys and dotfiles from
+ a git account. It writes the answers as presets for armbian-firstlogin,
+ which applies them.
