@@ -6,6 +6,8 @@ It asks for a wireless network (only without a connection), the user account and
 
 The wizard is a frontend. It writes `PRESET_*` variables to `/root/.not_logged_in_yet` and runs `armbian-firstlogin`, which applies them. When presets answer everything, the wizard does not start. Serial console and SSH keep the text setup.
 
+Git account (optional, needs a network): the user selects GitHub, GitLab, Codeberg or another server and types a username. The wizard reads public data only: the SSH keys (`https://<host>/<user>.keys`), the display name, and a public repository with the name `armbian-dotfiles`. The fixed name keeps it apart from a `dotfiles` repository for other systems. The account fills in the name and username. The wizard writes `PRESET_USER_KEY` (the keys URL) and `PRESET_DOTFILES_URL` (the repository). `armbian-firstlogin` puts the keys into `authorized_keys`, then clones the repository and applies it as the user.
+
 ## Use
 
 - Image: install the package, for example in the package list of a desktop. The service starts only while `/root/.not_logged_in_yet` exists.
@@ -20,4 +22,4 @@ The patched source stays under `target/`. Other crate dependencies use Cargo as 
 
 `cargo build --features dev` draws in an X11 window. `FRG_FAKE_WIFI=1` shows fake wireless networks. Keep `rust-version` at the oldest Rust of the releases (trixie: 1.85): `resolver = "3"` keeps `Cargo.lock` compatible.
 
-Code: `src/main.rs` (pages, presets), `src/data.rs` (lists, location), `src/wifi.rs` (NetworkManager or netplan), `ui/app.slint` (layout).
+Code: `src/main.rs` (pages, presets), `src/data.rs` (lists, location), `src/git.rs` (git account lookup), `src/wifi.rs` (NetworkManager or netplan), `ui/app.slint` (layout).
