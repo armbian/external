@@ -11,10 +11,12 @@ mod wifi;
 use data::{Item, Location};
 use slint::{ComponentHandle, ModelRc, SharedString, StandardListViewItem, VecModel};
 use std::cell::RefCell;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::io::{BufRead, BufReader};
+use std::os::fd::AsFd;
 use std::os::unix::process::CommandExt;
+use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::rc::Rc;
 use std::sync::mpsc::{channel, Receiver, Sender};
@@ -204,6 +206,58 @@ fn validate_user(ui: &AppWindow) -> Result<(), &'static str> {
 /// True when /etc/shells lists zsh.
 fn has_zsh() -> bool {
     fs::read_to_string("/etc/shells").unwrap_or_default().lines().any(|l| l.trim().ends_with("/zsh"))
+}
+
+/// Match touchscreen event devices on the seat used by the LinuxKMS backend.
+fn is_touchscreen(device: &udev::Device) -> bool {
+    device.sysname().to_string_lossy().starts_with("event")
+        && device.devnode().is_some()
+        && device.property_value("ID_INPUT_TOUCHSCREEN").is_some_and(|value| value == "1")
+        && device.property_value("ID_SEAT").is_none_or(|seat| seat == "seat0")
+        && device.property_value("LIBINPUT_IGNORE_DEVICE").is_none_or(|value| value != "1")
+}
+
+fn touchscreens() -> std::io::Result<BTreeSet<PathBuf>> {
+    let mut devices = udev::Enumerator::new()?;
+    devices.match_subsystem("input")?;
+    devices.match_sysname("event*")?;
+    devices.match_property("ID_INPUT_TOUCHSCREEN", "1")?;
+    Ok(devices.scan_devices()?.filter(is_touchscreen).map(|device| device.syspath().to_owned()).collect())
+}
+
+fn monitor_touchscreens(ui: &slint::Weak<AppWindow>) -> std::io::Result<()> {
+    use nix::poll::{poll, PollFd, PollFlags, PollTimeout};
+
+    // Subscribe before scanning so devices probed during startup are not missed.
+    // Udev events include device classification, unlike raw kernel events.
+    let monitor = udev::MonitorBuilder::new()?.match_subsystem("input")?.listen()?;
+    let mut fds = [PollFd::new(monitor.as_fd(), PollFlags::POLLIN)];
+    let mut devices = touchscreens()?;
+    loop {
+        let present = !devices.is_empty();
+        if ui.upgrade_in_event_loop(move |ui| ui.global::<InputCapabilities>().set_has_touchscreen(present)).is_err() {
+            return Ok(());
+        }
+        loop {
+            match poll(&mut fds, PollTimeout::NONE) {
+                Ok(_) => break,
+                Err(nix::errno::Errno::EINTR) => continue,
+                Err(e) => return Err(e.into()),
+            }
+        }
+        let events = fds[0].revents().unwrap_or(PollFlags::empty());
+        if events.intersects(PollFlags::POLLERR | PollFlags::POLLHUP | PollFlags::POLLNVAL) {
+            return Err(std::io::Error::other("input device monitor disconnected"));
+        }
+        for event in monitor.iter() {
+            // A remove event is authoritative even if sysfs still contains the device.
+            if event.event_type() == udev::EventType::Remove || !is_touchscreen(&event) {
+                devices.remove(event.syspath());
+            } else {
+                devices.insert(event.syspath().to_owned());
+            }
+        }
+    }
 }
 
 /// IPv4 addresses of the network interfaces, without container and VM bridges.
@@ -652,6 +706,13 @@ fn main() {
     let ui = AppWindow::new().expect("cannot create the window");
     ui.set_dry_run(a.dry_run);
     ui.set_has_zsh(has_zsh());
+    let weak = ui.as_weak();
+    std::thread::spawn(move || {
+        if let Err(e) = monitor_touchscreens(&weak) {
+            eprintln!("Cannot monitor touchscreen devices: {e}");
+            let _ = weak.upgrade_in_event_loop(|ui| ui.global::<InputCapabilities>().set_has_touchscreen(false));
+        }
+    });
     ui.set_ip_address(ip_addresses().into());
     if !font.starts_with('/') {
         ui.set_font_family(font.into());
@@ -910,6 +971,18 @@ fn main() {
     // Exit at once: quit_event_loop() does not end the linuxkms event loop.
     ui.on_finish(|| std::process::exit(0));
     ui.on_text_mode(|| std::process::exit(1));
+
+    // Mark screen-key events to prevent their releases from hiding the keyboard.
+    {
+        let weak = ui.as_weak();
+        ui.on_screen_key(move |text| {
+            let Some(ui) = weak.upgrade() else { return };
+            ui.set_screen_key_active(true);
+            let _ = ui.window().try_dispatch_event(slint::platform::WindowEvent::KeyPressed { text: text.clone() });
+            let _ = ui.window().try_dispatch_event(slint::platform::WindowEvent::KeyReleased { text });
+            ui.set_screen_key_active(false);
+        });
+    }
 
     // Key repeat. libinput reports one press, and the linuxkms backend of Slint does not
     // repeat. X11 and Wayland repeat in the server. Same timing as the X11 default.

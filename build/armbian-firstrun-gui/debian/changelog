@@ -1,3 +1,10 @@
+armbian-firstrun-gui (0.1.5) unstable; urgency=medium
+
+  * Add an on-screen keyboard for text fields.
+  * Keep the page title and input fields visible above the keyboard.
+
+ -- Armbian <info@armbian.com>  Tue, 17 Nov 2026 03:15:17 +0100
+
 armbian-firstrun-gui (0.1.4) unstable; urgency=medium
 
   * Honor scanout row pitch in the Slint software renderer.
