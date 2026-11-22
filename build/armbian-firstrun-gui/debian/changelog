@@ -1,3 +1,9 @@
+armbian-firstrun-gui (0.1.6) unstable; urgency=medium
+
+  * Try four more location services when ipwhois.app fails or rate limits.
+
+ -- Armbian <info@armbian.com>  Sun, 22 Nov 2026 19:30:10 +0100
+
 armbian-firstrun-gui (0.1.5) unstable; urgency=medium
 
   * Add an on-screen keyboard for text fields.

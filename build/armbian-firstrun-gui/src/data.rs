@@ -119,17 +119,39 @@ fn curl(url: &str) -> Option<String> {
     out.status.success().then(|| String::from_utf8_lossy(&out.stdout).trim().to_string()).filter(|s| !s.is_empty())
 }
 
-/// Same services as armbian-firstlogin, over HTTPS: ipinfo.io for the address, ipwhois.app for the location.
-/// Returns (online, location). Online without a location: the location service failed.
+/// Location services, in order: URL, then JSON pointers to the timezone and the country code.
+/// Free services rate limit shared public IPs, so the next one is tried. The same list as
+/// armbian-firstlogin.
+const SERVICES: [(&str, &str, &str); 5] = [
+    ("https://ipwhois.app/json/", "/timezone", "/country_code"),
+    ("https://ipinfo.io/json", "/timezone", "/country"),
+    ("https://ipwho.is/", "/timezone/id", "/country_code"),
+    ("https://get.geojs.io/v1/ip/geo.json", "/timezone", "/country_code"),
+    ("https://ipapi.co/json/", "/timezone", "/country_code"),
+];
+
+/// The location from one service answer. None: no known timezone.
+fn parse_location(text: &str, tz: &str, cc: &str) -> Option<Location> {
+    let json = serde_json::from_str::<serde_json::Value>(text).ok()?;
+    let s = |p: &str| json.pointer(p).and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let timezone = s(tz);
+    let mut country_code = s(cc);
+    if timezone.is_empty() || !std::path::Path::new("/usr/share/zoneinfo").join(&timezone).is_file() {
+        return None;
+    }
+    if !(country_code.len() == 2 && country_code.bytes().all(|b| b.is_ascii_uppercase())) {
+        country_code.clear();
+    }
+    Some(Location { timezone, country_code })
+}
+
+/// ipinfo.io for the address, then the location services in order.
+/// Returns (online, location). Online without a location: all location services failed.
 pub fn detect() -> (bool, Option<Location>) {
-    let Some(ip) = curl("https://ipinfo.io/ip") else { return (false, None) };
-    let loc = curl(&format!("https://ipwhois.app/json/{ip}"))
-        .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok())
-        .map(|json| {
-            let s = |k: &str| json.get(k).and_then(|v| v.as_str()).unwrap_or("").to_string();
-            Location { timezone: s("timezone"), country_code: s("country_code") }
-        })
-        .filter(|l| !l.timezone.is_empty());
+    if curl("https://ipinfo.io/ip").is_none() {
+        return (false, None);
+    }
+    let loc = SERVICES.iter().find_map(|(url, tz, cc)| curl(url).and_then(|t| parse_location(&t, tz, cc)));
     (true, loc)
 }
 
