@@ -36,9 +36,20 @@ pub fn timezones() -> Vec<Item> {
     items
 }
 
+/// A tzdata zone name: relative, no "." or "..", a file under /usr/share/zoneinfo.
+/// The name can come from a location service.
+fn known_timezone(tz: &str) -> bool {
+    use std::path::{Component, Path};
+    let path = Path::new(tz);
+    !tz.is_empty()
+        && tz.bytes().all(|b| b.is_ascii_alphanumeric() || b"/_+-".contains(&b))
+        && path.components().all(|c| matches!(c, Component::Normal(_)))
+        && Path::new("/usr/share/zoneinfo").join(path).is_file()
+}
+
 /// Add a zone that the list does not have (an alias such as Etc/UTC), when tzdata knows it.
 pub fn add_timezone(items: &mut Vec<Item>, tz: &str) {
-    if !tz.is_empty() && !items.iter().any(|i| i.value == tz) && std::path::Path::new("/usr/share/zoneinfo").join(tz).is_file() {
+    if !items.iter().any(|i| i.value == tz) && known_timezone(tz) {
         items.push(Item { value: tz.into(), label: tz.replace('_', " "), countries: vec![] });
         items.sort_by(|a, b| a.label.cmp(&b.label));
     }
@@ -136,7 +147,7 @@ fn parse_location(text: &str, tz: &str, cc: &str) -> Option<Location> {
     let s = |p: &str| json.pointer(p).and_then(|v| v.as_str()).unwrap_or("").to_string();
     let timezone = s(tz);
     let mut country_code = s(cc);
-    if timezone.is_empty() || !std::path::Path::new("/usr/share/zoneinfo").join(&timezone).is_file() {
+    if !known_timezone(&timezone) {
         return None;
     }
     if !(country_code.len() == 2 && country_code.bytes().all(|b| b.is_ascii_uppercase())) {
@@ -194,4 +205,23 @@ pub fn system_defaults() -> (String, String, String) {
     let variant = var("/etc/default/keyboard", "XKBVARIANT").unwrap_or_default();
     let kb = if variant.is_empty() { layout } else { format!("{layout}:{variant}") };
     (tz, locale, kb)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn timezone_stays_in_zoneinfo() {
+        for bad in ["", "/etc/passwd", "../../../etc/passwd", "Europe/../../../etc/passwd", "./UTC", "Europe"] {
+            assert!(!known_timezone(bad), "{bad}");
+        }
+        if std::path::Path::new("/usr/share/zoneinfo/Europe/Ljubljana").is_file() {
+            for good in ["Europe/Ljubljana", "Etc/UTC", "Etc/GMT+1", "America/Argentina/Buenos_Aires"] {
+                assert!(known_timezone(good), "{good}");
+            }
+        }
+        let fallback = r#"{"timezone":"/etc/passwd","country_code":"SI"}"#;
+        assert!(parse_location(fallback, "/timezone", "/country_code").is_none());
+    }
 }
