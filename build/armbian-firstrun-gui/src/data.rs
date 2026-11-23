@@ -44,8 +44,15 @@ fn known_timezone(tz: &str) -> bool {
     !tz.is_empty()
         && tz.bytes().all(|b| b.is_ascii_alphanumeric() || b"/_+-".contains(&b))
         && path.components().all(|c| matches!(c, Component::Normal(_)))
-        && Path::new("/usr/share/zoneinfo").join(path).is_file()
         && within_zoneinfo(path)
+        && is_tzif(&Path::new("/usr/share/zoneinfo").join(path))
+}
+
+/// Compiled zone data, not a text file such as leapseconds.
+fn is_tzif(path: &std::path::Path) -> bool {
+    use std::io::Read;
+    let mut magic = [0u8; 4];
+    fs::File::open(path).and_then(|mut f| f.read_exact(&mut magic)).is_ok() && &magic == b"TZif"
 }
 
 /// Links in the name point inside zoneinfo, and so does the resolved file.
@@ -238,6 +245,7 @@ mod tests {
             if std::path::Path::new("/usr/share/zoneinfo/localtime").is_symlink() {
                 assert!(!known_timezone("localtime"));
             }
+            assert!(!known_timezone("leapseconds"));
             for good in ["Europe/Ljubljana", "Etc/UTC", "Etc/GMT+1", "America/Argentina/Buenos_Aires"] {
                 assert!(known_timezone(good), "{good}");
             }
