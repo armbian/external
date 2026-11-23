@@ -45,6 +45,24 @@ fn known_timezone(tz: &str) -> bool {
         && tz.bytes().all(|b| b.is_ascii_alphanumeric() || b"/_+-".contains(&b))
         && path.components().all(|c| matches!(c, Component::Normal(_)))
         && Path::new("/usr/share/zoneinfo").join(path).is_file()
+        && within_zoneinfo(path)
+}
+
+/// Links in the name point inside zoneinfo, and so does the resolved file.
+/// Debian has localtime -> /etc/localtime.
+fn within_zoneinfo(path: &std::path::Path) -> bool {
+    let base = std::path::Path::new("/usr/share/zoneinfo");
+    let Ok(real_base) = std::fs::canonicalize(base) else { return false };
+    let mut cur = base.to_path_buf();
+    for part in path.components() {
+        cur.push(part);
+        if let Ok(target) = std::fs::read_link(&cur) {
+            if target.is_absolute() && !target.starts_with(base) && !target.starts_with(&real_base) {
+                return false;
+            }
+        }
+    }
+    std::fs::canonicalize(&cur).is_ok_and(|p| p.starts_with(&real_base))
 }
 
 /// Add a zone that the list does not have (an alias such as Etc/UTC), when tzdata knows it.
@@ -217,6 +235,9 @@ mod tests {
             assert!(!known_timezone(bad), "{bad}");
         }
         if std::path::Path::new("/usr/share/zoneinfo/Europe/Ljubljana").is_file() {
+            if std::path::Path::new("/usr/share/zoneinfo/localtime").is_symlink() {
+                assert!(!known_timezone("localtime"));
+            }
             for good in ["Europe/Ljubljana", "Etc/UTC", "Etc/GMT+1", "America/Argentina/Buenos_Aires"] {
                 assert!(known_timezone(good), "{good}");
             }
