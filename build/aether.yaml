@@ -5,7 +5,7 @@ method: build
 # packaging in build/aether/debian/.
 upstream:
   url: https://github.com/omacom/aether
-  ref: v4.32.0
+  ref: v4.33.0
   bump_group: omarchy
 releases:
 - forky

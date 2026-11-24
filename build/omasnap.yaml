@@ -5,7 +5,7 @@ method: build
 # after the upstream Arch PKGBUILD (omacom/omarchy-pkgs, pkgbuilds/omasnap).
 upstream:
   url: https://github.com/omacom/omasnap
-  ref: v1.25.0
+  ref: v1.26.3
   bump_group: omarchy
 releases:
 - forky

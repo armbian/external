@@ -5,7 +5,7 @@ method: build
 # (omacom/omarchy-pkgs, pkgbuilds/hype).
 upstream:
   url: https://github.com/omacom/hype
-  ref: v0.6.0
+  ref: v0.7.1
   bump_group: omarchy
 releases:
 - forky

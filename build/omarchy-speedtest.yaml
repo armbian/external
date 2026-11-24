@@ -5,7 +5,7 @@ method: build
 # PKGBUILD (omacom/omarchy-pkgs, pkgbuilds/omarchy-speedtest).
 upstream:
   url: https://github.com/omacom/omarchy-speedtest
-  ref: v0.2.1
+  ref: v0.2.2
   bump_group: omarchy
 releases:
 - forky

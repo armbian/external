@@ -6,9 +6,9 @@ method: build
 # Local packaging in build/omarchy-hyprland-titlebars/debian/.
 upstream:
   url: https://github.com/omacom/omarchy-hyprland-titlebars
-  ref: v0.3.0
+  ref: v0.4.0
   bump_group: omarchy
-revision: 2
+revision: 1
 releases:
 - forky
 - sid
