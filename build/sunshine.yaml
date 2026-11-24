@@ -8,7 +8,7 @@ method: build
 # FFmpeg of LizardByte/build-deps, and checks its SHA256.
 upstream:
   url: https://github.com/LizardByte/Sunshine
-  ref: v2026.914.233613
+  ref: v2026.1123.40502
   submodules: true
 releases:
 - forky
