@@ -21,10 +21,18 @@ def default_pattern(ref):
 
 
 def _eligible(pkg):
+    """A tag in upstream.ref that gives the version. upstream.version or
+    version_file set the version themselves: a new tag does not change it."""
     up = pkg.get("upstream") or {}
     ref = str(up.get("ref", "latest"))
     return (pkg["method"] == "build" and up.get("url") and ref != "latest"
-            and not up.get("rebase") and up.get("bump", "pr") not in ("off", False))
+            and not up.get("rebase") and not up.get("version") and not up.get("version_file")
+            and up.get("bump", "pr") not in ("off", False))
+
+
+def _ref_line(old):
+    """The block-style ref line that apply edits."""
+    return re.compile(r"^(\s+ref:\s*)(['\"]?)" + re.escape(old) + r"\2(\s*(?:#.*)?)$", re.M)
 
 
 def find(directory, names=None, tags_of=source.remote_tags):
@@ -45,12 +53,22 @@ def find(directory, names=None, tags_of=source.remote_tags):
         tags = tags_cache[up["url"]]
         if old not in tags:
             continue  # a branch
-        new = source.newest_tag(tags, up.get("tags") or default_pattern(old))
-        if not new or debver.compare(source.tag_version(new), source.tag_version(old)) <= 0:
+        try:
+            old_ver = source.tag_version(old)
+        except ValueError:
+            net.warn(f"{pkg['name']}: no version in tag {old!r}: skipped")
             continue
+        new = source.newest_tag(tags, up.get("tags") or default_pattern(old))
+        if not new or debver.compare(source.tag_version(new), old_ver) <= 0:
+            continue
+        path = os.path.join(directory, f"{pkg['name']}.yaml")
+        with open(path) as f:
+            if len(_ref_line(old).findall(f.read())) != 1:
+                net.warn(f"{pkg['name']}: no single block-style 'ref: {old}' line: skipped")
+                continue
         found.append({"config": pkg["name"], "url": up["url"], "old": old, "new": new,
                       "group": up.get("bump_group") or pkg["name"],
-                      "path": os.path.join(directory, f"{pkg['name']}.yaml")})
+                      "path": path})
     return sorted(found, key=lambda b: b["config"])
 
 
@@ -59,8 +77,7 @@ def apply(path, old, new):
     A revision above 1 goes back to 1: the new upstream version sorts higher."""
     with open(path) as f:
         text = f.read()
-    ref_line = re.compile(r"^(\s+ref:\s*)(['\"]?)" + re.escape(old) + r"\2(\s*(?:#.*)?)$", re.M)
-    text, n = ref_line.subn(lambda m: f"{m.group(1)}{m.group(2)}{new}{m.group(2)}{m.group(3)}", text)
+    text, n = _ref_line(old).subn(lambda m: f"{m.group(1)}{m.group(2)}{new}{m.group(2)}{m.group(3)}", text)
     if n != 1:
         raise config.ConfigError(f"{path}: expected one 'ref: {old}' line, found {n}")
     text = re.sub(r"^revision:\s*\d+\s*$", "revision: 1", text, flags=re.M)

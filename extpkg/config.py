@@ -121,8 +121,9 @@ def _check_build(pkg, path, need):
         # YAML reads a bare off as false.
         need(up.get("bump", "pr") in ("pr", "off", False), "upstream.bump must be pr or off")
         grp = up.get("bump_group")
-        need(grp is None or (isinstance(grp, str) and re.fullmatch(r"[a-z0-9][a-z0-9.-]*", grp)),
-             "upstream.bump_group must be a lower-case name")
+        need(grp is None or (isinstance(grp, str) and re.fullmatch(r"[a-z0-9]+(?:[.-][a-z0-9]+)*", grp)
+                             and not grp.endswith(".lock")),
+             "upstream.bump_group must be a lower-case name, for example omarchy")
     rev = pkg.get("revision", 1)
     need(isinstance(rev, int) and rev >= 1, "revision must be a number >= 1")
     deps = pkg.get("build_depends", [])
