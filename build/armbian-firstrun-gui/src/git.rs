@@ -6,9 +6,6 @@
 
 use std::process::Command;
 
-/// The entries of the service picker. The last one shows the server field.
-pub const SERVICES: [&str; 4] = ["GitHub", "GitLab", "Codeberg", "Other server…"];
-pub const OTHER: i32 = 3;
 /// Name of the dotfiles repository of the account.
 pub const REPO: &str = "armbian-dotfiles";
 
@@ -30,12 +27,13 @@ pub struct Account {
     pub user: String,
 }
 
-/// The input of the field, after normalize().
+/// The name field, after parse().
 #[derive(Debug, PartialEq, Eq)]
 pub enum Input {
-    Empty,
-    /// Other server without a server name.
-    NeedHost,
+    /// A name, not an account: no "@" at the start.
+    Name,
+    /// Only "@" so far.
+    Partial,
     Invalid(&'static str),
     Ok(Account),
 }
@@ -56,26 +54,13 @@ pub enum Lookup {
     Unreachable,
 }
 
-/// Host of a picker entry. None: the user types the server.
-pub fn service_host(service: i32) -> Option<&'static str> {
-    match service {
-        0 => Some("github.com"),
-        1 => Some("gitlab.com"),
-        2 => Some("codeberg.org"),
-        _ => None,
-    }
-}
-
-/// Picker entry of a host: a known service, else "Other server".
-pub fn service_of(host: &str) -> i32 {
-    (0..OTHER).find(|&i| service_host(i) == Some(host)).unwrap_or(OTHER)
-}
-
-/// Name of the source for the labels: "from GitHub", "from your server".
-pub fn source_name(service: i32) -> &'static str {
-    match service {
-        0..=2 => SERVICES[service as usize],
-        _ => "your server",
+/// Name of the service for the labels: "GitHub", or the server name.
+pub fn source_name(host: &str) -> String {
+    match host {
+        "github.com" => "GitHub".into(),
+        "gitlab.com" => "GitLab".into(),
+        "codeberg.org" => "Codeberg".into(),
+        _ => host.into(),
     }
 }
 
@@ -112,29 +97,25 @@ pub fn valid_host(h: &str) -> bool {
     port_ok && name.len() <= 253 && name.split('.').all(label_ok)
 }
 
-/// The account from the picker, the server field and the username field.
-/// A pasted "host/user" (or a profile URL) in the username field names the server too.
-pub fn normalize(service: i32, host_text: &str, user_text: &str) -> Input {
-    let user = clean(user_text);
-    if user.is_empty() {
-        return Input::Empty;
-    }
-    let (host, user) = match user.split_once('/') {
-        Some((h, rest)) => (h.to_lowercase(), rest.split(['/', '?', '#']).next().unwrap_or("")),
-        None => match service_host(service) {
-            Some(h) => (h.to_string(), user),
-            None => (clean(host_text).to_lowercase(), user),
-        },
+/// The account in the name field: "@user" on GitHub, or "@user@host" on another
+/// server (GitLab, Gitea or Forgejo).
+pub fn parse(text: &str) -> Input {
+    let Some(rest) = text.trim().strip_prefix('@') else { return Input::Name };
+    let (user, host) = match rest.split_once('@') {
+        Some((u, h)) => (u, clean(h).to_lowercase()),
+        None => (rest, "github.com".to_string()),
     };
-    let user = user.strip_prefix('@').unwrap_or(user);
-    if host.is_empty() {
-        return Input::NeedHost;
-    }
-    if !valid_host(&host) {
-        return Input::Invalid("Not a valid server");
+    if user.is_empty() {
+        return Input::Partial;
     }
     if !valid_user(user) {
         return Input::Invalid("Not a valid username");
+    }
+    if host.is_empty() {
+        return Input::Partial;
+    }
+    if !valid_host(&host) {
+        return Input::Invalid("Not a valid server");
     }
     Input::Ok(Account { kind: kind_of(&host), host, user: user.to_string() })
 }
@@ -266,10 +247,10 @@ pub fn status(acc: &Account, r: &Lookup) -> String {
                 1 => "1 SSH key".to_string(),
                 n => format!("{n} SSH keys"),
             };
-            let repo = if f.dotfiles { format!("{}/{}/{REPO}", acc.host, acc.user) } else { format!("no {REPO} repository") };
-            format!("{name} · {keys} · {repo}")
+            let repo = if f.dotfiles { REPO.to_string() } else { format!("no {REPO}") };
+            format!("{name} on {} · {keys} · {repo}", source_name(&acc.host))
         }
-        Lookup::NotFound => format!("Nothing found for {} on {}", acc.user, acc.host),
+        Lookup::NotFound => format!("No account {} on {}", acc.user, source_name(&acc.host)),
         Lookup::Unreachable => format!("Could not reach {}", acc.host),
     }
 }
@@ -295,19 +276,18 @@ mod tests {
 
     #[test]
     fn input() {
-        assert_eq!(normalize(0, "", "  "), Input::Empty);
-        assert_eq!(normalize(0, "", " igorpecovnik "), acc(Kind::GitHub, "github.com", "igorpecovnik"));
-        assert_eq!(normalize(2, "", "@anna"), acc(Kind::Gitea, "codeberg.org", "anna"));
-        assert_eq!(normalize(0, "", "https://github.com/igorpecovnik/"), acc(Kind::GitHub, "github.com", "igorpecovnik"));
-        assert_eq!(normalize(0, "", "GitLab.com/some.one?tab=repos"), acc(Kind::GitLab, "gitlab.com", "some.one"));
-        assert_eq!(normalize(OTHER, "", "bob"), Input::NeedHost);
-        assert_eq!(normalize(OTHER, " https://git.example.org/ ", "bob"), acc(Kind::Unknown, "git.example.org", "bob"));
-        assert_eq!(normalize(OTHER, "git.example.org:3000", "bob"), acc(Kind::Unknown, "git.example.org:3000", "bob"));
-        assert_eq!(normalize(OTHER, "git.example.org/path", "bob"), Input::Invalid("Not a valid server"));
-        assert_eq!(normalize(OTHER, "bad host", "bob"), Input::Invalid("Not a valid server"));
-        assert_eq!(normalize(0, "", "-bob"), Input::Invalid("Not a valid username"));
-        assert_eq!(normalize(0, "", ".bob"), Input::Invalid("Not a valid username"));
-        assert_eq!(normalize(0, "", "bo b"), Input::Invalid("Not a valid username"));
+        assert_eq!(parse("Igor Pečovnik"), Input::Name);
+        assert_eq!(parse(""), Input::Name);
+        assert_eq!(parse(" @ "), Input::Partial);
+        assert_eq!(parse("@anna@"), Input::Partial);
+        assert_eq!(parse(" @igorpecovnik "), acc(Kind::GitHub, "github.com", "igorpecovnik"));
+        assert_eq!(parse("@anna@codeberg.org"), acc(Kind::Gitea, "codeberg.org", "anna"));
+        assert_eq!(parse("@some.one@GitLab.com"), acc(Kind::GitLab, "gitlab.com", "some.one"));
+        assert_eq!(parse("@bob@https://git.example.org/"), acc(Kind::Unknown, "git.example.org", "bob"));
+        assert_eq!(parse("@bob@git.example.org:3000"), acc(Kind::Unknown, "git.example.org:3000", "bob"));
+        assert_eq!(parse("@bob@git.example.org/path"), Input::Invalid("Not a valid server"));
+        assert_eq!(parse("@-bob"), Input::Invalid("Not a valid username"));
+        assert_eq!(parse("@bo b"), Input::Invalid("Not a valid username"));
     }
 
     #[test]
@@ -324,11 +304,9 @@ mod tests {
     }
 
     #[test]
-    fn services() {
-        assert_eq!(service_of("gitlab.com"), 1);
-        assert_eq!(service_of("git.example.org"), OTHER);
-        assert_eq!(source_name(2), "Codeberg");
-        assert_eq!(source_name(OTHER), "your server");
+    fn sources() {
+        assert_eq!(source_name("codeberg.org"), "Codeberg");
+        assert_eq!(source_name("git.example.org"), "git.example.org");
     }
 
     #[test]
@@ -372,10 +350,10 @@ mod tests {
     fn statuses() {
         let a = Account { kind: Kind::GitHub, host: "github.com".into(), user: "u".into() };
         let f = Lookup::Found(Found { name: Some("Ana".into()), keys: 3, dotfiles: true });
-        assert_eq!(status(&a, &f), "Ana · 3 SSH keys · github.com/u/armbian-dotfiles");
+        assert_eq!(status(&a, &f), "Ana on GitHub · 3 SSH keys · armbian-dotfiles");
         let f = Lookup::Found(Found { name: None, keys: 0, dotfiles: false });
-        assert_eq!(status(&a, &f), "u · no SSH keys · no armbian-dotfiles repository");
-        assert_eq!(status(&a, &Lookup::NotFound), "Nothing found for u on github.com");
+        assert_eq!(status(&a, &f), "u on GitHub · no SSH keys · no armbian-dotfiles");
+        assert_eq!(status(&a, &Lookup::NotFound), "No account u on GitHub");
         assert_eq!(status(&a, &Lookup::Unreachable), "Could not reach github.com");
     }
 

@@ -242,136 +242,6 @@ component Field inherits VerticalLayout {
     }
 }
 
-// One choice of a few, in a box like Field. Up and Down, or Space, change it.
-// A click opens the list.
-component Select inherits Rectangle {
-    in property <[string]> options;
-    in-out property <int> current;
-    in property <bool> enabled: true;
-    in property <bool> dense;
-    in property <length> px: 1px;
-    callback changed();
-    function pick(i: int) {
-        if root.options.length == 0 || i == root.current {
-            return;
-        }
-        root.current = mod(i + root.options.length, root.options.length);
-        root.changed();
-    }
-    horizontal-stretch: 0;
-    vertical-stretch: 0;
-    height: (root.dense ? 46 : 52) * root.px;
-    border-radius: 12 * root.px;
-    background: ta.has-hover && root.enabled ? Theme.border : Theme.field;
-    border-width: fs.has-focus ? 2px : 1px;
-    border-color: fs.has-focus ? Theme.accent : root.enabled ? Theme.edge : Theme.border;
-    // Focus ring as in Field.
-    Rectangle {
-        visible: fs.has-focus;
-        x: -3 * root.px;
-        y: -3 * root.px;
-        width: parent.width + 6 * root.px;
-        height: parent.height + 6 * root.px;
-        border-radius: 15 * root.px;
-        border-width: 3 * root.px;
-        border-color: Theme.accent.with-alpha(0.22);
-    }
-
-    fs := FocusScope {
-        enabled: root.enabled;
-        key-pressed(event) => {
-            if event.text == Key.UpArrow {
-                root.pick(root.current - 1);
-                return accept;
-            }
-            if event.text == Key.DownArrow || event.text == " " {
-                root.pick(root.current + 1);
-                return accept;
-            }
-            return reject;
-        }
-    }
-
-    ta := TouchArea {
-        enabled: root.enabled;
-        clicked => {
-            fs.focus();
-            popup.show();
-        }
-    }
-
-    HorizontalLayout {
-        padding-left: 16 * root.px;
-        padding-right: 12 * root.px;
-        spacing: 8 * root.px;
-        Text {
-            horizontal-stretch: 1;
-            text: root.current >= 0 && root.current < root.options.length ? root.options[root.current] : "";
-            color: root.enabled ? Theme.text : Theme.faint;
-            font-size: (root.dense ? 16 : 17) * root.px;
-            vertical-alignment: center;
-            overflow: elide;
-        }
-
-        VerticalLayout {
-            alignment: center;
-            Icon {
-                source: @image-url("icons/chevron-down.svg");
-                colorize: root.enabled ? Theme.dim : Theme.faint;
-                size: 18 * root.px;
-            }
-        }
-    }
-
-    popup := PopupWindow {
-        x: 0px;
-        y: root.height + 6 * root.px;
-        width: max(root.width, 200 * root.px);
-        Rectangle {
-            background: Theme.field;
-            border-radius: 12 * root.px;
-            border-width: 1px;
-            border-color: Theme.edge;
-            VerticalLayout {
-                padding: 4 * root.px;
-                for option[i] in root.options: Rectangle {
-                    height: (root.dense ? 40 : 44) * root.px;
-                    border-radius: 9 * root.px;
-                    background: i == root.current ? Theme.accent-soft : row.has-hover ? Theme.border : transparent;
-                    HorizontalLayout {
-                        padding-left: 12 * root.px;
-                        padding-right: 12 * root.px;
-                        spacing: 8 * root.px;
-                        Text {
-                            horizontal-stretch: 1;
-                            text: option;
-                            color: Theme.text;
-                            font-size: 16 * root.px;
-                            font-weight: i == root.current ? 600 : 400;
-                            vertical-alignment: center;
-                        }
-
-                        if i == root.current: VerticalLayout {
-                            alignment: center;
-                            Icon {
-                                source: @image-url("icons/check.svg");
-                                colorize: Theme.accent;
-                                size: 16 * root.px;
-                            }
-                        }
-                    }
-
-                    row := TouchArea {
-                        clicked => {
-                            root.pick(i);
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
 // Two or more choices, all in view. Left and Right change the choice.
 component Segmented inherits Rectangle {
     in property <[string]> options;
@@ -654,6 +524,8 @@ component PickList inherits VerticalLayout {
     in property <int> current: -1;
     in property <bool> dense;
     in property <length> px: 1px;
+    // The list gets the focus after the first layout.
+    in property <bool> start-focus;
     callback search(string);
     callback picked(int);
     property <length> row-h: (root.dense ? 40 : 48) * root.px;
@@ -699,6 +571,14 @@ component PickList inherits VerticalLayout {
         border-color: keys.has-focus ? Theme.accent : Theme.border;
         keys := FocusScope {
             focus-on-click: false;
+            Timer {
+                interval: 1ms;
+                running: root.start-focus;
+                triggered => {
+                    self.running = false;
+                    keys.focus();
+                }
+            }
             key-pressed(event) => {
                 if event.text == Key.UpArrow {
                     root.pick(root.current - 1);
@@ -864,11 +744,7 @@ export component AppWindow inherits Window {
     // IPv4 addresses, for SSH. Empty without a network.
     in property <string> ip-address;
 
-    // Git account: SSH keys and dotfiles. Rust looks it up and fills the account fields.
-    in property <[string]> git-services;
-    in-out property <int> git-service: 0;
-    in-out property <string> git-host;
-    in-out property <string> git-user;
+    // Git account: "@user" in the name field. Rust looks it up and fills the account fields.
     in property <string> git-status;
     in property <bool> git-found;
     in property <bool> git-warn;
@@ -877,6 +753,10 @@ export component AppWindow inherits Window {
     in property <string> git-name;
     in property <string> git-username;
     in property <string> git-source;
+    // Rust adds 1 after it fills the fields from a git account: the password gets the focus.
+    in property <int> git-filled;
+    // The keyboard step before the Wi-Fi page: page 3 with the keyboard list only.
+    in property <bool> keyboard-only;
 
     in property <string> error;
     in property <string> log;
@@ -912,7 +792,7 @@ export component AppWindow inherits Window {
     property <length> screen-keyboard-height: min(280 * root.px, root.height * 0.4);
     property <length> content-height: root.height - (root.screen-keyboard-visible ? root.screen-keyboard-height : 0px);
 
-    property <[string]> titles: ["Welcome", "Connect to a wireless network", "Create your account", "Region and keyboard", "Applying settings"];
+    property <[string]> titles: ["Welcome", "Connect to a wireless network", "Create your account", self.keyboard-only ? "Choose your keyboard" : "Region and keyboard", "Applying settings"];
 
     // Layout. Large screens: all sizes grow, to 2 times at most.
     property <float> scale: max(1, min(2, min(self.width / 1280px, self.height / 800px)));
@@ -939,7 +819,7 @@ export component AppWindow inherits Window {
     // The box has its full height: the account page uses more space between its parts.
     property <bool> roomy: !self.dense && self.box-h >= 590 * self.px;
     // 0 network, 1 account, 2 setup.
-    property <int> phase: self.page <= 1 ? 0 : self.page <= 3 ? 1 : 2;
+    property <int> phase: self.page <= 1 || self.keyboard-only ? 0 : self.page <= 3 ? 1 : 2;
     property <string> apply-title: self.failed ? "Setup failed" : self.dry-run ? "Dry run complete" : self.titles[4];
     property <string> apply-status: self.failed ? "The text setup asks the same questions on this screen." : self.dry-run ? "Press Enter to close." : "";
     // Which region list shows: 0 time zone, 1 language, 2 keyboard.
@@ -1048,7 +928,7 @@ export component AppWindow inherits Window {
                 }
 
                 Text {
-                    text: root.page == 1 ? "Not connected yet. Select a network or connect a cable. The setup then continues." : root.page == 2 ? "This password is also the root password." : "Select the time zone, the language and the keyboard.";
+                    text: root.page == 1 ? "Not connected yet. Select a network or connect a cable. The setup then continues." : root.page == 2 ? "This password is also the root password." : root.keyboard-only ? "You type the Wi-Fi password with this keyboard." : "Select the time zone, the language and the keyboard.";
                     color: Theme.dim;
                     font-size: 16 * root.px;
                     wrap: word-wrap;
@@ -1063,14 +943,14 @@ export component AppWindow inherits Window {
                     Step {
                         px: root.px;
                         label: "Network";
-                        value: root.ip-address != "" ? "IP " + root.ip-address : root.page == 1 ? "" : "Not connected";
-                        state: root.page == 1 ? 1 : root.ip-address != "" ? 2 : 0;
+                        value: root.ip-address != "" ? "IP " + root.ip-address : root.page == 1 || root.keyboard-only ? "" : "Not connected";
+                        state: root.page == 1 || root.keyboard-only ? 1 : root.ip-address != "" ? 2 : 0;
                     }
 
                     Step {
                         px: root.px;
                         label: "Account";
-                        state: root.page == 1 ? 0 : 1;
+                        state: root.page == 1 || root.keyboard-only ? 0 : 1;
                     }
 
                     Step {
@@ -1086,7 +966,7 @@ export component AppWindow inherits Window {
 
                 // The keys of the page, as one quiet text.
                 Text {
-                    text: root.page == 1 ? "Keys: Up and Down select a network. Enter connects. Esc skips." : root.page == 2 ? "Keys: Tab goes to the next field. Up and Down change the git service. Enter starts the setup." : "Keys: Tab goes to the next part. Up and Down select. Enter is Done. Esc is Cancel.";
+                    text: root.page == 1 ? "Keys: Up and Down select a network. Enter connects. Esc skips." : root.page == 2 ? "Keys: Tab goes to the next field. Enter starts the setup." : root.keyboard-only ? "Keys: Up and Down select. Tab goes to the search. Enter continues." : "Keys: Tab goes to the next part. Up and Down select. Enter is Done. Esc is Cancel.";
                     color: Theme.faint;
                     font-size: 13 * root.px;
                     wrap: word-wrap;
@@ -1461,105 +1341,23 @@ export component AppWindow inherits Window {
                     // The form is shorter than its space: it stays in the middle.
                     alignment: center;
                     spacing: (root.dense ? 16 : root.roomy ? 24 : 20) * root.px;
-                    // Focus after the first layout: the git username, or the password after a restart.
+                    // Focus after the first layout: the name, or the password after a restart.
                     Timer {
                         interval: 1ms;
                         running: true;
                         triggered => {
                             self.running = false;
-                            if root.realname == "" && root.ip-address != "" {
-                                git-user-field.focus();
-                            } else if root.realname == "" {
+                            if root.realname == "" {
                                 name-field.focus();
                             } else {
                                 password-field.focus();
                             }
                         }
                     }
-
-                    // Git account, optional. Low screens: no title, the status goes to the footer.
-                    git-box := VerticalLayout {
-                        spacing: (root.dense ? 5 : 8) * root.px;
-                        property <bool> online: root.ip-address != "";
-                        if !root.dense: HorizontalLayout {
-                            spacing: 6 * root.px;
-                            Text {
-                                horizontal-stretch: 0;
-                                text: "Git account";
-                                color: Theme.dim;
-                                font-size: 14 * root.px;
-                                font-weight: 600;
-                            }
-
-                            Text {
-                                horizontal-stretch: 1;
-                                text: "optional";
-                                color: Theme.faint;
-                                font-size: 14 * root.px;
-                            }
-                        }
-                        HorizontalLayout {
-                            spacing: 16 * root.px;
-                            Select {
-                                width: (root.dense ? 180 : 200) * root.px;
-                                px: root.px;
-                                dense: root.dense;
-                                enabled: git-box.online;
-                                options: root.git-services;
-                                current <=> root.git-service;
-                                changed => {
-                                    root.git-changed();
-                                }
-                            }
-
-                            if root.git-service == 3: Field {
-                                px: root.px;
-                                dense: root.dense;
-                                enabled: git-box.online;
-                                placeholder: "git.example.org";
-                                text <=> root.git-host;
-                                edited(t) => {
-                                    root.git-changed();
-                                }
-                                accepted => {
-                                    root.apply();
-                                }
-                            }
-                            git-user-field := Field {
-                                px: root.px;
-                                dense: root.dense;
-                                enabled: git-box.online;
-                                placeholder: root.dense ? "Git username, optional" : "Git username";
-                                text <=> root.git-user;
-                                edited(t) => {
-                                    root.git-changed();
-                                }
-                                accepted => {
-                                    root.apply();
-                                }
-                            }
-                        }
-
-                        if !root.dense: HorizontalLayout {
-                            height: 18 * root.px;
-                            spacing: 6 * root.px;
-                            if root.git-found: VerticalLayout {
-                                alignment: center;
-                                Icon {
-                                    source: @image-url("icons/check.svg");
-                                    colorize: Theme.accent;
-                                    size: 14 * root.px;
-                                }
-                            }
-                            Text {
-                                horizontal-stretch: 1;
-                                text: root.git-status;
-                                color: root.git-warn ? Theme.warning : Theme.dim;
-                                font-size: 13 * root.px;
-                                vertical-alignment: center;
-                                overflow: elide;
-                            }
-                        }
+                    // A git account filled the fields: the password is next.
+                    property <int> filled: root.git-filled;
+                    changed filled => {
+                        password-field.focus();
                     }
 
                     HorizontalLayout {
@@ -1569,6 +1367,7 @@ export component AppWindow inherits Window {
                             dense: root.dense;
                             label: "Your name";
                             note: root.git-name != "" && root.realname == root.git-name ? "from " + root.git-source : "";
+                            placeholder: root.ip-address != "" ? "Name or @github-user" : "";
                             text <=> root.realname;
                             edited(t) => {
                                 root.realname-edited(t);
@@ -1590,6 +1389,27 @@ export component AppWindow inherits Window {
                             accepted => {
                                 root.apply();
                             }
+                        }
+                    }
+
+                    if !root.dense && root.git-status != "": HorizontalLayout {
+                        height: 18 * root.px;
+                        spacing: 6 * root.px;
+                        if root.git-found: VerticalLayout {
+                            alignment: center;
+                            Icon {
+                                source: @image-url("icons/check.svg");
+                                colorize: Theme.accent;
+                                size: 14 * root.px;
+                            }
+                        }
+                        Text {
+                            horizontal-stretch: 1;
+                            text: root.git-status;
+                            color: root.git-warn ? Theme.warning : Theme.dim;
+                            font-size: 13 * root.px;
+                            vertical-alignment: center;
+                            overflow: elide;
                         }
                     }
 
@@ -1683,11 +1503,11 @@ export component AppWindow inherits Window {
                     property <length> gap: (root.screen-keyboard-visible ? 8 : root.dense ? 12 : 16) * root.px;
                     property <length> tab-h: (root.screen-keyboard-visible ? 44 : root.dense ? 54 : 72) * root.px;
                     property <length> tab-w: self.side ? 220 * root.px : (self.width - 2 * self.gap) / 3;
-                    property <length> list-x: self.side ? self.tab-w + self.gap : 0px;
-                    property <length> list-y: self.side ? 0px : self.tab-h + self.gap;
+                    property <length> list-x: root.keyboard-only ? 0px : self.side ? self.tab-w + self.gap : 0px;
+                    property <length> list-y: root.keyboard-only ? 0px : self.side ? 0px : self.tab-h + self.gap;
                     // The search of the list that closes must not stay in Rust.
                     function show(tab: int) {
-                        if tab == root.region-tab {
+                        if tab == root.region-tab || root.keyboard-only {
                             return;
                         }
                         if root.region-tab == 0 {
@@ -1701,8 +1521,13 @@ export component AppWindow inherits Window {
                     }
                     // Before the widgets: the lists use Enter themselves.
                     capture-key-pressed(event) => {
+                        // The keyboard step has nothing to cancel: Escape keeps the keyboard.
                         if event.text == Key.Escape {
-                            root.region-cancel();
+                            if root.keyboard-only {
+                                root.region-done();
+                            } else {
+                                root.region-cancel();
+                            }
                             return accept;
                         }
                         if event.text == Key.Return {
@@ -1717,8 +1542,10 @@ export component AppWindow inherits Window {
                         running: true;
                         triggered => {
                             self.running = false;
-                            root.region-tab = 0;
-                            tabs.focus();
+                            root.region-tab = root.keyboard-only ? 2 : 0;
+                            if !root.keyboard-only {
+                                tabs.focus();
+                            }
                         }
                     }
 
@@ -1727,6 +1554,7 @@ export component AppWindow inherits Window {
                         // Up and Down, or Left and Right, change the list.
                         tabs := FocusScope {
                             focus-on-click: false;
+                            visible: !root.keyboard-only;
                             x: 0px;
                             y: 0px;
                             width: region.side ? region.tab-w : parent.width;
@@ -1836,6 +1664,7 @@ export component AppWindow inherits Window {
                             px: root.px;
                             dense: root.dense;
                             placeholder: "Search a keyboard";
+                            start-focus: root.keyboard-only;
                             model: root.kb-model;
                             current: root.kb-current;
                             search(t) => {
@@ -1949,7 +1778,7 @@ export component AppWindow inherits Window {
                         horizontal-stretch: 1;
                         error: root.error != "" && root.page != 1;
                         dot: root.dry-run ? Theme.warning : transparent;
-                        text: root.page == 1 ? "" : root.error != "" ? root.error : root.page != 2 ? "" : root.dense && root.git-user != "" ? (root.git-found ? "✓ " : "") + root.git-status : root.dry-run ? "Dry run: the settings go to a file only." : root.compact ? "This password is also the root password." : "";
+                        text: root.page == 1 ? "" : root.error != "" ? root.error : root.page != 2 ? "" : root.dense && root.git-status != "" ? (root.git-found ? "✓ " : "") + root.git-status : root.dry-run ? "Dry run: the settings go to a file only." : root.compact ? "This password is also the root password." : "";
                     }
 
                     if root.page == 1: PillButton {
@@ -1977,7 +1806,7 @@ export component AppWindow inherits Window {
                             root.apply();
                         }
                     }
-                    if root.page == 3: PillButton {
+                    if root.page == 3 && !root.keyboard-only: PillButton {
                         px: root.px;
                         text: "Cancel";
                         clicked => {
@@ -1987,7 +1816,7 @@ export component AppWindow inherits Window {
                     if root.page == 3: PillButton {
                         px: root.px;
                         primary: true;
-                        text: "Done";
+                        text: root.keyboard-only ? "Next" : "Done";
                         clicked => {
                             root.region-done();
                         }

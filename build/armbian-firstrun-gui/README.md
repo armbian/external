@@ -6,7 +6,9 @@ It asks for a wireless network (only without a connection), the user account and
 
 The wizard is a frontend. It writes `PRESET_*` variables to `/root/.not_logged_in_yet` and runs `armbian-firstlogin`, which applies them. When presets answer everything, the wizard does not start. Serial console and SSH keep the text setup.
 
-Git account (optional, needs a network): the user selects GitHub, GitLab, Codeberg or another server and types a username. The wizard reads public data only: the SSH keys (`https://<host>/<user>.keys`), the display name, and a public repository with the name `armbian-dotfiles`. The fixed name keeps it apart from a `dotfiles` repository for other systems. The account fills in the name and username. The wizard writes `PRESET_USER_KEY` (the keys URL) and `PRESET_DOTFILES_URL` (the repository). `armbian-firstlogin` puts the keys into `authorized_keys`, then clones the repository and applies it as the user.
+Order: with a network, the account page comes first. Without a network, the keyboard comes first, then the Wi-Fi page: the Wi-Fi password uses the keyboard.
+
+Git account (optional, needs a network): type `@user` in the name field for GitHub, or `@user@host` for GitLab, Codeberg or another server. The wizard reads public data only: the SSH keys (`https://<host>/<user>.keys`), the display name, and a public repository with the name `armbian-dotfiles`. The fixed name keeps it apart from a `dotfiles` repository for other systems. The account fills in the name and username. The wizard writes `PRESET_USER_KEY` (the keys URL) and `PRESET_DOTFILES_URL` (the repository), only for the items that exist. `armbian-firstlogin` puts the keys into `authorized_keys`, then clones the repository and applies it as the user.
 
 ## Use
 
