@@ -1184,7 +1184,6 @@ fn main() {
             {
                 let mut guard = st2.borrow_mut();
                 let s = &mut *guard;
-                s.saved = None;
                 for (n, list) in [&mut s.tz, &mut s.locale, &mut s.kb].into_iter().enumerate() {
                     let (before, text) = (list.value.clone(), list.search.clone());
                     list.take_match(&text);
@@ -1199,14 +1198,19 @@ fn main() {
             r2(true);
             let ui = weak.unwrap();
             // The keyboard step: the Wi-Fi page is next. The keyboard counts as chosen.
+            // The saved values stay until the page changes: after a failed restart,
+            // Cancel still restores the layout that is active.
             if ui.get_keyboard_only() {
                 st2.borrow_mut().touched[2] = true;
                 if goto_wifi(&ui, &st2.borrow()) {
                     ui.set_keyboard_only(false);
+                    st2.borrow_mut().saved = None;
                 }
                 return;
             }
-            goto_account(&ui, &st2.borrow());
+            if goto_account(&ui, &st2.borrow()) {
+                st2.borrow_mut().saved = None;
+            }
         });
         let (weak, st2, r2) = (ui.as_weak(), st.clone(), refresh.clone());
         ui.on_region_cancel(move || {
