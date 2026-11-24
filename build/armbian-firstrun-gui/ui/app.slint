@@ -56,6 +56,14 @@ component PillButton inherits Rectangle {
     in property <bool> wide;
     in property <length> px: 1px;
     callback clicked;
+    // Asks the page to scroll this control into view: its window position and height.
+    callback reveal(length, length);
+    changed has-keyboard-focus => {
+        if self.has-keyboard-focus {
+            root.reveal(self.absolute-position.y, self.height);
+        }
+    }
+    out property <bool> has-keyboard-focus: focus.has-focus;
     horizontal-stretch: root.wide ? 1 : 0;
     vertical-stretch: 0;
     height: (root.small ? 38 : 48) * root.px;
@@ -347,29 +355,6 @@ component Segmented inherits Rectangle {
                     root.value = option;
                 }
             }
-        }
-    }
-}
-
-// The shell, with its label.
-component ShellChoice inherits VerticalLayout {
-    in-out property <string> value;
-    in property <bool> dense;
-    in property <length> px: 1px;
-    spacing: (root.dense ? 5 : 8) * root.px;
-    Text {
-        text: "Shell";
-        color: Theme.dim;
-        font-size: (root.dense ? 13 : 14) * root.px;
-        font-weight: 600;
-    }
-
-    HorizontalLayout {
-        alignment: start;
-        Segmented {
-            px: root.px;
-            options: ["bash", "zsh"];
-            value <=> root.value;
         }
     }
 }
@@ -758,6 +743,9 @@ component NetStatus inherits Rectangle {
 
 // The result of the git account lookup.
 component GitCard inherits Rectangle {
+    // The profile picture, round, made by Rust. Without one: a mark.
+    in property <image> avatar;
+    in property <bool> has-avatar;
     in property <string> title;
     in property <string> detail;
     in property <bool> found;
@@ -775,7 +763,34 @@ component GitCard inherits Rectangle {
         VerticalLayout {
             alignment: center;
             horizontal-stretch: 0;
-            Rectangle {
+            if root.has-avatar && root.found: Rectangle {
+                width: 44 * root.px;
+                height: 44 * root.px;
+                Image {
+                    width: parent.width;
+                    height: parent.height;
+                    source: root.avatar;
+                    image-fit: contain;
+                }
+
+                // A small check on the picture.
+                Rectangle {
+                    x: parent.width - 16 * root.px;
+                    y: parent.height - 16 * root.px;
+                    width: 18 * root.px;
+                    height: 18 * root.px;
+                    border-radius: 9 * root.px;
+                    background: Theme.success;
+                    border-width: 2 * root.px;
+                    border-color: Theme.surface;
+                    Icon {
+                        source: @image-url("icons/check.svg");
+                        colorize: white;
+                        size: 11 * root.px;
+                    }
+                }
+            }
+            if !(root.has-avatar && root.found): Rectangle {
                 width: 28 * root.px;
                 height: 28 * root.px;
                 border-radius: 14 * root.px;
@@ -820,6 +835,13 @@ component GitCard inherits Rectangle {
 
 // A check box with a label and a quiet second line. Space or a press changes it.
 component CheckRow inherits Rectangle {
+    callback reveal(length, length);
+    out property <bool> has-keyboard-focus: fs.has-focus;
+    changed has-keyboard-focus => {
+        if self.has-keyboard-focus {
+            root.reveal(self.absolute-position.y, self.height);
+        }
+    }
     in property <string> text;
     in property <string> detail;
     in-out property <bool> checked;
@@ -888,6 +910,13 @@ component CheckRow inherits Rectangle {
 
 // A setting with its value. A press opens its list.
 component SettingRow inherits Rectangle {
+    callback reveal(length, length);
+    out property <bool> has-keyboard-focus: fs.has-focus;
+    changed has-keyboard-focus => {
+        if self.has-keyboard-focus {
+            root.reveal(self.absolute-position.y, self.height);
+        }
+    }
     in property <string> label;
     in property <string> value;
     in property <length> px: 1px;
@@ -903,7 +932,6 @@ component SettingRow inherits Rectangle {
         spacing: 12 * root.px;
         Text {
             horizontal-stretch: 0;
-            min-width: 120 * root.px;
             text: root.label;
             color: Theme.dim;
             font-size: 15 * root.px;
@@ -949,6 +977,13 @@ component SettingRow inherits Rectangle {
 
 // A row that opens or closes the section under it.
 component Disclosure inherits Rectangle {
+    callback reveal(length, length);
+    out property <bool> has-keyboard-focus: fs.has-focus;
+    changed has-keyboard-focus => {
+        if self.has-keyboard-focus {
+            root.reveal(self.absolute-position.y, self.height);
+        }
+    }
     in property <string> text;
     in property <string> summary;
     in-out property <bool> open;
@@ -1010,6 +1045,13 @@ component Disclosure inherits Rectangle {
 
 // A quiet text button.
 component LinkButton inherits Rectangle {
+    callback reveal(length, length);
+    out property <bool> has-keyboard-focus: fs.has-focus;
+    changed has-keyboard-focus => {
+        if self.has-keyboard-focus {
+            root.reveal(self.absolute-position.y, self.height);
+        }
+    }
     in property <string> text;
     in property <bool> enabled: true;
     in property <length> px: 1px;
@@ -1101,6 +1143,8 @@ export component AppWindow inherits Window {
     // Git account lookup: a title and a detail line.
     in property <string> git-title;
     in property <string> git-detail;
+    in property <image> git-avatar;
+    in property <bool> git-has-avatar;
     in property <bool> git-found;
     in property <bool> git-warn;
     in property <bool> git-checking;
@@ -1272,7 +1316,7 @@ export component AppWindow inherits Window {
                 if root.page == 1: wifi := FocusScope {
                     focus-on-click: false;
                     property <length> row-h: (root.dense ? 48 : 52) * root.px;
-                    property <int> rows-shown: max(root.typing ? 2 : 3, min(root.typing ? 3 : 5, root.wifi-model.length));
+                    property <int> rows-shown: root.wifi-model.length == 0 ? 3 : min(root.typing ? 3 : 5, root.wifi-model.length);
                     function select(i: int) {
                         if root.wifi-model.length == 0 {
                             return;
@@ -1370,6 +1414,9 @@ export component AppWindow inherits Window {
                             }
 
                             PillButton {
+                                reveal(y, h) => {
+                                    root.reveal(y, h);
+                                }
                                 px: root.px;
                                 small: true;
                                 text: "Change";
@@ -1380,6 +1427,9 @@ export component AppWindow inherits Window {
                             }
 
                             PillButton {
+                                reveal(y, h) => {
+                                    root.reveal(y, h);
+                                }
                                 px: root.px;
                                 small: true;
                                 text: "Scan";
@@ -1493,14 +1543,12 @@ export component AppWindow inherits Window {
                         }
 
                         // Open networks have no password: the field takes no space. It stays in the
-                        // tree, so that the keys can focus it. The margin keeps its focus ring in view.
+                        // tree, so that the keys can focus it.
                         Rectangle {
-                            height: wifi.needs-password() ? password.preferred-height + 8 * root.px : 0px;
-                            clip: true;
+                            height: wifi.needs-password() ? password.preferred-height : 0px;
                             password := Field {
-                                x: 4 * root.px;
-                                y: 4 * root.px;
-                                width: parent.width - 8 * root.px;
+                                visible: wifi.needs-password();
+                                width: parent.width;
                                 px: root.px;
                                 dense: root.dense;
                                 label: "Password";
@@ -1535,6 +1583,9 @@ export component AppWindow inherits Window {
                         }
 
                         PillButton {
+                            reveal(y, h) => {
+                                root.reveal(y, h);
+                            }
                             px: root.px;
                             primary: true;
                             wide: true;
@@ -1548,6 +1599,9 @@ export component AppWindow inherits Window {
                         HorizontalLayout {
                             alignment: center;
                             LinkButton {
+                                reveal(y, h) => {
+                                    root.reveal(y, h);
+                                }
                                 px: root.px;
                                 text: "Skip for now";
                                 enabled: !root.wifi-busy;
@@ -1560,8 +1614,9 @@ export component AppWindow inherits Window {
                 }
 
                 // 2: quick setup. One screen: username or @user, password, optional settings.
+                // With Customize open the header and the help texts hide: the page fits without scrolling.
                 if root.page == 2: VerticalLayout {
-                    spacing: root.gap;
+                    spacing: root.customize-open && !root.typing ? 12 * root.px : root.gap;
                     // Focus after the first layout: the username, or the password after a restart.
                     Timer {
                         interval: 1ms;
@@ -1583,7 +1638,7 @@ export component AppWindow inherits Window {
                         }
                     }
 
-                    if !root.typing: VerticalLayout {
+                    if !root.typing && !root.customize-open: VerticalLayout {
                         spacing: (root.dense ? 12 : 20) * root.px;
                         Logo {
                             logo: root.logo;
@@ -1613,7 +1668,7 @@ export component AppWindow inherits Window {
                         dense: root.dense;
                         label: "Username";
                         placeholder: root.ip-address != "" ? "username or @github-user" : "username";
-                        help: root.typing ? "" : "Use username for a local account or @username to import your GitHub profile.";
+                        help: root.typing || root.customize-open ? "" : "Use username for a local account or @username to import your GitHub profile.";
                         error-text: root.account-error;
                         text <=> root.account;
                         watch: root.content-height;
@@ -1630,6 +1685,8 @@ export component AppWindow inherits Window {
 
                     if root.git-title != "": GitCard {
                         px: root.px;
+                        avatar: root.git-avatar;
+                        has-avatar: root.git-has-avatar;
                         title: root.git-title;
                         detail: root.git-detail;
                         found: root.git-found;
@@ -1663,7 +1720,7 @@ export component AppWindow inherits Window {
                         // The two passwords are not the same.
                         invalid: root.password2 != "" && root.password2 != root.password;
                         error-text: self.invalid ? "The passwords are not the same." : "";
-                        help: root.typing ? "" : "This password is also the root password.";
+                        help: root.typing || root.customize-open ? "" : "This password is also the root password.";
                         watch: root.content-height;
                         reveal(y, h) => {
                             root.reveal(y, h);
@@ -1675,6 +1732,9 @@ export component AppWindow inherits Window {
 
                     // Optional settings: closed by default, with the values in one line.
                     Disclosure {
+                        reveal(y, h) => {
+                            root.reveal(y, h);
+                        }
                         px: root.px;
                         text: "Customize";
                         summary: root.compact ? "" : root.summary;
@@ -1722,52 +1782,92 @@ export component AppWindow inherits Window {
                             }
                         }
 
-                        if root.has-zsh: ShellChoice {
-                            px: root.px;
-                            dense: root.dense;
-                            value <=> root.shell;
-                        }
-                        SettingRow {
-                            px: root.px;
-                            label: "Time zone";
-                            value: root.timezone;
-                            clicked => {
-                                root.region-tab = 0;
-                                root.change-region();
+                        HorizontalLayout {
+                            spacing: 16 * root.px;
+                            SettingRow {
+                                reveal(y, h) => {
+                                    root.reveal(y, h);
+                                }
+                                px: root.px;
+                                label: "Time zone";
+                                value: root.timezone;
+                                clicked => {
+                                    root.region-tab = 0;
+                                    root.change-region();
+                                }
+                            }
+
+                            SettingRow {
+                                reveal(y, h) => {
+                                    root.reveal(y, h);
+                                }
+                                px: root.px;
+                                label: "Language";
+                                value: root.locale;
+                                clicked => {
+                                    root.region-tab = 1;
+                                    root.change-region();
+                                }
                             }
                         }
 
-                        SettingRow {
-                            px: root.px;
-                            label: "Language";
-                            value: root.locale;
-                            clicked => {
-                                root.region-tab = 1;
-                                root.change-region();
+                        HorizontalLayout {
+                            spacing: 16 * root.px;
+                            if root.has-zsh: HorizontalLayout {
+                                horizontal-stretch: 1;
+                                spacing: 12 * root.px;
+                                padding-left: 8 * root.px;
+                                Text {
+                                    horizontal-stretch: 1;
+                                    text: "Shell";
+                                    color: Theme.dim;
+                                    font-size: 15 * root.px;
+                                    vertical-alignment: center;
+                                }
+
+                                VerticalLayout {
+                                    alignment: center;
+                                    Segmented {
+                                        px: root.px;
+                                        options: ["bash", "zsh"];
+                                        value <=> root.shell;
+                                    }
+                                }
+                            }
+                            SettingRow {
+                                reveal(y, h) => {
+                                    root.reveal(y, h);
+                                }
+                                px: root.px;
+                                label: "Keyboard";
+                                value: root.keyboard;
+                                clicked => {
+                                    root.region-tab = 2;
+                                    root.change-region();
+                                }
                             }
                         }
 
-                        SettingRow {
-                            px: root.px;
-                            label: "Keyboard";
-                            value: root.keyboard;
-                            clicked => {
-                                root.region-tab = 2;
-                                root.change-region();
+                        if root.git-found && (root.git-keys > 0 || root.git-dotfiles-url != ""): HorizontalLayout {
+                            spacing: 16 * root.px;
+                            if root.git-keys > 0: CheckRow {
+                                reveal(y, h) => {
+                                    root.reveal(y, h);
+                                }
+                                px: root.px;
+                                text: root.git-keys == 1 ? "Import 1 SSH key" : "Import " + root.git-keys + " SSH keys";
+                                detail: root.git-keys-url;
+                                checked <=> root.import-keys;
                             }
-                        }
-
-                        if root.git-found && root.git-keys > 0: CheckRow {
-                            px: root.px;
-                            text: root.git-keys == 1 ? "Import 1 SSH key" : "Import " + root.git-keys + " SSH keys";
-                            detail: root.git-keys-url;
-                            checked <=> root.import-keys;
-                        }
-                        if root.git-found && root.git-dotfiles-url != "": CheckRow {
-                            px: root.px;
-                            text: "Apply armbian-dotfiles";
-                            detail: root.git-dotfiles-url;
-                            checked <=> root.import-dotfiles;
+                            if root.git-dotfiles-url != "": CheckRow {
+                                reveal(y, h) => {
+                                    root.reveal(y, h);
+                                }
+                                px: root.px;
+                                text: "Apply armbian-dotfiles";
+                                detail: root.git-dotfiles-url;
+                                checked <=> root.import-dotfiles;
+                            }
                         }
                     }
 
@@ -1779,6 +1879,9 @@ export component AppWindow inherits Window {
                     }
 
                     PillButton {
+                        reveal(y, h) => {
+                            root.reveal(y, h);
+                        }
                         px: root.px;
                         primary: true;
                         wide: true;
@@ -1982,6 +2085,9 @@ export component AppWindow inherits Window {
                         spacing: 12 * root.px;
                         alignment: end;
                         PillButton {
+                            reveal(y, h) => {
+                                root.reveal(y, h);
+                            }
                             px: root.px;
                             text: "Cancel";
                             clicked => {
@@ -1990,6 +2096,9 @@ export component AppWindow inherits Window {
                         }
 
                         PillButton {
+                            reveal(y, h) => {
+                                root.reveal(y, h);
+                            }
                             px: root.px;
                             primary: true;
                             text: "Done";
@@ -2057,6 +2166,9 @@ export component AppWindow inherits Window {
                         }
 
                         if root.failed: PillButton {
+                            reveal(y, h) => {
+                                root.reveal(y, h);
+                            }
                             px: root.px;
                             primary: true;
                             wide: true;
@@ -2069,6 +2181,16 @@ export component AppWindow inherits Window {
                 }
             }
         }
+    }
+
+    // Small screens: a thin bar shows that the content scrolls. Drag or the wheel moves it.
+    if flick.viewport-height > flick.height + 1px: Rectangle {
+        x: root.width - 8px;
+        y: -flick.viewport-y / flick.viewport-height * flick.height;
+        width: 4px;
+        height: flick.height * flick.height / flick.viewport-height;
+        border-radius: 2px;
+        background: Theme.edge;
     }
 
     if root.screen-keyboard-visible: VirtualKeyboard {

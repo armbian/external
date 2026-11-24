@@ -45,6 +45,8 @@ pub struct Found {
     pub name: Option<String>,
     pub keys: usize,
     pub dotfiles: bool,
+    /// The profile picture as a PNG or JPEG file. None: no picture, or it did not load.
+    pub avatar: Option<Vec<u8>>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -152,8 +154,8 @@ pub fn count_keys(text: &str) -> usize {
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Profile {
-    /// The account exists. The display name, when the profile has one.
-    Exists(Option<String>),
+    /// The account exists: the display name and the picture URL, when the profile has them.
+    Exists(Option<String>, Option<String>),
     Missing,
     /// No answer, or an answer that tells nothing (rate limit, sign-in needed, not this API).
     Unknown,
@@ -173,13 +175,33 @@ pub fn parse_profile(kind: Kind, code: u16, body: &str) -> Profile {
         // GitLab: a list, empty when the user does not exist.
         Kind::GitLab => match json.as_array() {
             Some(a) if a.is_empty() => Profile::Missing,
-            Some(a) => Profile::Exists(text(a[0].get("name"))),
+            Some(a) => Profile::Exists(text(a[0].get("name")), text(a[0].get("avatar_url"))),
             None => Profile::Unknown,
         },
-        Kind::GitHub if json.get("login").is_some() => Profile::Exists(text(json.get("name"))),
-        Kind::Gitea if json.get("login").is_some() => Profile::Exists(text(json.get("full_name"))),
+        Kind::GitHub if json.get("login").is_some() => Profile::Exists(text(json.get("name")), text(json.get("avatar_url"))),
+        Kind::Gitea if json.get("login").is_some() => Profile::Exists(text(json.get("full_name")), text(json.get("avatar_url"))),
         _ => Profile::Unknown,
     }
+}
+
+/// The URL of a small picture: HTTPS only. A relative URL (GitLab uploads) is on the host.
+/// GitHub sends the picture at the size it is asked for.
+pub fn avatar_url(acc: &Account, url: &str) -> Option<String> {
+    let url = if url.starts_with('/') { format!("https://{}{url}", acc.host) } else { url.to_string() };
+    if !url.starts_with("https://") {
+        return None;
+    }
+    let sep = if url.contains('?') { '&' } else { '?' };
+    Some(if acc.kind == Kind::GitHub { format!("{url}{sep}s=96") } else { url })
+}
+
+/// The bytes of a file, at most 1 MB. None: no answer, or not HTTP 200.
+fn get_bytes(url: &str) -> Option<Vec<u8>> {
+    let out = Command::new("curl")
+        .args(["-sSfL", "--proto", "=https", "--max-time", "5", "--max-filesize", "1000000", "-A", "armbian-firstrun-gui", url])
+        .output()
+        .ok()?;
+    (out.status.success() && !out.stdout.is_empty()).then_some(out.stdout)
 }
 
 /// HTTP code and body. Code 0: no answer.
@@ -203,7 +225,7 @@ fn profile(acc: &Account) -> (Profile, bool) {
         }
         reached = true;
         match parse_profile(kind, code, &body) {
-            Profile::Exists(name) => return (Profile::Exists(name), true),
+            Profile::Exists(name, avatar) => return (Profile::Exists(name, avatar), true),
             // A known service: its answer is final. Other server: try the next API.
             Profile::Missing if acc.kind != Kind::Unknown => return (Profile::Missing, true),
             _ => {}
@@ -227,14 +249,15 @@ pub fn lookup(acc: &Account) -> Lookup {
     }
     let keys = if keys_code == 200 { count_keys(&keys_text) } else { 0 };
     let dotfiles = refs == 200;
-    let name = match prof {
-        Profile::Exists(name) => name,
+    let (name, avatar) = match prof {
+        Profile::Exists(name, avatar) => (name, avatar),
         // The profile tells nothing (for example the GitHub rate limit): the keys
         // file or the repository shows that the account exists.
-        Profile::Unknown if keys_code == 200 || dotfiles => None,
+        Profile::Unknown if keys_code == 200 || dotfiles => (None, None),
         _ => return Lookup::NotFound,
     };
-    Lookup::Found(Found { name, keys, dotfiles })
+    let avatar = avatar.and_then(|u| avatar_url(acc, &u)).and_then(|u| get_bytes(&u));
+    Lookup::Found(Found { name, keys, dotfiles, avatar })
 }
 
 /// The first line of the result card.
@@ -314,6 +337,16 @@ mod tests {
     }
 
     #[test]
+    fn avatars() {
+        let gh = Account { kind: Kind::GitHub, host: "github.com".into(), user: "u".into() };
+        assert_eq!(avatar_url(&gh, "https://avatars.githubusercontent.com/u/1?v=4").as_deref(), Some("https://avatars.githubusercontent.com/u/1?v=4&s=96"));
+        assert_eq!(avatar_url(&gh, "http://example.org/a.png"), None);
+        let gl = Account { kind: Kind::GitLab, host: "gitlab.com".into(), user: "u".into() };
+        assert_eq!(avatar_url(&gl, "/uploads/a.png").as_deref(), Some("https://gitlab.com/uploads/a.png"));
+        assert_eq!(parse_profile(Kind::GitHub, 200, r#"{"login":"u","name":"A","avatar_url":"https://x/a"}"#), Profile::Exists(Some("A".into()), Some("https://x/a".into())));
+    }
+
+    #[test]
     fn sources() {
         assert_eq!(source_name("codeberg.org"), "Codeberg");
         assert_eq!(source_name("git.example.org"), "git.example.org");
@@ -345,24 +378,24 @@ mod tests {
 
     #[test]
     fn profiles() {
-        assert_eq!(parse_profile(Kind::GitHub, 200, r#"{"login":"u","name":"Igor Pečovnik"}"#), Profile::Exists(Some("Igor Pečovnik".into())));
-        assert_eq!(parse_profile(Kind::GitHub, 200, r#"{"login":"u","name":null}"#), Profile::Exists(None));
+        assert_eq!(parse_profile(Kind::GitHub, 200, r#"{"login":"u","name":"Igor Pečovnik"}"#), Profile::Exists(Some("Igor Pečovnik".into()), None));
+        assert_eq!(parse_profile(Kind::GitHub, 200, r#"{"login":"u","name":null}"#), Profile::Exists(None, None));
         assert_eq!(parse_profile(Kind::GitHub, 404, "{}"), Profile::Missing);
         assert_eq!(parse_profile(Kind::GitHub, 403, r#"{"message":"rate limit"}"#), Profile::Unknown);
-        assert_eq!(parse_profile(Kind::GitLab, 200, r#"[{"username":"u","name":"Ana"}]"#), Profile::Exists(Some("Ana".into())));
+        assert_eq!(parse_profile(Kind::GitLab, 200, r#"[{"username":"u","name":"Ana"}]"#), Profile::Exists(Some("Ana".into()), None));
         assert_eq!(parse_profile(Kind::GitLab, 200, "[]"), Profile::Missing);
         assert_eq!(parse_profile(Kind::GitLab, 200, "<html>"), Profile::Unknown);
-        assert_eq!(parse_profile(Kind::Gitea, 200, r#"{"login":"u","full_name":""}"#), Profile::Exists(None));
-        assert_eq!(parse_profile(Kind::Gitea, 200, r#"{"login":"u","full_name":"Bob B"}"#), Profile::Exists(Some("Bob B".into())));
+        assert_eq!(parse_profile(Kind::Gitea, 200, r#"{"login":"u","full_name":""}"#), Profile::Exists(None, None));
+        assert_eq!(parse_profile(Kind::Gitea, 200, r#"{"login":"u","full_name":"Bob B"}"#), Profile::Exists(Some("Bob B".into()), None));
     }
 
     #[test]
     fn statuses() {
         let a = Account { kind: Kind::GitHub, host: "github.com".into(), user: "u".into() };
-        let f = Lookup::Found(Found { name: Some("Ana".into()), keys: 3, dotfiles: true });
+        let f = Lookup::Found(Found { name: Some("Ana".into()), keys: 3, dotfiles: true, avatar: None });
         assert_eq!(title(&a, &f), "GitHub profile found");
         assert_eq!(detail(&a, &f), "Ana · 3 SSH keys · armbian-dotfiles");
-        let f = Lookup::Found(Found { name: None, keys: 0, dotfiles: false });
+        let f = Lookup::Found(Found { name: None, keys: 0, dotfiles: false, avatar: None });
         assert_eq!(detail(&a, &f), "u · no SSH keys · no armbian-dotfiles");
         assert_eq!(title(&a, &Lookup::NotFound), "No account u on GitHub");
         assert_eq!(title(&a, &Lookup::Unreachable), "Could not reach github.com");

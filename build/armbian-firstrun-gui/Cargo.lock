@@ -114,6 +114,7 @@ dependencies = [
 name = "armbian-firstrun-gui"
 version = "0.1.7"
 dependencies = [
+ "image",
  "nix",
  "roxmltree",
  "serde_json",

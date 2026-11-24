@@ -772,6 +772,7 @@ fn git_drop(ui: &AppWindow, s: &mut State) {
     ui.set_git_name("".into());
     ui.set_git_username("".into());
     ui.set_git_keys(0);
+    ui.set_git_has_avatar(false);
     ui.set_git_keys_url("".into());
     ui.set_git_dotfiles_url("".into());
     if s.name_auto {
@@ -782,6 +783,23 @@ fn git_drop(ui: &AppWindow, s: &mut State) {
         let plain = !account.trim_start().starts_with('@');
         ui.set_username(if plain { account.trim().into() } else { "".into() });
     }
+}
+
+/// The profile picture as a round image of 96x96 pixels: the corners are transparent.
+/// The software renderer cannot clip a picture to a circle, so the picture itself is round.
+fn round_avatar(bytes: &[u8]) -> Option<slint::Image> {
+    const N: u32 = 96;
+    let img = image::load_from_memory(bytes).ok()?.resize_to_fill(N, N, image::imageops::FilterType::Triangle).to_rgba8();
+    let mut buf = slint::SharedPixelBuffer::<slint::Rgba8Pixel>::new(N, N);
+    let r = N as f32 / 2.0;
+    for (i, (dst, src)) in buf.make_mut_slice().iter_mut().zip(img.pixels()).enumerate() {
+        let (x, y) = ((i as u32 % N) as f32 + 0.5 - r, (i as u32 / N) as f32 + 0.5 - r);
+        // One pixel of soft edge.
+        let cover = (r - (x * x + y * y).sqrt()).clamp(0.0, 1.0);
+        let a = (src[3] as f32 * cover) as u8;
+        *dst = slint::Rgba8Pixel { r: src[0], g: src[1], b: src[2], a };
+    }
+    Some(slint::Image::from_rgba8(buf))
 }
 
 /// Show the result. A found account fills the full name and the username that the
@@ -809,6 +827,13 @@ fn git_show_result(ui: &AppWindow, s: &mut State, acc: &git::Account, r: git::Lo
     ui.set_git_keys(f.keys as i32);
     ui.set_git_keys_url(if f.keys > 0 { acc.keys_url().trim_start_matches("https://").into() } else { "".into() });
     ui.set_git_dotfiles_url(if f.dotfiles { acc.dotfiles_url().trim_start_matches("https://").trim_end_matches(".git").into() } else { "".into() });
+    match f.avatar.as_deref().and_then(round_avatar) {
+        Some(img) => {
+            ui.set_git_avatar(img);
+            ui.set_git_has_avatar(true);
+        }
+        None => ui.set_git_has_avatar(false),
+    }
     ui.set_import_keys(true);
     ui.set_import_dotfiles(true);
     s.git_result = Some((acc.clone(), f));
@@ -979,6 +1004,7 @@ fn main() {
                     name: resume.get("GIT_NAME").cloned(),
                     keys: resume.get("GIT_KEYS").and_then(|k| k.parse().ok()).unwrap_or(0),
                     dotfiles: resume.get("GIT_DOTFILES").is_some_and(|d| d == "1"),
+                    avatar: None,
                 },
             )),
             _ => None,
