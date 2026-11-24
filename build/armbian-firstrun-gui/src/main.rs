@@ -172,6 +172,8 @@ struct State {
     git_result: Option<(git::Account, git::Found)>,
     /// Results per account: the GitHub API allows 60 requests per hour without a sign-in.
     git_cache: HashMap<git::Account, git::Lookup>,
+    /// The account whose import choices (SSH keys, dotfiles) the check boxes show.
+    git_choice: Option<git::Account>,
     /// Git presets of the image (PRESET_USER_KEY). They stay when no account fills the fields.
     git_keep: Vec<(&'static str, String)>,
     /// The layout that the input uses now.
@@ -480,6 +482,7 @@ fn run_firstlogin(ui: &AppWindow, firstlogin: &str) {
 
 /// Restart with the chosen keyboard layout, so that the passwords use it.
 /// `next`: the page after the restart, PAGE_WIFI or PAGE_ACCOUNT.
+/// Returns only when the answers cannot be saved: then the page stays, with the error.
 fn restart_with_layout(ui: &AppWindow, st: &State, next: i32) {
     let (git, keys, dotfiles) = match &st.git_result {
         Some((acc, f)) => (format!("@{}@{}", acc.user, acc.host), f.keys, u8::from(f.dotfiles)),
@@ -515,20 +518,26 @@ fn restart_with_layout(ui: &AppWindow, st: &State, next: i32) {
 }
 
 /// Show the account page. A new keyboard layout restarts the wizard first.
-fn goto_account(ui: &AppWindow, st: &State) {
+/// False: the restart failed, the page did not change.
+fn goto_account(ui: &AppWindow, st: &State) -> bool {
     if st.kms && st.kb.value != st.active_kb {
         restart_with_layout(ui, st, PAGE_ACCOUNT);
+        return false;
     }
     ui.set_page(PAGE_ACCOUNT);
+    true
 }
 
-/// Show the Wi-Fi page. A new keyboard layout restarts the wizard first.
-fn goto_wifi(ui: &AppWindow, st: &State) {
+/// Show the Wi-Fi page. A new keyboard layout restarts the wizard first: the password
+/// must use it. False: the restart failed, the page did not change.
+fn goto_wifi(ui: &AppWindow, st: &State) -> bool {
     if st.kms && st.kb.value != st.active_kb {
         restart_with_layout(ui, st, PAGE_WIFI);
+        return false;
     }
     ui.set_page(PAGE_WIFI);
     start_scan(ui, st);
+    true
 }
 
 /// Network check and location lookup in a thread. `quiet`: a background check on the Wi-Fi page.
@@ -702,8 +711,11 @@ fn update_ready(ui: &AppWindow, s: &State) {
     let account = ui.get_account();
     let git = account.trim_start().starts_with('@');
     let user = ui.get_username();
-    let error = if git || account.trim().is_empty() { None } else { username_error(&user) };
-    ui.set_account_error(error.unwrap_or("").into());
+    // The username that the setup uses, from the field, the git login or Customize.
+    let error = if user.is_empty() { None } else { username_error(&user) };
+    // The error shows once there is a username to judge: not during a lookup.
+    let shown = if git && s.git_result.is_none() { None } else { error };
+    ui.set_account_error(shown.unwrap_or("").into());
     ui.set_can_apply(!user.is_empty() && error.is_none() && (!git || s.git_result.is_some()) && !ui.get_git_checking());
 }
 
@@ -834,15 +846,16 @@ fn git_show_result(ui: &AppWindow, s: &mut State, acc: &git::Account, r: git::Lo
         }
         None => ui.set_git_has_avatar(false),
     }
-    ui.set_import_keys(true);
-    ui.set_import_dotfiles(true);
+    // A new account offers everything again. The same account keeps the user's choices,
+    // also when a lookup repeats after the network comes back.
+    if s.git_choice.as_ref() != Some(acc) {
+        ui.set_import_keys(true);
+        ui.set_import_dotfiles(true);
+        s.git_choice = Some(acc.clone());
+    }
     s.git_result = Some((acc.clone(), f));
     ui.set_git_filled(ui.get_git_filled() + 1);
     update_ready(ui, s);
-    // A login that is not a valid or free Linux username: the error shows under the field.
-    if let Some(e) = username_error(&ui.get_username()) {
-        ui.set_account_error(e.into());
-    }
 }
 
 fn screen_modes() -> (String, Vec<(u32, u32)>) {
@@ -1009,6 +1022,7 @@ fn main() {
             )),
             _ => None,
         }),
+        git_choice: None,
         git_cache: HashMap::new(),
         git_keep: GIT_VARS.iter().filter_map(|&k| preset.get(k).filter(|v| !v.is_empty()).map(|v| (k, v.clone()))).collect(),
         active_kb,
@@ -1106,10 +1120,6 @@ fn main() {
             s.username_auto = false;
             ui.set_error("".into());
             update_ready(&ui, &s);
-            // The username of the field is now its own: show its error there too.
-            if let Some(e) = username_error(&ui.get_username()) {
-                ui.set_account_error(e.into());
-            }
         });
     }
 
@@ -1118,7 +1128,9 @@ fn main() {
         let (weak, st2) = (ui.as_weak(), st.clone());
         ui.on_wifi_rescan(move || start_scan(&weak.unwrap(), &st2.borrow()));
         let (weak, st2) = (ui.as_weak(), st.clone());
-        ui.on_wifi_skip(move || goto_account(&weak.unwrap(), &st2.borrow()));
+        ui.on_wifi_skip(move || {
+            goto_account(&weak.unwrap(), &st2.borrow());
+        });
         let (weak, st2) = (ui.as_weak(), st.clone());
         ui.on_wifi_connect(move || {
             let ui = weak.unwrap();
@@ -1188,9 +1200,10 @@ fn main() {
             let ui = weak.unwrap();
             // The keyboard step: the Wi-Fi page is next. The keyboard counts as chosen.
             if ui.get_keyboard_only() {
-                ui.set_keyboard_only(false);
                 st2.borrow_mut().touched[2] = true;
-                goto_wifi(&ui, &st2.borrow());
+                if goto_wifi(&ui, &st2.borrow()) {
+                    ui.set_keyboard_only(false);
+                }
                 return;
             }
             goto_account(&ui, &st2.borrow());
@@ -1348,6 +1361,14 @@ fn main() {
             ui.set_git_keys(f.keys as i32);
             ui.set_git_keys_url(if f.keys > 0 { acc.keys_url().trim_start_matches("https://").into() } else { "".into() });
             ui.set_git_dotfiles_url(if f.dotfiles { acc.dotfiles_url().trim_start_matches("https://").trim_end_matches(".git").into() } else { "".into() });
+        }
+        // A finished lookup keeps its import choices. A lookup that ran during the
+        // restart starts again.
+        let done = st.borrow().git_result.as_ref().map(|(acc, _)| acc.clone());
+        match done {
+            Some(acc) => st.borrow_mut().git_choice = Some(acc),
+            None if ui.get_account().trim_start().starts_with('@') => on_git(),
+            None => {}
         }
         update_ready(&ui, &st.borrow());
         if resume.get("NEXT").and_then(|n| n.parse().ok()) == Some(PAGE_WIFI) {

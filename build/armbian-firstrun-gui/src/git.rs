@@ -184,11 +184,16 @@ pub fn parse_profile(kind: Kind, code: u16, body: &str) -> Profile {
     }
 }
 
-/// The URL of a small picture: HTTPS only. A relative URL (GitLab uploads) is on the host.
-/// GitHub sends the picture at the size it is asked for.
+/// Servers that a profile may name for its picture, beside the git server itself.
+const AVATAR_HOSTS: [&str; 4] = ["avatars.githubusercontent.com", "secure.gravatar.com", "www.gravatar.com", "gravatar.com"];
+
+/// The URL of a small picture: HTTPS only, on the git server or a known picture server.
+/// The profile comes from the server: it must not send the device to other addresses.
+/// A relative URL (GitLab uploads) is on the host. GitHub sends the size it is asked for.
 pub fn avatar_url(acc: &Account, url: &str) -> Option<String> {
     let url = if url.starts_with('/') { format!("https://{}{url}", acc.host) } else { url.to_string() };
-    if !url.starts_with("https://") {
+    let authority = url.strip_prefix("https://")?.split(['/', '?', '#']).next()?;
+    if authority != acc.host && !AVATAR_HOSTS.contains(&authority) {
         return None;
     }
     let sep = if url.contains('?') { '&' } else { '?' };
@@ -196,20 +201,24 @@ pub fn avatar_url(acc: &Account, url: &str) -> Option<String> {
 }
 
 /// The bytes of a file, at most 1 MB. None: no answer, or not HTTP 200.
+/// No redirects: the picture server answers itself.
 fn get_bytes(url: &str) -> Option<Vec<u8>> {
     let out = Command::new("curl")
-        .args(["-sSfL", "--proto", "=https", "--max-time", "5", "--max-filesize", "1000000", "-A", "armbian-firstrun-gui", url])
+        .args(["-sSf", "--proto", "=https", "--max-time", "5", "--max-filesize", "1000000", "-A", "armbian-firstrun-gui", url])
         .output()
         .ok()?;
     (out.status.success() && !out.stdout.is_empty()).then_some(out.stdout)
 }
 
-/// HTTP code and body. Code 0: no answer.
+/// HTTP code and body, at most 1 MB. Code 0: no answer, or a transfer that did not
+/// complete (time-out, too large): a part of a body tells nothing.
 fn get(url: &str) -> (u16, String) {
     let out = Command::new("curl")
-        .args(["-sS", "--max-time", "5", "-A", "armbian-firstrun-gui", "-H", "Accept: application/json", "-w", "\n%{http_code}", url])
+        .args(["-sS", "--max-time", "5", "--max-filesize", "1000000", "-A", "armbian-firstrun-gui", "-H", "Accept: application/json", "-w", "\n%{http_code}", url])
         .output();
-    let Ok(out) = out else { return (0, String::new()) };
+    let Ok(out) = out.map_err(|_| ()).and_then(|o| if o.status.success() { Ok(o) } else { Err(()) }) else {
+        return (0, String::new());
+    };
     let text = String::from_utf8_lossy(&out.stdout);
     let (body, code) = text.rsplit_once('\n').unwrap_or(("", &text));
     (code.trim().parse().unwrap_or(0), body.to_string())
@@ -235,26 +244,35 @@ fn profile(acc: &Account) -> (Profile, bool) {
     (if missing { Profile::Missing } else { Profile::Unknown }, reached)
 }
 
+/// A git server answers the first request of a clone with this line. A sign-in page
+/// with HTTP 200 does not start with it.
+pub fn is_ref_advertisement(code: u16, body: &str) -> bool {
+    code == 200 && body.starts_with("001e# service=git-upload-pack")
+}
+
 /// Look up the account. Blocks for up to about 10 s: run it in a thread.
 pub fn lookup(acc: &Account) -> Lookup {
     let (prof, keys, refs) = std::thread::scope(|s| {
         let keys = s.spawn(|| get(&acc.keys_url()));
-        let refs = s.spawn(|| get(&acc.refs_url()).0);
+        let refs = s.spawn(|| get(&acc.refs_url()));
         let prof = profile(acc);
-        (prof, keys.join().unwrap_or_default(), refs.join().unwrap_or(0))
+        (prof, keys.join().unwrap_or_default(), refs.join().unwrap_or_default())
     });
-    let ((prof, reached), (keys_code, keys_text)) = (prof, keys);
-    if !reached && keys_code == 0 && refs == 0 {
+    let ((prof, reached), (keys_code, keys_text), (refs_code, refs_text)) = (prof, keys, refs);
+    if !reached && keys_code == 0 && refs_code == 0 {
         return Lookup::Unreachable;
     }
     let keys = if keys_code == 200 { count_keys(&keys_text) } else { 0 };
-    let dotfiles = refs == 200;
+    let dotfiles = is_ref_advertisement(refs_code, &refs_text);
     let (name, avatar) = match prof {
         Profile::Exists(name, avatar) => (name, avatar),
         // The profile tells nothing (for example the GitHub rate limit): the keys
         // file or the repository shows that the account exists.
-        Profile::Unknown if keys_code == 200 || dotfiles => (None, None),
-        _ => return Lookup::NotFound,
+        _ if keys_code == 200 || dotfiles => (None, None),
+        // Absent only when the server says so twice: the profile and the keys file.
+        Profile::Missing if keys_code == 404 => return Lookup::NotFound,
+        // No clear answer: not kept, so that the next try asks again.
+        _ => return Lookup::Unreachable,
     };
     let avatar = avatar.and_then(|u| avatar_url(acc, &u)).and_then(|u| get_bytes(&u));
     Lookup::Found(Found { name, keys, dotfiles, avatar })
@@ -344,6 +362,23 @@ mod tests {
         let gl = Account { kind: Kind::GitLab, host: "gitlab.com".into(), user: "u".into() };
         assert_eq!(avatar_url(&gl, "/uploads/a.png").as_deref(), Some("https://gitlab.com/uploads/a.png"));
         assert_eq!(parse_profile(Kind::GitHub, 200, r#"{"login":"u","name":"A","avatar_url":"https://x/a"}"#), Profile::Exists(Some("A".into()), Some("https://x/a".into())));
+    }
+
+    #[test]
+    fn avatar_hosts() {
+        let gt = Account { kind: Kind::Unknown, host: "git.example.org".into(), user: "u".into() };
+        assert_eq!(avatar_url(&gt, "https://git.example.org/avatars/1").as_deref(), Some("https://git.example.org/avatars/1"));
+        assert_eq!(avatar_url(&gt, "https://secure.gravatar.com/avatar/x").as_deref(), Some("https://secure.gravatar.com/avatar/x"));
+        assert_eq!(avatar_url(&gt, "https://169.254.169.254/latest"), None);
+        assert_eq!(avatar_url(&gt, "https://git.example.org.evil/a"), None);
+        assert_eq!(avatar_url(&gt, "https://user@git.example.org/a"), None);
+    }
+
+    #[test]
+    fn refs() {
+        assert!(is_ref_advertisement(200, "001e# service=git-upload-pack\n0000"));
+        assert!(!is_ref_advertisement(200, "<html>Sign in</html>"));
+        assert!(!is_ref_advertisement(401, "001e# service=git-upload-pack"));
     }
 
     #[test]
