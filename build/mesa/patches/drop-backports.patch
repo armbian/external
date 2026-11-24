@@ -1,0 +1,11 @@
+Drop Debian backports that mesa 27.0 code already has, or that do not
+apply to it: MR 44789 (lp2143073) and MR 43715 (d3d12).
+
+--- a/debian/patches/series
++++ b/debian/patches/series
+@@ -1,5 +1,3 @@
+ path_max.diff
+ src_glx_dri_common.h.diff
+-lp2143073.patch
+ meson-check-TLSDESC-support-with-a-shared-library.patch
+-do-not-use-D3D12_VIDEO_ENCODER_PICTURE_CONTROL_CODEC_DATA1.patch

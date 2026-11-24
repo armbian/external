@@ -1,0 +1,16 @@
+Refresh Debian's dri_common.h patch for mesa 27.0 code. Debian 26.2
+has no driDestroyConfigs; 27.0 code still has it.
+
+--- a/debian/patches/src_glx_dri_common.h.diff
++++ b/debian/patches/src_glx_dri_common.h.diff
+@@ -1,8 +1,8 @@
+ --- a/src/glx/dri_common.h
+ +++ b/src/glx/dri_common.h
+ @@ -56,6 +56,10 @@ extern struct glx_config *driConvertConf
+- extern struct glx_config *driConvertConfigs(struct glx_config * modes,
+-                                            const struct dri_config ** configs);
++ 
++ extern void driDestroyConfigs(const struct dri_config **configs);
+  
+ +#ifndef __GLXDRIdrawable
+ +typedef struct __GLXDRIdrawableRec __GLXDRIdrawable;
