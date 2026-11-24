@@ -237,8 +237,18 @@ pub fn lookup(acc: &Account) -> Lookup {
     Lookup::Found(Found { name, keys, dotfiles })
 }
 
-/// The status line for a result.
-pub fn status(acc: &Account, r: &Lookup) -> String {
+/// The first line of the result card.
+pub fn title(acc: &Account, r: &Lookup) -> String {
+    let service = source_name(&acc.host);
+    match r {
+        Lookup::Found(_) => format!("{service} profile found"),
+        Lookup::NotFound => format!("No account {} on {service}", acc.user),
+        Lookup::Unreachable => format!("Could not reach {}", acc.host),
+    }
+}
+
+/// The second line of the result card: what the account brings, or what to do.
+pub fn detail(acc: &Account, r: &Lookup) -> String {
     match r {
         Lookup::Found(f) => {
             let name = f.name.clone().unwrap_or_else(|| acc.user.clone());
@@ -248,10 +258,10 @@ pub fn status(acc: &Account, r: &Lookup) -> String {
                 n => format!("{n} SSH keys"),
             };
             let repo = if f.dotfiles { REPO.to_string() } else { format!("no {REPO}") };
-            format!("{name} on {} · {keys} · {repo}", source_name(&acc.host))
+            format!("{name} · {keys} · {repo}")
         }
-        Lookup::NotFound => format!("No account {} on {}", acc.user, source_name(&acc.host)),
-        Lookup::Unreachable => format!("Could not reach {}", acc.host),
+        Lookup::NotFound => "Check the username, or remove the @ for a local account.".to_string(),
+        Lookup::Unreachable => "Check the network, or remove the @ for a local account.".to_string(),
     }
 }
 
@@ -350,11 +360,12 @@ mod tests {
     fn statuses() {
         let a = Account { kind: Kind::GitHub, host: "github.com".into(), user: "u".into() };
         let f = Lookup::Found(Found { name: Some("Ana".into()), keys: 3, dotfiles: true });
-        assert_eq!(status(&a, &f), "Ana on GitHub · 3 SSH keys · armbian-dotfiles");
+        assert_eq!(title(&a, &f), "GitHub profile found");
+        assert_eq!(detail(&a, &f), "Ana · 3 SSH keys · armbian-dotfiles");
         let f = Lookup::Found(Found { name: None, keys: 0, dotfiles: false });
-        assert_eq!(status(&a, &f), "u on GitHub · no SSH keys · no armbian-dotfiles");
-        assert_eq!(status(&a, &Lookup::NotFound), "No account u on GitHub");
-        assert_eq!(status(&a, &Lookup::Unreachable), "Could not reach github.com");
+        assert_eq!(detail(&a, &f), "u · no SSH keys · no armbian-dotfiles");
+        assert_eq!(title(&a, &Lookup::NotFound), "No account u on GitHub");
+        assert_eq!(title(&a, &Lookup::Unreachable), "Could not reach github.com");
     }
 
     #[test]

@@ -12,20 +12,19 @@ export global Theme {
     out property <color> accent-solid: accent.darker(0.2);
     out property <color> accent-hover: accent.darker(0.1);
     // Opaque tints. Blending on large areas is slow in the software renderer.
-    out property <color> accent-soft: accent.mix(card, 0.14);
-    out property <color> accent-line: accent.mix(card, 0.5);
-    // The side panel: darker than the card, and neutral.
-    out property <color> rail: #0a0a0c;
-    out property <color> bg: #050505;
-    out property <color> card: #121214;
+    out property <color> accent-soft: accent.mix(bg, 0.16);
+    out property <color> accent-line: accent.mix(bg, 0.5);
     // Dark greys keep red, green and blue equal on a 16-bit panel: no green tint.
-    out property <color> field: #1b1b1e;
-    out property <color> border: #26262e;
-    // Edge of a control: 3:1 on the card.
-    out property <color> edge: #5c5c6a;
-    out property <color> text: #f0f0f5;
-    out property <color> dim: #a1a1aa;
-    out property <color> faint: #82828f;
+    out property <color> bg: #0c0c0c;
+    out property <color> field: #1b1b1b;
+    out property <color> surface: #202020;
+    out property <color> border: #2a2a2a;
+    // Edge of a control: 3:1 on the background.
+    out property <color> edge: #5c5c5c;
+    out property <color> text: #f0f0f0;
+    out property <color> dim: #a1a1a1;
+    out property <color> faint: #828282;
+    out property <color> success: #22a65a;
     out property <color> error: #e36d6e;
     out property <color> warning: #f59e0b;
 }
@@ -53,13 +52,15 @@ component PillButton inherits Rectangle {
     in property <bool> enabled: true;
     in property <bool> primary;
     in property <bool> small;
+    // Full width of its row.
+    in property <bool> wide;
     in property <length> px: 1px;
     callback clicked;
-    horizontal-stretch: 0;
+    horizontal-stretch: root.wide ? 1 : 0;
     vertical-stretch: 0;
     height: (root.small ? 38 : 48) * root.px;
     min-width: max((root.primary ? 148 : 0) * root.px, label.preferred-width + (root.small ? 36 : 52) * root.px);
-    border-radius: self.height / 2;
+    border-radius: 10 * root.px;
     background: root.primary ? (!root.enabled ? Theme.field : ta.pressed || ta.has-hover ? Theme.accent-hover : Theme.accent-solid) : (ta.pressed ? Theme.border : ta.has-hover ? Theme.field : transparent);
     border-width: root.primary ? 0px : 1px;
     border-color: root.enabled ? Theme.edge : Theme.border;
@@ -71,7 +72,7 @@ component PillButton inherits Rectangle {
         y: -4 * root.px;
         width: parent.width + 8 * root.px;
         height: parent.height + 8 * root.px;
-        border-radius: self.height / 2;
+        border-radius: 14 * root.px;
         border-width: 2 * root.px;
         border-color: Theme.accent;
     }
@@ -79,7 +80,7 @@ component PillButton inherits Rectangle {
     label := Text {
         text: root.text;
         color: !root.enabled ? Theme.faint : root.primary ? white : Theme.text;
-        font-size: (root.small ? 14 : 16) * root.px;
+        font-size: (root.small ? 14 : root.wide ? 18 : 16) * root.px;
         font-weight: 600;
     }
 
@@ -106,6 +107,16 @@ component PillButton inherits Rectangle {
 // A text field with an optional label above it.
 component Field inherits VerticalLayout {
     in property <string> label;
+    // > 0: the label is left of the box, this wide.
+    in property <length> label-width;
+    // Quiet text under the box, and an error that replaces it.
+    in property <string> help;
+    in property <string> error-text;
+    out property <bool> focused: ti.has-focus;
+    // The space above the on-screen keyboard. A change shows the field again.
+    in property <length> watch;
+    // Asks the page to scroll this field into view: its window position and height.
+    callback reveal(length, length);
     // Quiet text after the label: where the value comes from.
     in property <string> note;
     in property <bool> enabled: true;
@@ -118,15 +129,25 @@ component Field inherits VerticalLayout {
     in property <length> px: 1px;
     callback edited(string);
     callback accepted();
-    property <bool> reveal;
+    property <bool> shown;
     property <length> margin: 2 * root.px;
+    changed focused => {
+        if self.focused {
+            root.reveal(self.absolute-position.y, self.height);
+        }
+    }
+    changed watch => {
+        if self.focused {
+            root.reveal(self.absolute-position.y, self.height);
+        }
+    }
     forward-focus: ti;
     // Fields in one row get the same width.
     preferred-width: 120 * root.px;
     horizontal-stretch: 1;
     vertical-stretch: 0;
     spacing: (root.dense ? 5 : 8) * root.px;
-    if root.label != "": HorizontalLayout {
+    if root.label != "" && root.label-width == 0: HorizontalLayout {
         spacing: 6 * root.px;
         Text {
             horizontal-stretch: 0;
@@ -144,9 +165,20 @@ component Field inherits VerticalLayout {
             overflow: elide;
         }
     }
+    HorizontalLayout {
+    spacing: 16 * root.px;
+    if root.label-width > 0: Text {
+        width: root.label-width;
+        text: root.label;
+        color: Theme.text;
+        font-size: 16 * root.px;
+        vertical-alignment: center;
+        overflow: elide;
+    }
     box := Rectangle {
-        height: (root.dense ? 46 : 52) * root.px;
-        border-radius: 12 * root.px;
+        horizontal-stretch: 1;
+        height: (root.dense ? 44 : 48) * root.px;
+        border-radius: 10 * root.px;
         background: Theme.field;
         border-width: ti.has-focus || root.invalid ? 2px : 1px;
         border-color: root.invalid ? Theme.error : ti.has-focus ? Theme.accent : root.enabled ? Theme.edge : Theme.border;
@@ -157,7 +189,7 @@ component Field inherits VerticalLayout {
             y: -3 * root.px;
             width: parent.width + 6 * root.px;
             height: parent.height + 6 * root.px;
-            border-radius: 15 * root.px;
+            border-radius: 13 * root.px;
             border-width: 3 * root.px;
             border-color: Theme.accent.with-alpha(0.22);
         }
@@ -183,7 +215,7 @@ component Field inherits VerticalLayout {
                     width: parent.width;
                     text: root.placeholder;
                     color: Theme.faint;
-                    font-size: (root.dense ? 16 : 17) * root.px;
+                    font-size: 16 * root.px;
                     vertical-alignment: center;
                     overflow: elide;
                 }
@@ -198,8 +230,8 @@ component Field inherits VerticalLayout {
                     enabled: root.enabled;
                     vertical-alignment: center;
                     color: root.enabled ? Theme.text : Theme.faint;
-                    font-size: (root.dense ? 16 : 17) * root.px;
-                    input-type: root.password && !root.reveal ? InputType.password : InputType.text;
+                    font-size: 16 * root.px;
+                    input-type: root.password && !root.shown ? InputType.password : InputType.text;
                     selection-background-color: Theme.accent-solid;
                     selection-foreground-color: white;
                     edited => {
@@ -225,19 +257,33 @@ component Field inherits VerticalLayout {
 
             // Show or hide the password.
             if root.password: Rectangle {
-                width: 38 * root.px;
+                width: 44 * root.px;
                 Icon {
-                    source: root.reveal ? @image-url("icons/eye-off.svg") : @image-url("icons/eye.svg");
+                    source: root.shown ? @image-url("icons/eye-off.svg") : @image-url("icons/eye.svg");
                     colorize: eye.has-hover ? Theme.text : Theme.faint;
                     size: 18 * root.px;
                 }
 
                 eye := TouchArea {
                     clicked => {
-                        root.reveal = !root.reveal;
+                        root.shown = !root.shown;
                     }
                 }
             }
+        }
+    }
+    }
+    if root.help != "" || root.error-text != "": HorizontalLayout {
+        spacing: 16 * root.px;
+        if root.label-width > 0: Rectangle {
+            width: root.label-width;
+        }
+        Text {
+            horizontal-stretch: 1;
+            text: root.error-text != "" ? root.error-text : root.help;
+            color: root.error-text != "" ? Theme.error : Theme.dim;
+            font-size: 14 * root.px;
+            wrap: word-wrap;
         }
     }
 }
@@ -349,75 +395,6 @@ component Bar inherits Rectangle {
         animate width {
             duration: 400ms;
             easing: ease-out;
-        }
-    }
-}
-
-// The three steps of the setup as dots. The current step is wide.
-component Dots inherits HorizontalLayout {
-    in property <int> current;
-    in property <length> px: 1px;
-    spacing: 6 * root.px;
-    alignment: center;
-    for i in 3: VerticalLayout {
-        alignment: center;
-        Rectangle {
-            width: (i == root.current ? 20 : 6) * root.px;
-            height: 6 * root.px;
-            border-radius: 3 * root.px;
-            background: i <= root.current ? Theme.accent : Theme.edge;
-        }
-    }
-}
-
-// One step in the side panel. State: 0 not done, 1 current, 2 done.
-component Step inherits HorizontalLayout {
-    in property <string> label;
-    in property <string> value;
-    in property <int> state;
-    in property <length> px: 1px;
-    spacing: 12 * root.px;
-    alignment: start;
-    VerticalLayout {
-        alignment: start;
-        Rectangle {
-            width: 22 * root.px;
-            height: 22 * root.px;
-            border-radius: 11 * root.px;
-            background: root.state == 2 ? Theme.accent-solid : transparent;
-            border-width: root.state == 2 ? 0px : 2 * root.px;
-            border-color: root.state == 1 ? Theme.accent : Theme.edge;
-            if root.state == 2: Icon {
-                source: @image-url("icons/check.svg");
-                colorize: white;
-                size: 14 * root.px;
-            }
-            if root.state == 1: Rectangle {
-                width: 8 * root.px;
-                height: 8 * root.px;
-                border-radius: 4 * root.px;
-                background: Theme.accent;
-            }
-        }
-    }
-
-    VerticalLayout {
-        spacing: 3 * root.px;
-        alignment: start;
-        Text {
-            height: 22 * root.px;
-            text: root.label;
-            color: root.state == 0 ? Theme.dim : Theme.text;
-            font-size: 16 * root.px;
-            font-weight: 600;
-            vertical-alignment: center;
-        }
-
-        if root.value != "": Text {
-            text: root.value;
-            color: Theme.dim;
-            font-size: 14 * root.px;
-            wrap: word-wrap;
         }
     }
 }
@@ -697,6 +674,379 @@ component Brand inherits HorizontalLayout {
     }
 }
 
+// A title in the middle, with an optional line under it.
+component Heading inherits VerticalLayout {
+    in property <string> title;
+    in property <string> subtitle;
+    in property <bool> small;
+    in property <length> px: 1px;
+    spacing: 8 * root.px;
+    Text {
+        text: root.title;
+        color: Theme.text;
+        font-size: (root.small ? 24 : 32) * root.px;
+        font-weight: 700;
+        horizontal-alignment: center;
+        wrap: word-wrap;
+    }
+
+    if root.subtitle != "": Text {
+        text: root.subtitle;
+        color: Theme.dim;
+        font-size: (root.small ? 15 : 17) * root.px;
+        horizontal-alignment: center;
+        wrap: word-wrap;
+    }
+}
+
+// The logo in the middle of its row.
+component Logo inherits HorizontalLayout {
+    in property <image> logo;
+    in property <string> product;
+    in property <length> size;
+    in property <length> limit;
+    alignment: center;
+    Brand {
+        logo: root.logo;
+        product: root.product;
+        size: root.size;
+        limit: root.limit;
+    }
+}
+
+// The network state in one quiet line: a dot, the state, the address.
+component NetStatus inherits Rectangle {
+    in property <string> ip;
+    in property <length> px: 1px;
+    width: min(row.preferred-width, 10000px);
+    height: 36 * root.px;
+    border-radius: self.height / 2;
+    background: Theme.surface;
+    border-width: 1px;
+    border-color: Theme.border;
+    row := HorizontalLayout {
+        padding-left: 14 * root.px;
+        padding-right: 16 * root.px;
+        spacing: 10 * root.px;
+        VerticalLayout {
+            alignment: center;
+            Rectangle {
+                width: 8 * root.px;
+                height: 8 * root.px;
+                border-radius: 4 * root.px;
+                background: root.ip != "" ? Theme.success : Theme.faint;
+            }
+        }
+
+        Text {
+            text: root.ip != "" ? "Connected" : "Not connected";
+            color: Theme.text;
+            font-size: 14 * root.px;
+            font-weight: 600;
+            vertical-alignment: center;
+        }
+
+        if root.ip != "": Text {
+            text: root.ip;
+            color: Theme.dim;
+            font-size: 14 * root.px;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+    }
+}
+
+// The result of the git account lookup.
+component GitCard inherits Rectangle {
+    in property <string> title;
+    in property <string> detail;
+    in property <bool> found;
+    in property <bool> warn;
+    in property <bool> checking;
+    in property <length> px: 1px;
+    border-radius: 10 * root.px;
+    background: Theme.surface;
+    border-width: 1px;
+    border-color: Theme.border;
+    HorizontalLayout {
+        padding: 12 * root.px;
+        padding-left: 14 * root.px;
+        spacing: 12 * root.px;
+        VerticalLayout {
+            alignment: center;
+            horizontal-stretch: 0;
+            Rectangle {
+                width: 28 * root.px;
+                height: 28 * root.px;
+                border-radius: 14 * root.px;
+                background: root.found ? Theme.success : root.warn ? Theme.warning : Theme.field;
+                if root.found: Icon {
+                    source: @image-url("icons/check.svg");
+                    colorize: white;
+                    size: 16 * root.px;
+                }
+                if root.warn: Icon {
+                    source: @image-url("icons/alert.svg");
+                    colorize: Theme.bg;
+                    size: 16 * root.px;
+                }
+            }
+        }
+
+        VerticalLayout {
+            alignment: center;
+            spacing: 4 * root.px;
+            Text {
+                text: root.title;
+                color: Theme.text;
+                font-size: 15 * root.px;
+                font-weight: 600;
+                overflow: elide;
+            }
+
+            if root.detail != "": Text {
+                text: root.detail;
+                color: Theme.dim;
+                font-size: 14 * root.px;
+                overflow: elide;
+            }
+            if root.checking: Bar {
+                px: root.px;
+                indeterminate: true;
+            }
+        }
+    }
+}
+
+// A check box with a label and a quiet second line. Space or a press changes it.
+component CheckRow inherits Rectangle {
+    in property <string> text;
+    in property <string> detail;
+    in-out property <bool> checked;
+    in property <length> px: 1px;
+    min-height: 48 * root.px;
+    border-radius: 8 * root.px;
+    background: ta.has-hover ? Theme.field : transparent;
+    HorizontalLayout {
+        padding-left: 8 * root.px;
+        padding-right: 8 * root.px;
+        spacing: 12 * root.px;
+        VerticalLayout {
+            alignment: center;
+            horizontal-stretch: 0;
+            Rectangle {
+                width: 24 * root.px;
+                height: 24 * root.px;
+                border-radius: 6 * root.px;
+                background: root.checked ? Theme.accent-solid : Theme.field;
+                border-width: fs.has-focus ? 2px : 1px;
+                border-color: fs.has-focus ? Theme.accent : root.checked ? Theme.accent-solid : Theme.edge;
+                if root.checked: Icon {
+                    source: @image-url("icons/check.svg");
+                    colorize: white;
+                    size: 16 * root.px;
+                }
+            }
+        }
+
+        VerticalLayout {
+            alignment: center;
+            spacing: 2 * root.px;
+            Text {
+                text: root.text;
+                color: Theme.text;
+                font-size: 15 * root.px;
+                overflow: elide;
+            }
+
+            if root.detail != "": Text {
+                text: root.detail;
+                color: Theme.dim;
+                font-size: 13 * root.px;
+                overflow: elide;
+            }
+        }
+    }
+
+    fs := FocusScope {
+        key-pressed(event) => {
+            if event.text == " " {
+                root.checked = !root.checked;
+                return accept;
+            }
+            return reject;
+        }
+    }
+
+    ta := TouchArea {
+        clicked => {
+            fs.focus();
+            root.checked = !root.checked;
+        }
+    }
+}
+
+// A setting with its value. A press opens its list.
+component SettingRow inherits Rectangle {
+    in property <string> label;
+    in property <string> value;
+    in property <length> px: 1px;
+    callback clicked;
+    height: 48 * root.px;
+    border-radius: 8 * root.px;
+    background: ta.has-hover || fs.has-focus ? Theme.field : transparent;
+    border-width: fs.has-focus ? 2px : 0px;
+    border-color: Theme.accent;
+    HorizontalLayout {
+        padding-left: 8 * root.px;
+        padding-right: 12 * root.px;
+        spacing: 12 * root.px;
+        Text {
+            horizontal-stretch: 0;
+            min-width: 120 * root.px;
+            text: root.label;
+            color: Theme.dim;
+            font-size: 15 * root.px;
+            vertical-alignment: center;
+        }
+
+        Text {
+            horizontal-stretch: 1;
+            text: root.value;
+            color: Theme.text;
+            font-size: 15 * root.px;
+            horizontal-alignment: right;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+
+        Text {
+            horizontal-stretch: 0;
+            text: "›";
+            color: Theme.dim;
+            font-size: 20 * root.px;
+            vertical-alignment: center;
+        }
+    }
+
+    fs := FocusScope {
+        key-pressed(event) => {
+            if event.text == Key.Return || event.text == " " {
+                root.clicked();
+                return accept;
+            }
+            return reject;
+        }
+    }
+
+    ta := TouchArea {
+        clicked => {
+            fs.focus();
+            root.clicked();
+        }
+    }
+}
+
+// A row that opens or closes the section under it.
+component Disclosure inherits Rectangle {
+    in property <string> text;
+    in property <string> summary;
+    in-out property <bool> open;
+    in property <length> px: 1px;
+    height: 48 * root.px;
+    border-radius: 8 * root.px;
+    background: ta.has-hover || fs.has-focus ? Theme.field : transparent;
+    border-width: fs.has-focus ? 2px : 0px;
+    border-color: Theme.accent;
+    HorizontalLayout {
+        padding-left: 8 * root.px;
+        padding-right: 12 * root.px;
+        spacing: 10 * root.px;
+        Text {
+            horizontal-stretch: 0;
+            width: 16 * root.px;
+            text: root.open ? "▾" : "▸";
+            color: Theme.dim;
+            font-size: 16 * root.px;
+            vertical-alignment: center;
+        }
+
+        Text {
+            horizontal-stretch: 0;
+            text: root.text;
+            color: Theme.text;
+            font-size: 16 * root.px;
+            vertical-alignment: center;
+        }
+
+        Text {
+            horizontal-stretch: 1;
+            text: root.open ? "" : root.summary;
+            color: Theme.dim;
+            font-size: 14 * root.px;
+            horizontal-alignment: right;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+    }
+
+    fs := FocusScope {
+        key-pressed(event) => {
+            if event.text == Key.Return || event.text == " " {
+                root.open = !root.open;
+                return accept;
+            }
+            return reject;
+        }
+    }
+
+    ta := TouchArea {
+        clicked => {
+            fs.focus();
+            root.open = !root.open;
+        }
+    }
+}
+
+// A quiet text button.
+component LinkButton inherits Rectangle {
+    in property <string> text;
+    in property <bool> enabled: true;
+    in property <length> px: 1px;
+    callback clicked;
+    height: 44 * root.px;
+    min-width: label.preferred-width + 24 * root.px;
+    horizontal-stretch: 0;
+    border-radius: 8 * root.px;
+    background: fs.has-focus ? Theme.field : transparent;
+    border-width: fs.has-focus ? 2px : 0px;
+    border-color: Theme.accent;
+    label := Text {
+        text: root.text;
+        color: !root.enabled ? Theme.faint : ta.has-hover ? Theme.text : Theme.dim;
+        font-size: 16 * root.px;
+    }
+
+    fs := FocusScope {
+        enabled: root.enabled;
+        key-pressed(event) => {
+            if event.text == Key.Return || event.text == " " {
+                root.clicked();
+                return accept;
+            }
+            return reject;
+        }
+    }
+
+    ta := TouchArea {
+        enabled: root.enabled;
+        clicked => {
+            fs.focus();
+            root.clicked();
+        }
+    }
+}
+
 export component AppWindow inherits Window {
     title: "Armbian setup";
     preferred-width: 1280px;
@@ -708,14 +1058,12 @@ export component AppWindow inherits Window {
 
     in property <image> logo: @image-url("armbian-logo.svg");
     in property <image> background-image;
-    // The default background, made for the size of the screen and the accent.
-    in property <image> backdrop;
     in property <bool> has-background;
     // Empty: the logo.
     in property <string> product;
     in property <bool> dry-run;
 
-    // 0 network check, 1 Wi-Fi, 2 account, 3 region, 4 apply.
+    // 0 network check, 1 Wi-Fi, 2 quick setup, 3 region, 4 apply.
     in-out property <int> page: 0;
     in property <string> status;
 
@@ -735,6 +1083,8 @@ export component AppWindow inherits Window {
     in property <int> kb-current: -1;
     in property <string> keyboard;
 
+    // The first field: a local username, or "@user" for a git account.
+    in-out property <string> account;
     in-out property <string> realname;
     in-out property <string> username;
     in-out property <string> password;
@@ -743,9 +1093,14 @@ export component AppWindow inherits Window {
     in-out property <string> shell: "bash";
     // IPv4 addresses, for SSH. Empty without a network.
     in property <string> ip-address;
+    // Rust: the form is complete and no lookup runs.
+    in property <bool> can-apply;
+    // An error of the username, under the first field.
+    in property <string> account-error;
 
-    // Git account: "@user" in the name field. Rust looks it up and fills the account fields.
-    in property <string> git-status;
+    // Git account lookup: a title and a detail line.
+    in property <string> git-title;
+    in property <string> git-detail;
     in property <bool> git-found;
     in property <bool> git-warn;
     in property <bool> git-checking;
@@ -753,9 +1108,15 @@ export component AppWindow inherits Window {
     in property <string> git-name;
     in property <string> git-username;
     in property <string> git-source;
+    // What the account brings. The user can turn each off.
+    in property <int> git-keys;
+    in property <string> git-keys-url;
+    in property <string> git-dotfiles-url;
+    in-out property <bool> import-keys: true;
+    in-out property <bool> import-dotfiles: true;
     // Rust adds 1 after it fills the fields from a git account: the password gets the focus.
     in property <int> git-filled;
-    // The keyboard step before the Wi-Fi page: page 3 with the keyboard list only.
+    // Page 3 with the keyboard list only, opened from the Wi-Fi page.
     in property <bool> keyboard-only;
 
     in property <string> error;
@@ -775,10 +1136,12 @@ export component AppWindow inherits Window {
     callback pick-locale(int);
     callback search-kb(string);
     callback pick-kb(int);
+    callback account-edited(string);
     callback realname-edited(string);
     callback username-edited(string);
     callback git-changed();
     callback change-region();
+    callback change-keyboard();
     callback region-done();
     callback region-cancel();
     callback apply();
@@ -791,49 +1154,44 @@ export component AppWindow inherits Window {
     property <bool> screen-keyboard-visible: InputCapabilities.has-touchscreen && TextInputInterface.text-input-focused && root.page >= 1 && root.page <= 3 && !root.wifi-busy;
     property <length> screen-keyboard-height: min(280 * root.px, root.height * 0.4);
     property <length> content-height: root.height - (root.screen-keyboard-visible ? root.screen-keyboard-height : 0px);
-
-    property <[string]> titles: ["Welcome", "Connect to a wireless network", "Create your account", self.keyboard-only ? "Choose your keyboard" : "Region and keyboard", "Applying settings"];
+    // With the on-screen keyboard open, decorations hide and the content scrolls.
+    property <bool> typing: root.screen-keyboard-visible;
 
     // Layout. Large screens: all sizes grow, to 2 times at most.
     property <float> scale: max(1, min(2, min(self.width / 1280px, self.height / 800px)));
     property <length> px: 1px * self.scale;
-    // Narrow screens have no side part. Low screens use less space between rows.
     property <bool> compact: self.width < 940px;
     property <bool> dense: self.content-height < 560px;
-    // Pages without input have no side part: the text is in the middle.
-    property <bool> stage: self.page == 0 || self.page == 4;
+    property <length> side: self.compact ? 16px : 32 * self.px;
+    // One column for all pages. The region lists use a little more width.
+    property <length> col-w: min(self.width - 2 * self.side, (self.page == 3 ? 720 : 600) * self.px);
+    property <length> vpad: self.typing ? 8 * self.px : self.dense ? 16 * self.px : 40 * self.px;
+    property <length> gap: (self.typing ? 10 : self.dense ? 14 : 20) * self.px;
+    // Password labels go left of the box when the column is wide enough.
+    property <length> inline-w: self.col-w >= 520 * self.px ? 170 * self.px : 0px;
+    property <length> logo-size: (self.dense ? 30 : 40) * self.px;
     property <bool> with-log: self.page == 4 && (self.failed || self.dry-run);
-    property <bool> rail: !self.compact && !self.stage && !self.screen-keyboard-visible;
-    property <length> edge: self.screen-keyboard-visible ? 8 * self.px : self.compact ? 12px : 32 * self.px;
-    property <length> free-w: self.width - 2 * self.edge;
-    property <length> free-h: self.content-height - 2 * self.edge;
-    property <length> pad: self.screen-keyboard-visible ? 8 * self.px : self.compact ? 18px : 40 * self.px;
-    // One box for all pages.
-    property <length> box-w: self.compact ? min(self.free-w, 760px) : min(self.free-w, 1000 * self.px);
-    property <length> box-h: min(self.free-h, self.compact ? 560px : 600 * self.px);
-    property <length> radius: self.compact ? 18px : 24 * self.px;
-    property <length> rail-w: self.rail ? max(260px, min(340 * self.px, self.box-w * 0.34)) : 0px;
-    // Width of the text, and of the line, on the pages without input.
-    property <length> wait-w: min(self.box-w - 2 * self.pad, 640 * self.px);
-    property <length> line-w: min(self.wait-w, 400 * self.px);
-    // The box has its full height: the account page uses more space between its parts.
-    property <bool> roomy: !self.dense && self.box-h >= 590 * self.px;
-    // 0 network, 1 account, 2 setup.
-    property <int> phase: self.page <= 1 || self.keyboard-only ? 0 : self.page <= 3 ? 1 : 2;
-    property <string> apply-title: self.failed ? "Setup failed" : self.dry-run ? "Dry run complete" : self.titles[4];
+    property <string> apply-title: self.failed ? "Setup failed" : self.dry-run ? "Dry run complete" : "Applying settings…";
     property <string> apply-status: self.failed ? "The text setup asks the same questions on this screen." : self.dry-run ? "Press Enter to close." : "";
-    // Which region list shows: 0 time zone, 1 language, 2 keyboard.
-    property <int> region-tab: 0;
+    // Which region list shows: 0 time zone, 1 language, 2 keyboard. Set before change-region().
+    in-out property <int> region-tab: 0;
+    property <bool> customize-open;
+    property <string> summary: (root.shell == "zsh" ? "Zsh" : "Bash") + " · " + root.locale + " · " + root.timezone + " · " + root.keyboard;
 
-    // Background: the configured image, else the light that Rust makes as an image
-    // (src/backdrop.rs). No gradient here: an opaque image is fast in the software
-    // renderer, and blending on large areas is very slow on some GPUs.
-    if !root.has-background: Image {
-        width: 100%;
-        height: 100%;
-        source: root.backdrop;
-        image-fit: fill;
+    // Scroll the content so that a field at this window position is in view.
+    function reveal(y: length, h: length) {
+        let at = y - flick.absolute-position.y - flick.viewport-y;
+        let first = at - 8 * root.px;
+        let last = at + h + 8 * root.px;
+        let lowest = -max(0px, flick.viewport-height - flick.height);
+        if first < -flick.viewport-y {
+            flick.viewport-y = max(lowest, min(0px, -first));
+        } else if last > -flick.viewport-y + flick.height {
+            flick.viewport-y = max(lowest, min(0px, -(last - flick.height)));
+        }
     }
+
+    // A configured background image. Else the plain dark background.
     if root.has-background: Image {
         width: 100%;
         height: 100%;
@@ -857,271 +1215,64 @@ export component AppWindow inherits Window {
             return reject;
         }
 
-        // The box. Opaque, no blurred shadow: the software renderer draws it fast on large screens.
-        Rectangle {
-            x: (root.width - root.box-w) / 2;
-            y: (root.content-height - root.box-h) / 2;
-            width: root.box-w;
-            height: root.box-h;
-            border-radius: root.radius;
-            background: Theme.card;
+        // The content scrolls when it is higher than the screen. Shorter content stays in the middle.
+        flick := Flickable {
+            x: 0px;
+            y: 0px;
+            width: root.width;
+            height: root.content-height;
+            viewport-width: self.width;
+            viewport-height: max(self.height, col.preferred-height);
+            col := VerticalLayout {
+                x: (flick.width - root.col-w) / 2;
+                width: root.col-w;
+                height: flick.viewport-height;
+                padding-top: root.vpad;
+                padding-bottom: root.vpad;
+                alignment: root.page == 3 || root.with-log ? stretch : center;
 
-            // The side part is darker. Two fills make its round corners on the left only:
-            // the renderer cannot clip a fill to the round box.
-            if root.rail: Rectangle {
-                x: 0px;
-                width: root.rail-w + root.radius;
-                height: 100%;
-                border-radius: root.radius;
-                background: Theme.rail;
-            }
-            if root.rail: Rectangle {
-                x: root.rail-w;
-                width: root.radius + 1px;
-                height: 100%;
-                background: Theme.card;
-            }
-            if root.rail: Rectangle {
-                x: root.rail-w;
-                width: 1px;
-                height: 100%;
-                background: Theme.border;
-            }
-            Rectangle {
-                width: 100%;
-                height: 100%;
-                border-radius: root.radius;
-                border-width: 1px;
-                border-color: Theme.border;
-            }
-
-            // Side part: where the user is, and what the page is for.
-            if root.rail: VerticalLayout {
-                x: 0px;
-                y: 0px;
-                width: root.rail-w;
-                height: parent.height;
-                padding: 36 * root.px;
-                padding-top: 40 * root.px;
-                Brand {
-                    logo: root.logo;
-                    product: root.product;
-                    size: 34 * root.px;
-                    limit: root.rail-w - 72 * root.px;
-                }
-
-                Rectangle {
-                    height: 36 * root.px;
-                }
-
-                Text {
-                    text: root.titles[root.page];
-                    color: Theme.text;
-                    font-size: 32 * root.px;
-                    font-weight: 700;
-                    letter-spacing: -0.6 * root.px;
-                    wrap: word-wrap;
-                }
-
-                Rectangle {
-                    height: 12 * root.px;
-                }
-
-                Text {
-                    text: root.page == 1 ? "Not connected yet. Select a network or connect a cable. The setup then continues." : root.page == 2 ? "This password is also the root password." : root.keyboard-only ? "You type the Wi-Fi password with this keyboard." : "Select the time zone, the language and the keyboard.";
-                    color: Theme.dim;
-                    font-size: 16 * root.px;
-                    wrap: word-wrap;
-                }
-
-                Rectangle {
-                    height: 36 * root.px;
-                }
-
-                VerticalLayout {
-                    spacing: 14 * root.px;
-                    Step {
-                        px: root.px;
-                        label: "Network";
-                        value: root.ip-address != "" ? "IP " + root.ip-address : root.page == 1 || root.keyboard-only ? "" : "Not connected";
-                        state: root.page == 1 || root.keyboard-only ? 1 : root.ip-address != "" ? 2 : 0;
-                    }
-
-                    Step {
-                        px: root.px;
-                        label: "Account";
-                        state: root.page == 1 || root.keyboard-only ? 0 : 1;
-                    }
-
-                    Step {
-                        px: root.px;
-                        label: "Setup";
-                        state: 0;
-                    }
-                }
-
-                Rectangle {
-                    vertical-stretch: 1;
-                }
-
-                // The keys of the page, as one quiet text.
-                Text {
-                    text: root.page == 1 ? "Keys: Up and Down select a network. Enter connects. Esc skips." : root.page == 2 ? "Keys: Tab goes to the next field. Enter starts the setup." : root.keyboard-only ? "Keys: Up and Down select. Tab goes to the search. Enter continues." : "Keys: Tab goes to the next part. Up and Down select. Enter is Done. Esc is Cancel.";
-                    color: Theme.faint;
-                    font-size: 13 * root.px;
-                    wrap: word-wrap;
-                }
-            }
-
-            // Work part: the inputs, then the buttons.
-            VerticalLayout {
-                x: root.rail-w;
-                y: 0px;
-                width: parent.width - root.rail-w;
-                height: parent.height;
-                padding: root.pad;
-                spacing: (root.screen-keyboard-visible ? 8 : root.dense ? 12 : 24) * root.px;
-
-                // Narrow screens: logo, page title and step in one line.
-                if root.compact && !root.stage && !root.screen-keyboard-visible: HorizontalLayout {
-                    vertical-stretch: 0;
-                    height: 30px;
-                    spacing: 14px;
-                    VerticalLayout {
-                        alignment: center;
-                        horizontal-stretch: 0;
-                        Brand {
-                            logo: root.logo;
-                            product: root.product;
-                            size: 26px;
-                            limit: 240px;
+                // 0: network check. 4: setup. Only the logo, one line and the progress.
+                if root.page == 0 || (root.page == 4 && !root.with-log): VerticalLayout {
+                    spacing: (root.dense ? 28 : 40) * root.px;
+                    Timer {
+                        interval: 1ms;
+                        running: root.page == 4;
+                        triggered => {
+                            self.running = false;
+                            keys.focus();
                         }
                     }
-
-                    Rectangle {
-                        width: 1px;
-                        background: Theme.border;
+                    Logo {
+                        logo: root.logo;
+                        product: root.product;
+                        size: (root.dense ? 36 : 48) * root.px;
+                        limit: root.col-w;
                     }
 
-                    Text {
-                        horizontal-stretch: 1;
-                        text: root.titles[root.page];
-                        color: Theme.text;
-                        font-size: 18px;
-                        font-weight: 700;
-                        vertical-alignment: center;
-                        overflow: elide;
-                    }
-
-                    if root.ip-address != "": Text {
-                        horizontal-stretch: 0;
-                        text: "IP " + root.ip-address;
-                        color: Theme.dim;
-                        font-size: 13px;
-                        vertical-alignment: center;
-                    }
-                    Dots {
-                        horizontal-stretch: 0;
-                        current: root.phase;
-                    }
-                }
-
-                // Keep the page title visible while typing.
-                if root.screen-keyboard-visible: Text {
-                    vertical-stretch: 0;
-                    text: root.titles[root.page];
-                    color: Theme.text;
-                    font-size: 22 * root.px;
-                    font-weight: 600;
-                    overflow: elide;
-                }
-
-                // 0: network check and location.
-                if root.page == 0: HorizontalLayout {
-                    vertical-stretch: 1;
-                    alignment: center;
-                    VerticalLayout {
-                        width: root.wait-w;
-                        alignment: center;
-                        spacing: (root.dense ? 36 : 52) * root.px;
-                        HorizontalLayout {
-                            alignment: center;
-                            Brand {
-                                logo: root.logo;
-                                product: root.product;
-                                size: (root.dense ? 38 : 48) * root.px;
-                                limit: root.wait-w;
-                            }
-                        }
-
-                        VerticalLayout {
-                            spacing: 14 * root.px;
-                            Text {
-                                text: root.titles[0];
-                                color: Theme.text;
-                                font-size: (root.dense ? 44 : 56) * root.px;
-                                font-weight: 700;
-                                letter-spacing: -1.2 * root.px;
-                                horizontal-alignment: center;
-                            }
-
-                            Text {
-                                text: root.status;
-                                color: Theme.dim;
-                                font-size: (root.dense ? 18 : 20) * root.px;
-                                horizontal-alignment: center;
-                                wrap: word-wrap;
-                            }
-                        }
-
-                        HorizontalLayout {
-                            alignment: center;
-                            Bar {
-                                width: root.line-w;
-                                px: root.px;
-                                height: 6 * root.px;
-                                indeterminate: true;
-                            }
-                        }
-                    }
-                }
-
-                // 1: Wi-Fi. Optional: Skip continues without a network.
-                // The name of the list, and a new search. Not in the key scope below: Enter must press Scan.
-                if root.page == 1 && !root.screen-keyboard-visible: HorizontalLayout {
-                    vertical-stretch: 0;
-                    spacing: 16 * root.px;
-                    Text {
-                        horizontal-stretch: 1;
-                        text: root.compact ? "Not connected yet. Select a network or connect a cable." : "Wireless networks";
-                        color: Theme.dim;
-                        font-size: 14 * root.px;
-                        font-weight: root.compact ? 400 : 600;
-                        vertical-alignment: center;
-                        overflow: elide;
-                    }
-
-                    PillButton {
+                    Heading {
                         px: root.px;
                         small: true;
-                        text: "Scan";
-                        enabled: !root.wifi-busy;
-                        clicked => {
-                            root.wifi-rescan();
+                        title: root.page == 0 ? root.status : root.apply-title;
+                        subtitle: root.page == 4 ? root.apply-status : "";
+                    }
+
+                    HorizontalLayout {
+                        alignment: center;
+                        Bar {
+                            width: min(root.col-w, 320 * root.px);
+                            px: root.px;
+                            height: 4 * root.px;
+                            indeterminate: root.page == 0;
+                            progress: root.progress;
                         }
                     }
                 }
-                // Keys: Up/Down select, Enter password or connect, Escape skip.
+
+                // 1: Wi-Fi. Keys: Up/Down select, Enter password or connect, Escape skip.
                 if root.page == 1: wifi := FocusScope {
                     focus-on-click: false;
-                    vertical-stretch: 1;
-                    // Fill the list, but do not squeeze a row below its text height.
-                    property <length> row-min: (root.dense ? 44 : 52) * root.px;
-                    property <length> row-height: max(self.row-min, nets-box.height / max(1, floor(nets-box.height / self.row-min)));
-                    // Defer geometry observation to avoid recursive layout during page creation.
-                    property <bool> layout-ready;
-                    property <length> available-height: self.layout-ready ? nets.visible-height : 0px;
-                    property <length> list-height: self.layout-ready ? nets.viewport-height : 0px;
+                    property <length> row-h: (root.dense ? 48 : 52) * root.px;
+                    property <int> rows-shown: max(root.typing ? 2 : 3, min(root.typing ? 3 : 5, root.wifi-model.length));
                     function select(i: int) {
                         if root.wifi-model.length == 0 {
                             return;
@@ -1134,16 +1285,13 @@ export component AppWindow inherits Window {
                         if root.wifi-current < 0 {
                             return;
                         }
-                        if root.wifi-current * wifi.row-height < -nets.viewport-y {
-                            nets.viewport-y = -root.wifi-current * wifi.row-height;
+                        if root.wifi-current * wifi.row-h < -nets.viewport-y {
+                            nets.viewport-y = -root.wifi-current * wifi.row-h;
                         }
-                        if (root.wifi-current + 1) * wifi.row-height > -nets.viewport-y + nets.visible-height {
-                            nets.viewport-y = -((root.wifi-current + 1) * wifi.row-height - nets.visible-height);
+                        if (root.wifi-current + 1) * wifi.row-h > -nets.viewport-y + nets.visible-height {
+                            nets.viewport-y = -((root.wifi-current + 1) * wifi.row-h - nets.visible-height);
                         }
                     }
-                    // Keep the selected network visible when the keyboard resizes the list.
-                    changed available-height => { scroll(); }
-                    changed list-height => { scroll(); }
                     function needs-password() -> bool {
                         return root.wifi-current >= 0 && root.wifi-model[root.wifi-current].secure;
                     }
@@ -1178,63 +1326,131 @@ export component AppWindow inherits Window {
                         running: true;
                         triggered => {
                             self.running = false;
-                            wifi.layout-ready = true;
                             wifi.focus();
                         }
                     }
 
                     VerticalLayout {
-                        spacing: (root.dense ? 8 : 12) * root.px;
-                        nets-box := Rectangle {
-                            vertical-stretch: 1;
-                            nets := ListView {
-                                for net[i] in root.wifi-model: Rectangle {
-                                    height: wifi.row-height;
-                                    Rectangle {
-                                        y: 2 * root.px;
-                                        height: parent.height - 4 * root.px;
-                                        border-radius: 12 * root.px;
-                                        background: i == root.wifi-current ? Theme.accent-soft : ta.has-hover ? Theme.field : transparent;
-                                        border-width: i == root.wifi-current ? 1px : 0px;
-                                        border-color: Theme.accent-line;
-                                        HorizontalLayout {
-                                            padding-left: 16 * root.px;
-                                            padding-right: 16 * root.px;
-                                            spacing: 14 * root.px;
-                                            Text {
-                                                horizontal-stretch: 1;
-                                                text: net.ssid;
-                                                color: Theme.text;
-                                                font-size: 17 * root.px;
-                                                font-weight: i == root.wifi-current ? 600 : 400;
-                                                vertical-alignment: center;
-                                                overflow: elide;
-                                            }
+                        spacing: root.gap;
+                        if !root.typing: VerticalLayout {
+                            spacing: (root.dense ? 12 : 20) * root.px;
+                            Logo {
+                                logo: root.logo;
+                                product: root.product;
+                                size: root.logo-size;
+                                limit: root.col-w;
+                            }
 
-                                            // A lock for a network with a password. Words for an open one.
-                                            if net.secure: VerticalLayout {
-                                                alignment: center;
-                                                horizontal-stretch: 0;
-                                                Icon {
-                                                    source: @image-url("icons/lock.svg");
-                                                    colorize: Theme.faint;
-                                                    size: 16 * root.px;
-                                                }
+                            Heading {
+                                px: root.px;
+                                small: root.dense;
+                                title: "Connect to Wi-Fi";
+                                subtitle: root.dense ? "" : "Choose a network and enter the password.";
+                            }
+                        }
+
+                        // The keyboard comes before the password. Not in the key scope: Enter presses the buttons.
+                        HorizontalLayout {
+                            spacing: 12 * root.px;
+                            Text {
+                                horizontal-stretch: 0;
+                                text: "Keyboard";
+                                color: Theme.dim;
+                                font-size: 15 * root.px;
+                                vertical-alignment: center;
+                            }
+
+                            Text {
+                                horizontal-stretch: 1;
+                                text: root.keyboard;
+                                color: Theme.text;
+                                font-size: 15 * root.px;
+                                vertical-alignment: center;
+                                overflow: elide;
+                            }
+
+                            PillButton {
+                                px: root.px;
+                                small: true;
+                                text: "Change";
+                                enabled: !root.wifi-busy;
+                                clicked => {
+                                    root.change-keyboard();
+                                }
+                            }
+
+                            PillButton {
+                                px: root.px;
+                                small: true;
+                                text: "Scan";
+                                enabled: !root.wifi-busy;
+                                clicked => {
+                                    root.wifi-rescan();
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            height: wifi.rows-shown * wifi.row-h + 2px;
+                            border-radius: 10 * root.px;
+                            border-width: 1px;
+                            border-color: Theme.edge;
+                            clip: true;
+                            nets := ListView {
+                                x: 1px;
+                                y: 1px;
+                                width: parent.width - 2px;
+                                height: parent.height - 2px;
+                                for net[i] in root.wifi-model: Rectangle {
+                                    height: wifi.row-h;
+                                    background: i == root.wifi-current ? Theme.accent-soft : ta.has-hover ? Theme.field : transparent;
+                                    border-radius: 9 * root.px;
+                                    border-width: i == root.wifi-current ? 2px : 0px;
+                                    border-color: Theme.accent;
+                                    if i < root.wifi-model.length - 1 && i != root.wifi-current && i + 1 != root.wifi-current: Rectangle {
+                                        x: 12 * root.px;
+                                        y: parent.height - 1px;
+                                        width: parent.width - 24 * root.px;
+                                        height: 1px;
+                                        background: Theme.border;
+                                    }
+                                    HorizontalLayout {
+                                        padding-left: 16 * root.px;
+                                        padding-right: 16 * root.px;
+                                        spacing: 14 * root.px;
+                                        Text {
+                                            horizontal-stretch: 1;
+                                            text: net.ssid;
+                                            color: Theme.text;
+                                            font-size: 17 * root.px;
+                                            font-weight: i == root.wifi-current ? 600 : 400;
+                                            vertical-alignment: center;
+                                            overflow: elide;
+                                        }
+
+                                        // A lock for a network with a password. Words for an open one.
+                                        if net.secure: VerticalLayout {
+                                            alignment: center;
+                                            horizontal-stretch: 0;
+                                            Icon {
+                                                source: @image-url("icons/lock.svg");
+                                                colorize: Theme.dim;
+                                                size: 16 * root.px;
                                             }
-                                            if !net.secure: Text {
-                                                horizontal-stretch: 0;
-                                                text: "Open";
-                                                color: Theme.dim;
-                                                font-size: 14 * root.px;
-                                                vertical-alignment: center;
-                                            }
-                                            VerticalLayout {
-                                                alignment: center;
-                                                horizontal-stretch: 0;
-                                                Bars {
-                                                    px: root.px;
-                                                    signal: net.signal;
-                                                }
+                                        }
+                                        if !net.secure: Text {
+                                            horizontal-stretch: 0;
+                                            text: "Open";
+                                            color: Theme.dim;
+                                            font-size: 14 * root.px;
+                                            vertical-alignment: center;
+                                        }
+                                        VerticalLayout {
+                                            alignment: center;
+                                            horizontal-stretch: 0;
+                                            Bars {
+                                                px: root.px;
+                                                signal: net.signal;
                                             }
                                         }
                                     }
@@ -1256,19 +1472,11 @@ export component AppWindow inherits Window {
                             // No list yet: the shape of the rows during the search, else the result.
                             if root.wifi-model.length == 0 && root.wifi-busy: VerticalLayout {
                                 alignment: start;
-                                for i in 4: Rectangle {
-                                    height: wifi.row-height;
+                                for i in 3: Rectangle {
+                                    height: wifi.row-h;
                                     Rectangle {
                                         x: 16 * root.px;
                                         width: (150 + mod(i * 70, 110)) * root.px;
-                                        height: 12 * root.px;
-                                        border-radius: 6 * root.px;
-                                        background: Theme.field;
-                                    }
-
-                                    Rectangle {
-                                        x: parent.width - 60 * root.px;
-                                        width: 44 * root.px;
                                         height: 12 * root.px;
                                         border-radius: 6 * root.px;
                                         background: Theme.field;
@@ -1278,49 +1486,42 @@ export component AppWindow inherits Window {
                             if root.wifi-model.length == 0 && !root.wifi-busy: Text {
                                 text: root.wifi-status;
                                 color: Theme.dim;
-                                font-size: 17 * root.px;
+                                font-size: 16 * root.px;
                                 horizontal-alignment: center;
                                 vertical-alignment: center;
                             }
                         }
 
-                        // Reserve this row for a password or an open-network notice.
+                        // Open networks have no password: the field takes no space. It stays in the
+                        // tree, so that the keys can focus it. The margin keeps its focus ring in view.
                         Rectangle {
-                            vertical-stretch: 0;
-                            height: (root.dense ? 46 : 52) * root.px;
-                            // Always in the tree, so that the keys can focus it.
+                            height: wifi.needs-password() ? password.preferred-height + 8 * root.px : 0px;
+                            clip: true;
                             password := Field {
-                                width: 100%;
-                                height: 100%;
+                                x: 4 * root.px;
+                                y: 4 * root.px;
+                                width: parent.width - 8 * root.px;
                                 px: root.px;
                                 dense: root.dense;
-                                visible: needs-password();
+                                label: "Password";
+                                label-width: root.inline-w;
                                 text <=> root.wifi-password;
                                 password: true;
-                                placeholder: root.wifi-current >= 0 ? "Password for " + root.wifi-model[root.wifi-current].ssid : "";
-                            }
-
-                            if root.wifi-current >= 0 && !needs-password(): Text {
-                                x: 16 * root.px;
-                                width: parent.width - 32 * root.px;
-                                height: 100%;
-                                text: "This network has no password.";
-                                color: Theme.dim;
-                                font-size: 15 * root.px;
-                                vertical-alignment: center;
-                                overflow: elide;
+                                placeholder: root.inline-w > 0 ? "" : "Password for " + (root.wifi-current >= 0 ? root.wifi-model[root.wifi-current].ssid : "");
+                                watch: root.content-height;
+                                reveal(y, h) => {
+                                    root.reveal(y, h);
+                                }
                             }
                         }
 
-                        HorizontalLayout {
-                            min-height: 22 * root.px;
-                            vertical-stretch: 0;
+                        if root.error != "" || root.wifi-busy || (root.wifi-status != "" && root.wifi-model.length > 0): HorizontalLayout {
                             spacing: 16 * root.px;
                             Note {
                                 px: root.px;
                                 horizontal-stretch: 1;
                                 error: root.error != "";
-                                text: root.error != "" ? root.error : root.wifi-model.length == 0 && !root.wifi-busy ? "" : root.wifi-status;
+                                text: root.error != "" ? root.error : root.wifi-status;
                             }
 
                             if root.wifi-busy: VerticalLayout {
@@ -1332,358 +1533,476 @@ export component AppWindow inherits Window {
                                 }
                             }
                         }
+
+                        PillButton {
+                            px: root.px;
+                            primary: true;
+                            wide: true;
+                            text: "Connect  →";
+                            enabled: root.wifi-current >= 0 && !root.wifi-busy;
+                            clicked => {
+                                root.wifi-connect();
+                            }
+                        }
+
+                        HorizontalLayout {
+                            alignment: center;
+                            LinkButton {
+                                px: root.px;
+                                text: "Skip for now";
+                                enabled: !root.wifi-busy;
+                                clicked => {
+                                    root.wifi-skip();
+                                }
+                            }
+                        }
                     }
                 }
 
-                // 2: account. The region is one quiet line with a way to change it.
+                // 2: quick setup. One screen: username or @user, password, optional settings.
                 if root.page == 2: VerticalLayout {
-                    vertical-stretch: 1;
-                    // The form is shorter than its space: it stays in the middle.
-                    alignment: center;
-                    spacing: (root.dense ? 16 : root.roomy ? 24 : 20) * root.px;
-                    // Focus after the first layout: the name, or the password after a restart.
+                    spacing: root.gap;
+                    // Focus after the first layout: the username, or the password after a restart.
                     Timer {
                         interval: 1ms;
                         running: true;
                         triggered => {
                             self.running = false;
-                            if root.realname == "" {
-                                name-field.focus();
+                            if root.account == "" {
+                                account-field.focus();
                             } else {
                                 password-field.focus();
                             }
                         }
                     }
-                    // A git account filled the fields: the password is next.
+                    // A git account filled the fields: the password is next, when the user is still in the account field.
                     property <int> filled: root.git-filled;
                     changed filled => {
-                        password-field.focus();
-                    }
-
-                    HorizontalLayout {
-                        spacing: 16 * root.px;
-                        name-field := Field {
-                            px: root.px;
-                            dense: root.dense;
-                            label: "Your name";
-                            note: root.git-name != "" && root.realname == root.git-name ? "from " + root.git-source : "";
-                            placeholder: root.ip-address != "" ? "Name or @github-user" : "";
-                            text <=> root.realname;
-                            edited(t) => {
-                                root.realname-edited(t);
-                            }
-                            accepted => {
-                                root.apply();
-                            }
-                        }
-
-                        Field {
-                            px: root.px;
-                            dense: root.dense;
-                            label: "Username";
-                            note: root.git-username != "" && root.username == root.git-username ? "from " + root.git-source : "";
-                            text <=> root.username;
-                            edited(t) => {
-                                root.username-edited(t);
-                            }
-                            accepted => {
-                                root.apply();
-                            }
+                        if account-field.focused {
+                            password-field.focus();
                         }
                     }
 
-                    if !root.dense && root.git-status != "": HorizontalLayout {
-                        height: 18 * root.px;
-                        spacing: 6 * root.px;
-                        if root.git-found: VerticalLayout {
+                    if !root.typing: VerticalLayout {
+                        spacing: (root.dense ? 12 : 20) * root.px;
+                        Logo {
+                            logo: root.logo;
+                            product: root.product;
+                            size: root.logo-size;
+                            limit: root.col-w;
+                        }
+
+                        Heading {
+                            px: root.px;
+                            small: root.dense;
+                            title: "Quick setup";
+                            subtitle: root.dense ? "" : "Create your account and finish the setup.";
+                        }
+
+                        HorizontalLayout {
                             alignment: center;
-                            Icon {
-                                source: @image-url("icons/check.svg");
-                                colorize: Theme.accent;
-                                size: 14 * root.px;
-                            }
-                        }
-                        Text {
-                            horizontal-stretch: 1;
-                            text: root.git-status;
-                            color: root.git-warn ? Theme.warning : Theme.dim;
-                            font-size: 13 * root.px;
-                            vertical-alignment: center;
-                            overflow: elide;
-                        }
-                    }
-
-                    HorizontalLayout {
-                        spacing: 16 * root.px;
-                        password-field := Field {
-                            px: root.px;
-                            dense: root.dense;
-                            label: "Password";
-                            text <=> root.password;
-                            password: true;
-                            accepted => {
-                                root.apply();
-                            }
-                        }
-
-                        Field {
-                            px: root.px;
-                            dense: root.dense;
-                            label: "Confirm password";
-                            text <=> root.password2;
-                            password: true;
-                            // The two passwords are not the same.
-                            invalid: root.password2 != "" && root.password2 != root.password;
-                            accepted => {
-                                root.apply();
+                            NetStatus {
+                                px: root.px;
+                                ip: root.ip-address;
                             }
                         }
                     }
 
-                    if !root.dense && !root.screen-keyboard-visible: Rectangle {
-                        height: (root.roomy ? 12 : 4) * root.px;
-                    }
-                    if root.has-zsh && !root.dense && !root.screen-keyboard-visible: ShellChoice {
+                    account-field := Field {
                         px: root.px;
-                        value <=> root.shell;
+                        dense: root.dense;
+                        label: "Username";
+                        placeholder: root.ip-address != "" ? "username or @github-user" : "username";
+                        help: root.typing ? "" : "Use username for a local account or @username to import your GitHub profile.";
+                        error-text: root.account-error;
+                        text <=> root.account;
+                        watch: root.content-height;
+                        reveal(y, h) => {
+                            root.reveal(y, h);
+                        }
+                        edited(t) => {
+                            root.account-edited(t);
+                        }
+                        accepted => {
+                            root.apply();
+                        }
                     }
-                    if root.has-zsh && !root.dense && !root.screen-keyboard-visible: Rectangle {
-                        height: (root.roomy ? 12 : 4) * root.px;
+
+                    if root.git-title != "": GitCard {
+                        px: root.px;
+                        title: root.git-title;
+                        detail: root.git-detail;
+                        found: root.git-found;
+                        warn: root.git-warn;
+                        checking: root.git-checking;
                     }
-                    // Leave room for the account fields while the keyboard is open.
-                    if !root.screen-keyboard-visible: HorizontalLayout {
-                        spacing: 24 * root.px;
-                        if root.has-zsh && root.dense: ShellChoice {
+
+                    password-field := Field {
+                        px: root.px;
+                        dense: root.dense;
+                        label: "Password";
+                        label-width: root.inline-w;
+                        text <=> root.password;
+                        password: true;
+                        watch: root.content-height;
+                        reveal(y, h) => {
+                            root.reveal(y, h);
+                        }
+                        accepted => {
+                            root.apply();
+                        }
+                    }
+
+                    Field {
+                        px: root.px;
+                        dense: root.dense;
+                        label: "Confirm password";
+                        label-width: root.inline-w;
+                        text <=> root.password2;
+                        password: true;
+                        // The two passwords are not the same.
+                        invalid: root.password2 != "" && root.password2 != root.password;
+                        error-text: self.invalid ? "The passwords are not the same." : "";
+                        help: root.typing ? "" : "This password is also the root password.";
+                        watch: root.content-height;
+                        reveal(y, h) => {
+                            root.reveal(y, h);
+                        }
+                        accepted => {
+                            root.apply();
+                        }
+                    }
+
+                    // Optional settings: closed by default, with the values in one line.
+                    Disclosure {
+                        px: root.px;
+                        text: "Customize";
+                        summary: root.compact ? "" : root.summary;
+                        open <=> root.customize-open;
+                    }
+
+                    if root.customize-open: VerticalLayout {
+                        spacing: 12 * root.px;
+                        HorizontalLayout {
+                            spacing: 16 * root.px;
+                            Field {
+                                px: root.px;
+                                dense: root.dense;
+                                label: "Full name";
+                                note: root.git-name != "" && root.realname == root.git-name ? "from " + root.git-source : "";
+                                text <=> root.realname;
+                                watch: root.content-height;
+                                reveal(y, h) => {
+                                    root.reveal(y, h);
+                                }
+                                edited(t) => {
+                                    root.realname-edited(t);
+                                }
+                                accepted => {
+                                    root.apply();
+                                }
+                            }
+
+                            Field {
+                                px: root.px;
+                                dense: root.dense;
+                                label: "Local username";
+                                note: root.git-username != "" && root.username == root.git-username ? "from " + root.git-source : "";
+                                text <=> root.username;
+                                watch: root.content-height;
+                                reveal(y, h) => {
+                                    root.reveal(y, h);
+                                }
+                                edited(t) => {
+                                    root.username-edited(t);
+                                }
+                                accepted => {
+                                    root.apply();
+                                }
+                            }
+                        }
+
+                        if root.has-zsh: ShellChoice {
                             px: root.px;
-                            dense: true;
-                            horizontal-stretch: 0;
+                            dense: root.dense;
                             value <=> root.shell;
                         }
-                        VerticalLayout {
-                            horizontal-stretch: 1;
-                            spacing: (root.dense ? 5 : 8) * root.px;
-                            Text {
-                                text: "Region";
-                                color: Theme.dim;
-                                font-size: (root.dense ? 13 : 14) * root.px;
-                                font-weight: 600;
+                        SettingRow {
+                            px: root.px;
+                            label: "Time zone";
+                            value: root.timezone;
+                            clicked => {
+                                root.region-tab = 0;
+                                root.change-region();
                             }
+                        }
 
-                            HorizontalLayout {
-                                spacing: 16 * root.px;
-                                Text {
-                                    horizontal-stretch: 1;
-                                    min-width: 0px;
-                                    text: root.timezone + "  ·  " + root.locale + "  ·  " + root.keyboard;
-                                    color: Theme.text;
-                                    font-size: 16 * root.px;
-                                    vertical-alignment: center;
-                                    overflow: elide;
-                                }
-
-                                PillButton {
-                                    px: root.px;
-                                    small: true;
-                                    text: "Change";
-                                    clicked => {
-                                        root.change-region();
-                                    }
-                                }
+                        SettingRow {
+                            px: root.px;
+                            label: "Language";
+                            value: root.locale;
+                            clicked => {
+                                root.region-tab = 1;
+                                root.change-region();
                             }
+                        }
+
+                        SettingRow {
+                            px: root.px;
+                            label: "Keyboard";
+                            value: root.keyboard;
+                            clicked => {
+                                root.region-tab = 2;
+                                root.change-region();
+                            }
+                        }
+
+                        if root.git-found && root.git-keys > 0: CheckRow {
+                            px: root.px;
+                            text: root.git-keys == 1 ? "Import 1 SSH key" : "Import " + root.git-keys + " SSH keys";
+                            detail: root.git-keys-url;
+                            checked <=> root.import-keys;
+                        }
+                        if root.git-found && root.git-dotfiles-url != "": CheckRow {
+                            px: root.px;
+                            text: "Apply armbian-dotfiles";
+                            detail: root.git-dotfiles-url;
+                            checked <=> root.import-dotfiles;
+                        }
+                    }
+
+                    if root.error != "" || root.dry-run: Note {
+                        px: root.px;
+                        error: root.error != "";
+                        dot: root.dry-run ? Theme.warning : transparent;
+                        text: root.error != "" ? root.error : "Dry run: the settings go to a file only.";
+                    }
+
+                    PillButton {
+                        px: root.px;
+                        primary: true;
+                        wide: true;
+                        text: "Set up  →";
+                        enabled: root.can-apply && root.password != "" && root.password == root.password2;
+                        clicked => {
+                            root.apply();
                         }
                     }
                 }
 
                 // 3: region. One list shows at a time. The three values stay in view.
                 // Enter: Done (a search without a pick takes the best match). Escape: Cancel.
-                if root.page == 3: region := FocusScope {
-                    focus-on-click: false;
-                    vertical-stretch: 1;
-                    property <bool> side: root.dense && (!root.screen-keyboard-visible || !root.compact);
-                    property <length> gap: (root.screen-keyboard-visible ? 8 : root.dense ? 12 : 16) * root.px;
-                    property <length> tab-h: (root.screen-keyboard-visible ? 44 : root.dense ? 54 : 72) * root.px;
-                    property <length> tab-w: self.side ? 220 * root.px : (self.width - 2 * self.gap) / 3;
-                    property <length> list-x: root.keyboard-only ? 0px : self.side ? self.tab-w + self.gap : 0px;
-                    property <length> list-y: root.keyboard-only ? 0px : self.side ? 0px : self.tab-h + self.gap;
-                    // The search of the list that closes must not stay in Rust.
-                    function show(tab: int) {
-                        if tab == root.region-tab || root.keyboard-only {
-                            return;
-                        }
-                        if root.region-tab == 0 {
-                            root.search-tz("");
-                        } else if root.region-tab == 1 {
-                            root.search-locale("");
-                        } else {
-                            root.search-kb("");
-                        }
-                        root.region-tab = max(0, min(2, tab));
+                if root.page == 3: VerticalLayout {
+                    spacing: root.gap;
+                    if !root.typing: Heading {
+                        px: root.px;
+                        small: true;
+                        title: root.keyboard-only ? "Choose your keyboard" : "Region and keyboard";
+                        subtitle: root.keyboard-only && !root.dense ? "You type the Wi-Fi password with this keyboard." : "";
                     }
-                    // Before the widgets: the lists use Enter themselves.
-                    capture-key-pressed(event) => {
-                        // The keyboard step has nothing to cancel: Escape keeps the keyboard.
-                        if event.text == Key.Escape {
-                            if root.keyboard-only {
-                                root.region-done();
+
+                    region := FocusScope {
+                        focus-on-click: false;
+                        vertical-stretch: 1;
+                        min-height: (root.typing ? 140 : 260) * root.px;
+                        property <bool> side: root.dense && (!root.screen-keyboard-visible || !root.compact);
+                        property <length> gap: (root.typing ? 8 : root.dense ? 12 : 16) * root.px;
+                        property <length> tab-h: (root.typing ? 44 : root.dense ? 54 : 72) * root.px;
+                        property <length> tab-w: self.side ? 220 * root.px : (self.width - 2 * self.gap) / 3;
+                        property <length> list-x: root.keyboard-only ? 0px : self.side ? self.tab-w + self.gap : 0px;
+                        property <length> list-y: root.keyboard-only ? 0px : self.side ? 0px : self.tab-h + self.gap;
+                        // The search of the list that closes must not stay in Rust.
+                        function show(tab: int) {
+                            if tab == root.region-tab || root.keyboard-only {
+                                return;
+                            }
+                            if root.region-tab == 0 {
+                                root.search-tz("");
+                            } else if root.region-tab == 1 {
+                                root.search-locale("");
                             } else {
+                                root.search-kb("");
+                            }
+                            root.region-tab = max(0, min(2, tab));
+                        }
+                        // Before the widgets: the lists use Enter themselves.
+                        capture-key-pressed(event) => {
+                            if event.text == Key.Escape {
+                                root.region-cancel();
+                                return accept;
+                            }
+                            if event.text == Key.Return {
+                                root.region-done();
+                                return accept;
+                            }
+                            return reject;
+                        }
+                        // Focus after the first layout: not in init.
+                        Timer {
+                            interval: 1ms;
+                            running: true;
+                            triggered => {
+                                self.running = false;
+                                if root.keyboard-only {
+                                    root.region-tab = 2;
+                                } else {
+                                    tabs.focus();
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            // Up and Down, or Left and Right, change the list.
+                            tabs := FocusScope {
+                                focus-on-click: false;
+                                visible: !root.keyboard-only;
+                                x: 0px;
+                                y: 0px;
+                                width: region.side ? region.tab-w : parent.width;
+                                height: region.side ? parent.height : region.tab-h;
+                                key-pressed(event) => {
+                                    if event.text == Key.UpArrow || event.text == Key.LeftArrow {
+                                        region.show(root.region-tab - 1);
+                                        return accept;
+                                    }
+                                    if event.text == Key.DownArrow || event.text == Key.RightArrow {
+                                        region.show(root.region-tab + 1);
+                                        return accept;
+                                    }
+                                    return reject;
+                                }
+                                RegionTab {
+                                    x: 0px;
+                                    y: 0px;
+                                    width: region.tab-w;
+                                    height: region.tab-h;
+                                    px: root.px;
+                                    dense: root.dense;
+                                    label: "Time zone";
+                                    value: root.timezone;
+                                    active: root.region-tab == 0;
+                                    focused: tabs.has-focus;
+                                    clicked => {
+                                        tabs.focus();
+                                        region.show(0);
+                                    }
+                                }
+
+                                RegionTab {
+                                    x: region.side ? 0px : 1 * (region.tab-w + region.gap);
+                                    y: region.side ? 1 * (region.tab-h + 6 * root.px) : 0px;
+                                    width: region.tab-w;
+                                    height: region.tab-h;
+                                    px: root.px;
+                                    dense: root.dense;
+                                    label: "Language";
+                                    value: root.locale;
+                                    active: root.region-tab == 1;
+                                    focused: tabs.has-focus;
+                                    clicked => {
+                                        tabs.focus();
+                                        region.show(1);
+                                    }
+                                }
+
+                                RegionTab {
+                                    x: region.side ? 0px : 2 * (region.tab-w + region.gap);
+                                    y: region.side ? 2 * (region.tab-h + 6 * root.px) : 0px;
+                                    width: region.tab-w;
+                                    height: region.tab-h;
+                                    px: root.px;
+                                    dense: root.dense;
+                                    label: "Keyboard";
+                                    value: root.keyboard;
+                                    active: root.region-tab == 2;
+                                    focused: tabs.has-focus;
+                                    clicked => {
+                                        tabs.focus();
+                                        region.show(2);
+                                    }
+                                }
+                            }
+
+                            if root.region-tab == 0: PickList {
+                                x: region.list-x;
+                                y: region.list-y;
+                                width: parent.width - region.list-x;
+                                height: parent.height - region.list-y;
+                                px: root.px;
+                                dense: root.dense;
+                                placeholder: "Search a time zone";
+                                model: root.tz-model;
+                                current: root.tz-current;
+                                search(t) => {
+                                    root.search-tz(t);
+                                }
+                                picked(i) => {
+                                    root.pick-tz(i);
+                                }
+                            }
+                            if root.region-tab == 1: PickList {
+                                x: region.list-x;
+                                y: region.list-y;
+                                width: parent.width - region.list-x;
+                                height: parent.height - region.list-y;
+                                px: root.px;
+                                dense: root.dense;
+                                placeholder: "Search a language";
+                                model: root.locale-model;
+                                current: root.locale-current;
+                                search(t) => {
+                                    root.search-locale(t);
+                                }
+                                picked(i) => {
+                                    root.pick-locale(i);
+                                }
+                            }
+                            if root.region-tab == 2: PickList {
+                                x: region.list-x;
+                                y: region.list-y;
+                                width: parent.width - region.list-x;
+                                height: parent.height - region.list-y;
+                                px: root.px;
+                                dense: root.dense;
+                                placeholder: "Search a keyboard";
+                                start-focus: true;
+                                model: root.kb-model;
+                                current: root.kb-current;
+                                search(t) => {
+                                    root.search-kb(t);
+                                }
+                                picked(i) => {
+                                    root.pick-kb(i);
+                                }
+                            }
+                        }
+                    }
+
+                    HorizontalLayout {
+                        spacing: 12 * root.px;
+                        alignment: end;
+                        PillButton {
+                            px: root.px;
+                            text: "Cancel";
+                            clicked => {
                                 root.region-cancel();
                             }
-                            return accept;
-                        }
-                        if event.text == Key.Return {
-                            root.region-done();
-                            return accept;
-                        }
-                        return reject;
-                    }
-                    // Focus after the first layout: not in init.
-                    Timer {
-                        interval: 1ms;
-                        running: true;
-                        triggered => {
-                            self.running = false;
-                            root.region-tab = root.keyboard-only ? 2 : 0;
-                            if !root.keyboard-only {
-                                tabs.focus();
-                            }
-                        }
-                    }
-
-                    // Keep the tabs above the list on narrow screens while the keyboard is open.
-                    Rectangle {
-                        // Up and Down, or Left and Right, change the list.
-                        tabs := FocusScope {
-                            focus-on-click: false;
-                            visible: !root.keyboard-only;
-                            x: 0px;
-                            y: 0px;
-                            width: region.side ? region.tab-w : parent.width;
-                            height: region.side ? parent.height : region.tab-h;
-                            key-pressed(event) => {
-                                if event.text == Key.UpArrow || event.text == Key.LeftArrow {
-                                    region.show(root.region-tab - 1);
-                                    return accept;
-                                }
-                                if event.text == Key.DownArrow || event.text == Key.RightArrow {
-                                    region.show(root.region-tab + 1);
-                                    return accept;
-                                }
-                                return reject;
-                            }
-                            RegionTab {
-                                x: region.side ? 0px : 0 * (region.tab-w + region.gap);
-                                y: region.side ? 0 * (region.tab-h + 6 * root.px) : 0px;
-                                width: region.tab-w;
-                                height: region.tab-h;
-                                px: root.px;
-                                dense: root.dense;
-                                label: "Time zone";
-                                value: root.timezone;
-                                active: root.region-tab == 0;
-                                focused: tabs.has-focus;
-                                clicked => {
-                                    tabs.focus();
-                                    region.show(0);
-                                }
-                            }
-
-                            RegionTab {
-                                x: region.side ? 0px : 1 * (region.tab-w + region.gap);
-                                y: region.side ? 1 * (region.tab-h + 6 * root.px) : 0px;
-                                width: region.tab-w;
-                                height: region.tab-h;
-                                px: root.px;
-                                dense: root.dense;
-                                label: "Language";
-                                value: root.locale;
-                                active: root.region-tab == 1;
-                                focused: tabs.has-focus;
-                                clicked => {
-                                    tabs.focus();
-                                    region.show(1);
-                                }
-                            }
-
-                            RegionTab {
-                                x: region.side ? 0px : 2 * (region.tab-w + region.gap);
-                                y: region.side ? 2 * (region.tab-h + 6 * root.px) : 0px;
-                                width: region.tab-w;
-                                height: region.tab-h;
-                                px: root.px;
-                                dense: root.dense;
-                                label: "Keyboard";
-                                value: root.keyboard;
-                                active: root.region-tab == 2;
-                                focused: tabs.has-focus;
-                                clicked => {
-                                    tabs.focus();
-                                    region.show(2);
-                                }
-                            }
                         }
 
-                        if root.region-tab == 0: PickList {
-                            x: region.list-x;
-                            y: region.list-y;
-                            width: parent.width - region.list-x;
-                            height: parent.height - region.list-y;
+                        PillButton {
                             px: root.px;
-                            dense: root.dense;
-                            placeholder: "Search a time zone";
-                            model: root.tz-model;
-                            current: root.tz-current;
-                            search(t) => {
-                                root.search-tz(t);
-                            }
-                            picked(i) => {
-                                root.pick-tz(i);
-                            }
-                        }
-                        if root.region-tab == 1: PickList {
-                            x: region.list-x;
-                            y: region.list-y;
-                            width: parent.width - region.list-x;
-                            height: parent.height - region.list-y;
-                            px: root.px;
-                            dense: root.dense;
-                            placeholder: "Search a language";
-                            model: root.locale-model;
-                            current: root.locale-current;
-                            search(t) => {
-                                root.search-locale(t);
-                            }
-                            picked(i) => {
-                                root.pick-locale(i);
-                            }
-                        }
-                        if root.region-tab == 2: PickList {
-                            x: region.list-x;
-                            y: region.list-y;
-                            width: parent.width - region.list-x;
-                            height: parent.height - region.list-y;
-                            px: root.px;
-                            dense: root.dense;
-                            placeholder: "Search a keyboard";
-                            start-focus: root.keyboard-only;
-                            model: root.kb-model;
-                            current: root.kb-current;
-                            search(t) => {
-                                root.search-kb(t);
-                            }
-                            picked(i) => {
-                                root.pick-kb(i);
+                            primary: true;
+                            text: "Done";
+                            clicked => {
+                                root.region-done();
                             }
                         }
                     }
                 }
 
-                // 4: apply. A title and one progress line. A real setup closes by itself.
-                // The log shows after a failure, and for a dry run. Enter closes a dry run.
-                if root.page == 4: done := FocusScope {
+                // 4 with the log: after a failure, and for a dry run. Enter closes a dry run.
+                if root.with-log: done := FocusScope {
                     vertical-stretch: 1;
-                    // The log uses the full width. Other text stays in the middle.
-                    property <bool> wait: !root.with-log;
-                    property <length> text-w: root.with-log ? self.width : root.wait-w;
                     key-pressed(event) => {
                         if event.text == Key.Return && root.finished {
                             root.finish();
@@ -1701,46 +2020,26 @@ export component AppWindow inherits Window {
                     }
 
                     VerticalLayout {
-                        x: (parent.width - done.text-w) / 2;
-                        width: done.text-w;
-                        height: parent.height;
-                        spacing: (root.with-log ? (root.dense ? 16 : 24) : (root.dense ? 36 : 52)) * root.px;
-                        alignment: root.with-log ? stretch : center;
-                        HorizontalLayout {
-                            alignment: center;
-                            Brand {
-                                logo: root.logo;
-                                product: root.product;
-                                size: (root.dense ? 38 : 48) * root.px;
-                                limit: done.text-w;
-                            }
+                        spacing: root.gap;
+                        Logo {
+                            logo: root.logo;
+                            product: root.product;
+                            size: root.logo-size;
+                            limit: root.col-w;
                         }
 
-                        VerticalLayout {
-                            spacing: (done.wait ? 14 : 12) * root.px;
-                            Text {
-                                text: root.apply-title;
-                                color: Theme.text;
-                                font-size: (root.with-log ? 30 : root.dense ? 44 : 56) * root.px;
-                                font-weight: 700;
-                                letter-spacing: (done.wait ? -1.2 : -0.8) * root.px;
-                                horizontal-alignment: center;
-                            }
-
-                            if root.apply-status != "": Text {
-                                text: root.apply-status;
-                                color: Theme.dim;
-                                font-size: 17 * root.px;
-                                horizontal-alignment: center;
-                                wrap: word-wrap;
-                            }
+                        Heading {
+                            px: root.px;
+                            small: true;
+                            title: root.apply-title;
+                            subtitle: root.apply-status;
                         }
 
-                        // The log shows after a failure, and the dry-run result.
-                        if root.with-log: Rectangle {
+                        Rectangle {
                             vertical-stretch: 1;
-                            background: Theme.bg;
-                            border-radius: 12 * root.px;
+                            min-height: 120 * root.px;
+                            background: Theme.field;
+                            border-radius: 10 * root.px;
                             border-width: 1px;
                             border-color: Theme.border;
                             clip: true;
@@ -1756,77 +2055,15 @@ export component AppWindow inherits Window {
                                 }
                             }
                         }
-                        if done.wait: HorizontalLayout {
-                            alignment: center;
-                            Bar {
-                                width: root.line-w;
-                                px: root.px;
-                                height: 6 * root.px;
-                                progress: root.progress;
+
+                        if root.failed: PillButton {
+                            px: root.px;
+                            primary: true;
+                            wide: true;
+                            text: "Continue in text mode";
+                            clicked => {
+                                root.text-mode();
                             }
-                        }
-                    }
-                }
-
-                // Footer: a message, then the buttons. The main button is the last one.
-                if (root.page >= 1 && root.page <= 3) || (root.page == 4 && root.failed): HorizontalLayout {
-                    vertical-stretch: 0;
-                    spacing: 12 * root.px;
-                    // The Wi-Fi page shows its messages above this line.
-                    Note {
-                        px: root.px;
-                        horizontal-stretch: 1;
-                        error: root.error != "" && root.page != 1;
-                        dot: root.dry-run ? Theme.warning : transparent;
-                        text: root.page == 1 ? "" : root.error != "" ? root.error : root.page != 2 ? "" : root.dense && root.git-status != "" ? (root.git-found ? "✓ " : "") + root.git-status : root.dry-run ? "Dry run: the settings go to a file only." : root.compact ? "This password is also the root password." : "";
-                    }
-
-                    if root.page == 1: PillButton {
-                        px: root.px;
-                        text: "Skip";
-                        enabled: !root.wifi-busy;
-                        clicked => {
-                            root.wifi-skip();
-                        }
-                    }
-                    if root.page == 1: PillButton {
-                        px: root.px;
-                        primary: true;
-                        text: "Connect";
-                        enabled: root.wifi-current >= 0 && !root.wifi-busy;
-                        clicked => {
-                            root.wifi-connect();
-                        }
-                    }
-                    if root.page == 2: PillButton {
-                        px: root.px;
-                        primary: true;
-                        text: "Set up";
-                        clicked => {
-                            root.apply();
-                        }
-                    }
-                    if root.page == 3 && !root.keyboard-only: PillButton {
-                        px: root.px;
-                        text: "Cancel";
-                        clicked => {
-                            root.region-cancel();
-                        }
-                    }
-                    if root.page == 3: PillButton {
-                        px: root.px;
-                        primary: true;
-                        text: root.keyboard-only ? "Next" : "Done";
-                        clicked => {
-                            root.region-done();
-                        }
-                    }
-                    if root.page == 4 && root.failed: PillButton {
-                        px: root.px;
-                        primary: true;
-                        text: "Continue in text mode";
-                        clicked => {
-                            root.text-mode();
                         }
                     }
                 }
