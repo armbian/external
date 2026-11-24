@@ -8,8 +8,11 @@ PKG = debian/omacut
 
 override_dh_auto_configure:
 
+# The app target only, as upstream bin/build without its tests: the build
+# does not run them (nocheck), and they can need a newer Qt.
 override_dh_auto_build:
-	./bin/build
+	cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+	cmake --build build --target omacut -j$$(nproc)
 
 override_dh_auto_install:
 	install -D -m755 build/omacut $(PKG)/usr/bin/omacut
