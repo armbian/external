@@ -295,8 +295,9 @@ pub fn decide(prof: &Profile, reached: bool, keys_code: u16, dotfiles: bool) -> 
         // The profile tells nothing (for example the GitHub rate limit): the keys
         // file or the repository shows that the account exists.
         _ if keys_code == 200 || dotfiles => Lookup::Found(Found::default()),
-        // Absent only when the server says so twice: the profile and the keys file.
-        Profile::Missing if keys_code == 404 => Lookup::NotFound,
+        // The profile says absent: a known service, or every API of another server.
+        // The keys file does not decide it: gitlab.com redirects it to the sign-in (302).
+        Profile::Missing => Lookup::NotFound,
         // No clear answer: not kept, so that the next try asks again.
         _ => Lookup::Unreachable,
     }
@@ -416,8 +417,9 @@ mod tests {
         assert_eq!(p, Profile::Missing);
         // No answer at all.
         assert_eq!(decide(&Profile::Unknown, false, 0, false), Lookup::Unreachable);
-        // A keys file that failed (0) does not confirm the absence.
-        assert_eq!(decide(&Profile::Missing, true, 0, false), Lookup::Unreachable);
+        // gitlab.com: the profile list is empty, the keys file redirects to the sign-in.
+        let (p, reached) = profile_from(gl, [(gl, 200, "[]".into())]);
+        assert_eq!(decide(&p, reached, 302, false), Lookup::NotFound);
     }
 
     #[test]
