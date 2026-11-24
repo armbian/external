@@ -5,7 +5,7 @@ method: build
 # (omacom/omarchy-pkgs, pkgbuilds/cliamp).
 upstream:
   url: https://github.com/bjarneo/cliamp
-  ref: v2.3.0
+  ref: v2.4.1
 releases:
 - forky
 - sid
