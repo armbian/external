@@ -1,0 +1,106 @@
+name: "Upstream bump"
+
+# Daily: find build configs whose pinned upstream tag has a newer release.
+# Open or update one pull request per group (upstream.bump_group, else the config).
+# The Build workflow checks each pull request. A person merges.
+#
+# A closed pull request refuses its tags: the same tags do not open it again.
+#
+# Secrets:
+#   ACCESS_TOKEN  pushes the branches and opens the pull requests. With
+#                 GITHUB_TOKEN, the Build workflow does not start on them.
+
+on:
+  workflow_dispatch:
+    inputs:
+      only:
+        description: "Package configs, comma separated (empty: all)"
+        type: string
+        default: ""
+      dry_run:
+        description: "Dry run: show the bumps, push nothing"
+        type: boolean
+        default: true
+  schedule:
+    - cron: "30 2 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bump
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    if: ${{ github.repository_owner == 'armbian' }}
+    runs-on: ubuntu-latest
+    env:
+      DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && 'true' || 'false' }}
+      ONLY: ${{ inputs.only }}
+      GITHUB_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.ACCESS_TOKEN }}
+
+      - name: Find newer upstream tags
+        run: |
+          args=()
+          [ -n "$ONLY" ] && args+=(--only "$ONLY")
+          python3 -m extpkg bump "${args[@]}" --plan "$RUNNER_TEMP/bump.json" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Open or update pull requests
+        env:
+          GH_TOKEN: ${{ secrets.ACCESS_TOKEN }}
+        run: |
+          set -euo pipefail
+          plan=$RUNNER_TEMP/bump.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          base=$(git rev-parse HEAD)
+
+          for key in $(jq -r '.[].key' "$plan"); do
+            g=$(jq -c --arg k "$key" '.[] | select(.key == $k)' "$plan")
+            branch=$(jq -r .branch <<< "$g")
+            title=$(jq -r .title <<< "$g")
+            marker=$(jq -r .marker <<< "$g")
+
+            # Same tags in an open or a closed pull request: nothing to do.
+            if gh pr list --head "$branch" --state all --json state,body \
+                --jq ".[] | select(.state != \"MERGED\") | .body" | grep -qF "$marker"; then
+              echo "$branch: up to date or refused"
+              continue
+            fi
+
+            git checkout -q -B "$branch" "$base"
+            python3 -m extpkg bump --plan "$plan" --apply "$key"
+
+            # Hooks: build/<config>/bump-check <old> <new> lists the manual work.
+            body=$(jq -r .body <<< "$g")
+            draft=()
+            while read -r config old new; do
+              hook=build/$config/bump-check
+              [ -x "$hook" ] || continue
+              out=$("$hook" "$old" "$new" 2>&1 | head -c 40000) || true
+              body+=$'\n'"<details><summary>$config: bump-check $old $new</summary>"$'\n\n```\n'"$out"$'\n```\n</details>\n'
+              draft=(--draft)
+            done < <(jq -r '.bumps[] | "\(.config) \(.old) \(.new)"' <<< "$g")
+            [ ${#draft[@]} -gt 0 ] && body+=$'\nDraft: finish the manual work that bump-check lists. Then mark the pull request ready.\n'
+
+            git commit -q -a -s -m "$title"
+            git --no-pager show --stat HEAD
+            if [ "$DRY_RUN" = "true" ]; then
+              echo "dry run: no push for $branch"
+              continue
+            fi
+
+            git push -q -f origin "$branch"
+            if [ -n "$(gh pr list --head "$branch" --state open --json number --jq '.[].number')" ]; then
+              gh pr edit "$branch" --title "$title" --body "$body"
+            else
+              gh pr create --head "$branch" --base "${GITHUB_REF_NAME}" --title "$title" --body "$body" \
+                --label Dependencies "${draft[@]}"
+            fi
+          done

@@ -6,6 +6,7 @@ method: build
 upstream:
   url: https://github.com/omacom/hype
   ref: v0.6.0
+  bump_group: omarchy
 releases:
 - forky
 - sid

@@ -6,6 +6,7 @@ method: build
 upstream:
   url: https://github.com/omacom/omarchy-speedtest
   ref: v0.2.1
+  bump_group: omarchy
 releases:
 - forky
 - sid

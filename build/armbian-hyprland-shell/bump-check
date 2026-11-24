@@ -1,0 +1,4 @@
+#!/bin/bash
+# Bump hook: the port changes that a new Omarchy tag needs.
+# Usage: bump-check <old-tag> <new-tag>
+exec "$(dirname "$0")/debian/armbian/transform/check-upstream" "$@"

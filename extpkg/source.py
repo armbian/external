@@ -37,6 +37,12 @@ def local_dir(pkg, packages_dir):
     return os.path.join(packages_dir, pkg["name"])
 
 
+# Files under build/<name>/ that do not change the build.
+NOT_BUILD = ("bump-check",)
+# upstream keys that do not change the build.
+UPSTREAM_NOT_BUILD = ("bump", "bump_group")
+
+
 def local_hash(pkg, packages_dir):
     """SHA256 of every file under build/<name>/, or "" when there is none."""
     root = local_dir(pkg, packages_dir)
@@ -46,6 +52,8 @@ def local_hash(pkg, packages_dir):
         dirs.sort()
         for n in sorted(names):
             path = os.path.join(d, n)
+            if os.path.relpath(path, root) in NOT_BUILD:
+                continue
             h.update(os.path.relpath(path, root).encode() + b"\0")
             with open(path, "rb") as f:
                 h.update(f.read())
@@ -80,12 +88,16 @@ def _ref(url, ref):
     raise net.FetchError(f"{url}: no tag or branch {ref!r}")
 
 
-def latest_tag(url, pattern="*"):
-    """Newest release tag that matches pattern. Pre-releases (rc, alpha, beta) are left out."""
+def remote_tags(url):
+    """Tag names of a git repository."""
     out = _git("ls-remote", "--tags", "--refs", url)
+    return [line.split("\t", 1)[1][len("refs/tags/"):] for line in out.splitlines() if "\t" in line]
+
+
+def newest_tag(tags, pattern="*"):
+    """Newest release tag that matches pattern, or None. Pre-releases (rc, alpha, beta) are left out."""
     best = None
-    for line in out.splitlines():
-        tag = line.split("\t", 1)[1][len("refs/tags/"):]
+    for tag in tags:
         if not fnmatch.fnmatchcase(tag, pattern):
             continue
         try:
@@ -96,9 +108,15 @@ def latest_tag(url, pattern="*"):
             continue
         if best is None or debver.compare(ver, best[1]) > 0:
             best = (tag, ver)
-    if not best:
+    return best[0] if best else None
+
+
+def latest_tag(url, pattern="*"):
+    """Newest release tag of url that matches pattern."""
+    tag = newest_tag(remote_tags(url), pattern)
+    if not tag:
         raise net.FetchError(f"{url}: no release tag matches {pattern!r}")
-    return best[0]
+    return tag
 
 
 def _read_file(url, ref, path):
@@ -227,6 +245,8 @@ def resolve(pkg, release, arch, keyring, packages_dir):
     local = local_hash(pkg, packages_dir)
     # Config keys that change the build. releases, notes, install and the like do not.
     keys = {k: pkg.get(k) for k in ("packaging", "upstream", "revision", "build_depends", "include_debug")}
+    if keys["upstream"]:
+        keys["upstream"] = {k: v for k, v in keys["upstream"].items() if k not in UPSTREAM_NOT_BUILD}
     if pkg.get("version"):
         # Only when set: the identity of the other builds stays the same.
         keys["version"] = pkg["version"]

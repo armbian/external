@@ -184,6 +184,8 @@ install: [fastfetch]
 | `packaging.url`, `.suite`, `.components`, `.package` | apt repository and source package. Signature and hashes are checked, as for `apt`. |
 | `upstream.url`, `.ref` | git repository and tag or branch. `latest` (default): the latest GitHub release, or on other hosts the newest release tag. |
 | `upstream.tags` | Pattern for `latest`, for example `mesa-*`. Release candidates are left out. |
+| `upstream.bump` | `pr` (default) or `off`. With a tag in `ref`: the Upstream bump workflow opens a pull request for a newer release tag. See [Upstream bump](#upstream-bump-githubworkflowsbumpyml). |
+| `upstream.bump_group` | One bump pull request for all configs with this name, for example `omarchy`. Default: the config name. |
 | `upstream.version` | For a branch: the next upstream release, for example `27.0.0`. |
 | `upstream.version_file` | For a branch: a file that holds that version, for example `VERSION` (`27.0.0-devel` gives `27.0.0`). Read from the rebase base when `rebase` is set. |
 | `upstream.rebase.url`, `.ref` | Optional, off by default. A fork: rebase it onto this branch before each build. A conflict fails the build, and the last good packages stay. |
@@ -307,6 +309,19 @@ Pull requests are always dry runs. Scheduled runs are dry runs until the reposit
 
 A failed build skips only its own release and architecture. Its old files stay.
 
+### Upstream bump (`.github/workflows/bump.yml`)
+
+Runs daily and by hand. Manual inputs: `only` and `dry_run` (default true).
+It finds build configs whose `upstream.ref` tag has a newer release tag, and opens one pull request per `upstream.bump_group`. The Build workflow then builds the pull request. A person merges it.
+
+- Candidates: a tag in `upstream.ref`. Not `latest`, a branch, `rebase`, `version_url` or `bump: off`.
+- Newest tag: `upstream.tags`, else the prefix of the pinned tag (`v1.2.0` gives `v*`). Release candidates are left out. Only a newer version opens a pull request.
+- The bump sets `ref` and resets `revision` to 1. Comments stay.
+- One branch per group: `bump/<group>`. A newer tag updates the open pull request.
+- A closed pull request refuses its tags. The same tags do not open it again.
+- Hook: an executable `build/<name>/bump-check <old> <new>` lists the manual work for the new tag. Its output goes into the pull request, and the pull request opens as a draft. The hook and the bump keys do not change the build identity.
+- Secret `ACCESS_TOKEN` pushes and opens the pull requests. With `GITHUB_TOKEN`, the Build workflow does not start on them.
+
 ### Sync (`.github/workflows/sync.yml`)
 
 Runs every 2 hours (live), and by hand. Manual inputs: `only` (config names) and `dry_run` (default true).
@@ -405,7 +420,7 @@ Missing tools (`gpgv`, `dpkg-deb`, `fakeroot`, `rsync`, `ssh`, `python3-yaml`) a
 
 ### Secrets
 
-Needed for an upload only. Organisation secrets, shared with armbian.github.io.
+Organisation secrets. The upload secrets are shared with armbian.github.io.
 
 | Secret | Use |
 |---|---|
@@ -414,6 +429,7 @@ Needed for an upload only. Organisation secrets, shared with armbian.github.io.
 | `HOST_UPLOAD` | Server name |
 | `HOST_UPLOAD_USER` | SSH user |
 | `HOST_UPLOAD_PORT` | SSH port. Default: 22. |
+| `ACCESS_TOKEN` | Upstream bump: push branches, open pull requests |
 
 `GITHUB_TOKEN` comes from Actions. It raises the GitHub API rate limit.
 
@@ -468,9 +484,11 @@ python3 -m extpkg build-matrix --plan plan.json [--previous manifest.json]
 python3 -m extpkg build --plan plan.json --config name --release r --arch a [--out built]
 python3 -m extpkg run --configs build --shard build --plan plan.json --built built ...
 python3 -m extpkg site --manifest dir/manifest.json ... [--out site] [--published url ...]
+python3 -m extpkg bump [--only a,b] [--plan bump.json]
+python3 -m extpkg bump --plan bump.json --apply <group>
 ```
 
-`--configs`: the config directory. Default: `mirror/`; `build/` for `build-matrix` and `build`. `validate` checks both.
+`--configs`: the config directory. Default: `mirror/`; `build/` for `build-matrix`, `build` and `bump`. `validate` checks both.
 
 Common options: `--configs`, `--keys`, `--build-dir`, `--jobs`, `--published`.
 `--strict` exits 1 when a download or check fails. "No package matched" is not a failure.
@@ -491,6 +509,7 @@ Common options: `--configs`, `--keys`, `--build-dir`, `--jobs`, `--published`.
 | `extpkg/upload.py` | rsync upload |
 | `extpkg/source.py` | Method build: resolve packaging, upstream and patches; version and identity |
 | `extpkg/builder.py` | Method build: build in a container of the release |
+| `extpkg/bump.py` | Method build: newer upstream release tags, bump plan, config edit |
 | `extpkg/site.py` | Package site: configs and manifests to `index.html` and `packages.json` |
 | `tools/import-os.py` | One-time import of `armbian/os/external/*.conf` |
 
