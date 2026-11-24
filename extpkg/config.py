@@ -181,6 +181,24 @@ def load_all(directory, names=None):
     return pkgs
 
 
+def with_build_depends(directory, names):
+    """names and the build_depends of their build configs, two levels deep.
+    A build needs the plan entries of its dependencies."""
+    out = list(names)
+    todo = list(names)
+    while todo:
+        path = os.path.join(directory, f"{todo.pop()}.yaml")
+        if not os.path.exists(path):
+            continue
+        with open(path) as f:
+            pkg = yaml.safe_load(f) or {}
+        for dep in pkg.get("build_depends", []) if isinstance(pkg, dict) else []:
+            if dep not in out:
+                out.append(dep)
+                todo.append(dep)
+    return out
+
+
 def _check_build_depends(directory, pkgs):
     """build_depends: other build configs, two levels deep. The Build workflow has
     three stages: base (dependencies of dependencies), deps, build."""

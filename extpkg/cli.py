@@ -28,6 +28,8 @@ def _configs(args):
 
 def _load(args):
     names = [n for n in args.only.split(",") if n]
+    if names:
+        names = config.with_build_depends(_configs(args), names)
     pkgs = config.load_all(_configs(args), names or None)
     releases = config.supported_releases(args.build_dir)
     return pkgs, releases

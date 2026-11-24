@@ -33,6 +33,7 @@ on:
     paths:
       - "build/**"
       - "extpkg/**"
+      - "tools/build-in-container.sh"
       - ".github/workflows/build.yml"
 
 permissions:
@@ -54,11 +55,15 @@ jobs:
       base: ${{ steps.matrix.outputs.base }}
       deps: ${{ steps.matrix.outputs.deps }}
       builds: ${{ steps.matrix.outputs.builds }}
+      only: ${{ steps.matrix.outputs.only }}
     env:
       ARMBIAN_BUILD_DIR: ${{ github.workspace }}/armbian-build
       GITHUB_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          # Pull requests: the merge commit and its base, for the changed configs.
+          fetch-depth: 2
 
       - name: Checkout armbian/build (supported releases only)
         uses: actions/checkout@v7
@@ -76,9 +81,30 @@ jobs:
           key: state-live-build-${{ github.run_id }}
           restore-keys: state-live-build-
 
+      # Pull requests build only the changed configs and their build_depends.
+      # A change of the build code builds every config with a new identity.
+      - name: Changed configs (pull requests)
+        if: github.event_name == 'pull_request'
+        run: |
+          changed=$(git diff --name-only HEAD^1 HEAD)
+          if grep -qE '^(extpkg/|tools/build-in-container\.sh$|\.github/workflows/build\.yml$)' <<< "$changed"; then
+            echo "Build code changed: all configs."
+            exit 0
+          fi
+          names=$(sed -nE 's#^build/([^/]+)\.yaml$#\1#p; s#^build/([^/]+)/.*#\1#p' <<< "$changed" | sort -u \
+            | while read -r n; do [ -f "build/$n.yaml" ] && echo "$n"; done | paste -sd, -)
+          echo "Changed configs: ${names:-none}"
+          echo "ONLY=${names:-none}" >> "$GITHUB_ENV"
+
       - name: Plan
         id: matrix
         run: |
+          echo "only=$ONLY" >> "$GITHUB_OUTPUT"
+          if [ "$ONLY" = "none" ]; then
+            for k in base deps builds; do echo "$k=[]" >> "$GITHUB_OUTPUT"; done
+            echo '{"entries": []}' > plan.json
+            exit 0
+          fi
           args=(--configs build)
           [ -n "$ONLY" ] && args+=(--only "$ONLY")
           python3 -m extpkg plan "${args[@]}" --out plan.json
@@ -206,11 +232,14 @@ jobs:
   publish:
     needs: [plan, base, deps, build]
     # A failed build skips only its own files. The others go out. A cancelled run publishes nothing.
-    if: ${{ !cancelled() && needs.plan.result == 'success' }}
+    # A pull request without a changed config has nothing to publish.
+    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.plan.outputs.only != 'none' }}
     runs-on: ubuntu-latest
     env:
       ARMBIAN_BUILD_DIR: ${{ github.workspace }}/armbian-build
       GITHUB_TOKEN: ${{ github.token }}
+      # The configs that the plan job planned.
+      ONLY: ${{ needs.plan.outputs.only }}
     steps:
       - uses: actions/checkout@v7
 
