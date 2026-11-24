@@ -1,9 +1,13 @@
 armbian-firstrun-gui (0.1.7) unstable; urgency=medium
 
-  * "@user" in the name field fills in the account from GitHub: name,
-    username, public SSH keys and the armbian-dotfiles repository.
-    "@user@host" uses another server.
-  * No network: select the keyboard first, then the Wi-Fi network.
+  * Quick setup: one screen asks for the username and the password. Time
+    zone, language, keyboard, shell and the full name are under Customize.
+  * "@user" in the username field fills in the account from GitHub: name,
+    username, profile picture, public SSH keys and the armbian-dotfiles
+    repository. "@user@host" uses another server.
+  * No network: the Wi-Fi page has the keyboard choice before the password.
+  * After a successful setup without a display manager, tty1 shows the login
+    prompt again.
 
  -- Armbian <info@armbian.com>  Tue, 24 Nov 2026 12:00:00 +0100
 
