@@ -314,10 +314,10 @@ A failed build skips only its own release and architecture. Its old files stay.
 Runs daily and by hand. Manual inputs: `only` and `dry_run` (default true).
 It finds build configs whose `upstream.ref` tag has a newer release tag, and opens one pull request per `upstream.bump_group`. The Build workflow then builds the pull request. A person merges it.
 
-- Candidates: a tag in `upstream.ref`. Not `latest`, a branch, `rebase`, `version_url` or `bump: off`.
+- Candidates: a tag in `upstream.ref`, written as a block-style `ref:` line. Not `latest`, a branch, `rebase`, `version`, `version_file`, `version_url` or `bump: off`.
 - Newest tag: `upstream.tags`, else the prefix of the pinned tag (`v1.2.0` gives `v*`). Release candidates are left out. Only a newer version opens a pull request.
 - The bump sets `ref` and resets `revision` to 1. Comments stay.
-- One branch per group: `bump/<group>`. A newer tag updates the open pull request.
+- One branch per group: `bump/<group>`. A newer tag updates the open pull request. A branch with manual commits is not updated.
 - A closed pull request refuses its tags. The same tags do not open it again.
 - Hook: an executable `build/<name>/bump-check <old> <new>` lists the manual work for the new tag. Its output goes into the pull request, and the pull request opens as a draft. The hook and the bump keys do not change the build identity.
 - Secret `ACCESS_TOKEN` pushes and opens the pull requests. With `GITHUB_TOKEN`, the Build workflow does not start on them.

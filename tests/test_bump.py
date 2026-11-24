@@ -91,6 +91,26 @@ class Find(unittest.TestCase):
         with self.assertRaises(config.ConfigError):
             bump.apply(os.path.join(self.dir, "same.yaml"), "v1.0.0", "v1.1.0")
 
+    def test_skips(self):
+        """An explicit version, a tag without a version, a flow-style upstream: no bump."""
+        write_config(self.dir, "pinned-version", "  url: https://github.com/o/tool\n  ref: v0.2.0\n  version: '0.2.0'\n")
+        TAGS["https://github.com/o/word"] = ["stable", "v2.0"]
+        self.addCleanup(TAGS.pop, "https://github.com/o/word")
+        write_config(self.dir, "word", "  url: https://github.com/o/word\n  ref: stable\n  tags: v*\n")
+        path = os.path.join(self.dir, "flow.yaml")
+        write_config(self.dir, "flow", "")
+        with open(path) as f:
+            text = f.read().replace("upstream:\n", "upstream: {url: https://github.com/o/tool, ref: v0.2.0}\n")
+        with open(path, "w") as f:
+            f.write(text)
+        self.assertEqual({b["config"] for b in self.find()}, {"app", "tool", "date"})
+
+    def test_group_names(self):
+        for name in ("foo..bar", "-x", "x.", "x.lock", "Upper"):
+            path = write_config(self.dir, f"g{abs(hash(name))}", f"  url: https://github.com/o/tool\n  ref: v0.2.0\n  bump_group: '{name}'\n")
+            with self.assertRaises(config.ConfigError, msg=name):
+                config.load_one(path)
+
     def test_hook_does_not_change_build(self):
         pkg = config.load_one(os.path.join(self.dir, "app.yaml"))
         before = source.local_hash(pkg, self.dir)
