@@ -4,7 +4,7 @@ method: build
 # armbian-hyprland-shell desktop. Local packaging in build/usage/debian/.
 upstream:
   url: https://github.com/jdx/usage
-  ref: v7.2.0
+  ref: v7.4.1
 releases:
 - forky
 - sid
