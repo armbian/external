@@ -1339,6 +1339,18 @@ export component AppWindow inherits Window {
                     function needs-password() -> bool {
                         return root.wifi-current >= 0 && root.wifi-model[root.wifi-current].secure;
                     }
+                    // The on-screen keyboard makes the list shorter: keep the selected network in view.
+                    changed rows-shown => {
+                        scroll-later.running = true;
+                    }
+                    scroll-later := Timer {
+                        interval: 1ms;
+                        running: false;
+                        triggered => {
+                            self.running = false;
+                            wifi.scroll();
+                        }
+                    }
                     capture-key-pressed(event) => {
                         if root.wifi-busy {
                             return reject;
@@ -1356,6 +1368,10 @@ export component AppWindow inherits Window {
                             return accept;
                         }
                         if event.text == Key.Return {
+                            // A focused button takes Enter itself.
+                            if change-button.has-keyboard-focus || scan-button.has-keyboard-focus || skip-button.has-keyboard-focus {
+                                return reject;
+                            }
                             if needs-password() && root.wifi-password == "" {
                                 password.focus();
                             } else if root.wifi-current >= 0 {
@@ -1413,7 +1429,7 @@ export component AppWindow inherits Window {
                                 overflow: elide;
                             }
 
-                            PillButton {
+                            change-button := PillButton {
                                 reveal(y, h) => {
                                     root.reveal(y, h);
                                 }
@@ -1426,7 +1442,7 @@ export component AppWindow inherits Window {
                                 }
                             }
 
-                            PillButton {
+                            scan-button := PillButton {
                                 reveal(y, h) => {
                                     root.reveal(y, h);
                                 }
@@ -1598,7 +1614,7 @@ export component AppWindow inherits Window {
 
                         HorizontalLayout {
                             alignment: center;
-                            LinkButton {
+                            skip-button := LinkButton {
                                 reveal(y, h) => {
                                     root.reveal(y, h);
                                 }
@@ -2068,7 +2084,7 @@ export component AppWindow inherits Window {
                                 px: root.px;
                                 dense: root.dense;
                                 placeholder: "Search a keyboard";
-                                start-focus: true;
+                                start-focus: root.keyboard-only;
                                 model: root.kb-model;
                                 current: root.kb-current;
                                 search(t) => {
