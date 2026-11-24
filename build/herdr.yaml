@@ -5,7 +5,7 @@ method: build
 # PKGBUILD (omacom/omarchy-pkgs, pkgbuilds/herdr).
 upstream:
   url: https://github.com/herdrdev/herdr
-  ref: v0.9.1
+  ref: v0.9.5
 releases:
 - forky
 - sid
