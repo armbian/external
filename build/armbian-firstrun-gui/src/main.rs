@@ -4,7 +4,6 @@
 //! /root/.not_logged_in_yet and runs armbian-firstlogin, which applies them unattended.
 //! Network is optional: without it, the values start from the image defaults.
 
-mod backdrop;
 mod data;
 mod git;
 mod wifi;
@@ -163,10 +162,11 @@ struct State {
     kb: List,
     /// The user changed the value: detection must not replace it.
     touched: [bool; 3],
+    /// The username follows the first field (or the git login) until the user edits it.
     username_auto: bool,
-    /// The username came from the git account: it does not follow the name.
-    username_git: bool,
-    /// The "@user" account in the name field that a lookup runs for. None: no lookup.
+    /// The full name follows the git account until the user edits it.
+    name_auto: bool,
+    /// The "@user" account in the first field that a lookup runs for. None: no lookup.
     git_current: Option<git::Account>,
     /// The account that filled the fields, and what it has. Its presets go to the file.
     git_result: Option<(git::Account, git::Found)>,
@@ -174,8 +174,6 @@ struct State {
     git_cache: HashMap<git::Account, git::Lookup>,
     /// Git presets of the image (PRESET_USER_KEY). They stay when no account fills the fields.
     git_keep: Vec<(&'static str, String)>,
-    /// The username error came from the git lookup: an edit of the username removes it.
-    git_error: bool,
     /// The layout that the input uses now.
     active_kb: String,
     /// Draws without X11 or Wayland: a new layout needs a restart.
@@ -189,12 +187,6 @@ struct State {
     /// Values before the region page opened: Cancel restores them.
     saved: Option<([String; 3], [bool; 3])>,
     tx: Sender<Msg>,
-}
-
-fn suggest_username(realname: &str) -> String {
-    let first = realname.split_whitespace().next().unwrap_or("").to_lowercase();
-    let name: String = first.chars().filter(|c| c.is_ascii_lowercase() || c.is_ascii_digit()).collect();
-    name.trim_start_matches(|c: char| c.is_ascii_digit()).to_string()
 }
 
 fn user_exists(name: &str) -> bool {
@@ -327,7 +319,7 @@ fn preset_vars(ui: &AppWindow, st: &State) -> Vec<(&'static str, String)> {
         ("PRESET_ROOT_PASSWORD", password.clone()),
         ("PRESET_USER_NAME", ui.get_username().to_string()),
         ("PRESET_USER_PASSWORD", password),
-        ("PRESET_DEFAULT_REALNAME", ui.get_realname().to_string()),
+        ("PRESET_DEFAULT_REALNAME", realname_or_username(&ui.get_realname(), &ui.get_username())),
         ("PRESET_TIMEZONE", st.tz.value.clone()),
         ("PRESET_LOCALE", st.locale.value.clone()),
         ("SET_LANG_BASED_ON_LOCATION", "y".into()),
@@ -335,20 +327,32 @@ fn preset_vars(ui: &AppWindow, st: &State) -> Vec<(&'static str, String)> {
         ("PRESET_KEYBOARD_VARIANT", variant),
         ("PRESET_USER_SHELL", if ui.get_has_zsh() && ui.get_shell() == "zsh" { "zsh".into() } else { "bash".into() }),
     ];
-    vars.extend(git_vars(st));
+    vars.extend(git_vars(st, ui.get_import_keys(), ui.get_import_dotfiles()));
     vars
 }
 
-/// Presets from the git account that filled the fields. Else the ones of the image.
-fn git_vars(st: &State) -> Vec<(&'static str, String)> {
+/// The full name is optional. Without one, armbian-firstlogin uses the username with
+/// a capital first letter: the wizard writes the same, so that no question comes.
+fn realname_or_username(realname: &str, username: &str) -> String {
+    let name = realname.trim();
+    if !name.is_empty() {
+        return name.to_string();
+    }
+    let mut c = username.chars();
+    c.next().map(|f| f.to_uppercase().collect::<String>() + c.as_str()).unwrap_or_default()
+}
+
+/// Presets from the git account that filled the fields, without the parts the user
+/// turned off. Without an account: the ones of the image.
+fn git_vars(st: &State, keys: bool, dotfiles: bool) -> Vec<(&'static str, String)> {
     let Some((acc, found)) = st.git_result.as_ref() else {
         return st.git_keep.clone();
     };
     let mut vars = vec![];
-    if found.keys > 0 {
+    if found.keys > 0 && keys {
         vars.push(("PRESET_USER_KEY", acc.keys_url()));
     }
-    if found.dotfiles {
+    if found.dotfiles && dotfiles {
         vars.push(("PRESET_DOTFILES_URL", acc.dotfiles_url()));
     }
     vars.push(("PRESET_GIT_ACCOUNT", format!("{}/{}", acc.host, acc.user)));
@@ -482,10 +486,15 @@ fn restart_with_layout(ui: &AppWindow, st: &State, next: i32) {
         None => (String::new(), 0, 0),
     };
     let resume = format!(
-        "NEXT={next}\nTZ={}\nLOCALE={}\nKB={}\nNAME={}\nUSER={}\nSHELL={}\nGIT={git}\nGIT_KEYS={keys}\nGIT_DOTFILES={dotfiles}\nGIT_NAME={}\nGIT_USERNAME={}\nGIT_SOURCE={}\n",
+        "NEXT={next}\nTZ={}\nLOCALE={}\nKB={}\nACCOUNT={}\nNAME_AUTO={}\nUSER_AUTO={}\nIMPORT_KEYS={}\nIMPORT_DOTFILES={}\nNAME={}\nUSER={}\nSHELL={}\nGIT={git}\nGIT_KEYS={keys}\nGIT_DOTFILES={dotfiles}\nGIT_NAME={}\nGIT_USERNAME={}\nGIT_SOURCE={}\n",
         st.tz.value,
         st.locale.value,
         st.kb.value,
+        ui.get_account().replace('\n', " "),
+        u8::from(st.name_auto),
+        u8::from(st.username_auto),
+        u8::from(ui.get_import_keys()),
+        u8::from(ui.get_import_dotfiles()),
         ui.get_realname().replace('\n', " "),
         ui.get_username(),
         ui.get_shell(),
@@ -511,18 +520,6 @@ fn goto_account(ui: &AppWindow, st: &State) {
         restart_with_layout(ui, st, PAGE_ACCOUNT);
     }
     ui.set_page(PAGE_ACCOUNT);
-}
-
-/// No network: the keyboard first, because the Wi-Fi password uses it. Then the Wi-Fi page.
-/// A keyboard from the presets or from before a restart needs no question.
-fn goto_offline(ui: &AppWindow, st: &mut State) {
-    if !st.touched[2] {
-        st.saved = None;
-        ui.set_keyboard_only(true);
-        ui.set_page(PAGE_REGION);
-        return;
-    }
-    goto_wifi(ui, st);
 }
 
 /// Show the Wi-Fi page. A new keyboard layout restarts the wizard first.
@@ -595,7 +592,8 @@ fn apply_location(st: &mut State, loc: &Location, keyboard: bool) {
 /// values change, and a new keyboard layout restarts the wizard as usual. After the first
 /// typed character: the keyboard stays, because the user types the password with it.
 fn late_location(ui: &AppWindow, st: &Rc<RefCell<State>>, loc: &Location, refresh: &dyn Fn(bool)) {
-    let empty = ui.get_realname().is_empty()
+    let empty = ui.get_account().is_empty()
+        && ui.get_realname().is_empty()
         && ui.get_username().is_empty()
         && ui.get_password().is_empty()
         && ui.get_password2().is_empty();
@@ -636,7 +634,7 @@ fn handle(ui: &AppWindow, st: &Rc<RefCell<State>>, msg: Msg, refresh: &dyn Fn(bo
             } else if quiet {
                 // Background check on the Wi-Fi page: still offline.
             } else if st.borrow().wifi_iface.is_some() {
-                goto_offline(ui, &mut st.borrow_mut());
+                goto_wifi(ui, &st.borrow());
             } else {
                 // No network and no Wi-Fi: the image defaults.
                 goto_account(ui, &st.borrow());
@@ -690,39 +688,62 @@ fn handle(ui: &AppWindow, st: &Rc<RefCell<State>>, msg: Msg, refresh: &dyn Fn(bo
     }
 }
 
-fn git_status(ui: &AppWindow, text: &str, found: bool, warn: bool, checking: bool) {
-    ui.set_git_status(text.into());
+fn git_status(ui: &AppWindow, title: &str, detail: &str, found: bool, warn: bool, checking: bool) {
+    ui.set_git_title(title.into());
+    ui.set_git_detail(detail.into());
     ui.set_git_found(found);
     ui.set_git_warn(warn);
     ui.set_git_checking(checking);
 }
 
-/// The name field changed, or the network came or went. "@user" in the name field is
-/// a git account: it is looked up after a pause in the typing.
+/// The form can be sent: a username without an error, and no "@user" that is still
+/// open. The passwords are checked in the UI.
+fn update_ready(ui: &AppWindow, s: &State) {
+    let account = ui.get_account();
+    let git = account.trim_start().starts_with('@');
+    let user = ui.get_username();
+    let error = if git || account.trim().is_empty() { None } else { username_error(&user) };
+    ui.set_account_error(error.unwrap_or("").into());
+    ui.set_can_apply(!user.is_empty() && error.is_none() && (!git || s.git_result.is_some()) && !ui.get_git_checking());
+}
+
+/// The first field changed. A plain name is the local username. "@user" is a git account.
+fn account_changed(ui: &AppWindow, st: &Rc<RefCell<State>>, debounce: &slint::Timer) {
+    {
+        let s = st.borrow();
+        let account = ui.get_account();
+        if !account.trim_start().starts_with('@') && s.username_auto {
+            ui.set_username(account.trim().into());
+        }
+    }
+    git_changed(ui, st, debounce);
+    update_ready(ui, &st.borrow());
+}
+
+/// The first field changed, or the network came or went. "@user" is a git account:
+/// it is looked up after a pause in the typing.
 fn git_changed(ui: &AppWindow, st: &Rc<RefCell<State>>, debounce: &slint::Timer) {
     debounce.stop();
     let mut s = st.borrow_mut();
     s.git_current = None;
-    let text = ui.get_realname();
+    let text = ui.get_account();
     let acc = match git::parse(&text) {
-        // A name. An account that filled the fields stays, until the name is empty.
+        // A local account.
         git::Input::Name => {
-            if text.trim().is_empty() {
-                git_drop(ui, &mut s);
-            }
+            git_drop(ui, &mut s);
             return;
         }
         _ if ui.get_ip_address().is_empty() => {
             git_drop(ui, &mut s);
-            return git_status(ui, "A git account needs a network connection", false, true, false);
+            return git_status(ui, "A git account needs a network connection", "Remove the @ to create a local account.", false, true, false);
         }
         git::Input::Partial => {
             git_drop(ui, &mut s);
-            return git_status(ui, "Your GitHub username, or user@server for another server", false, false, false);
+            return git_status(ui, "Type your GitHub username", "For another server: @user@server", false, false, false);
         }
         git::Input::Invalid(e) => {
             git_drop(ui, &mut s);
-            return git_status(ui, e, false, true, false);
+            return git_status(ui, e, "", false, true, false);
         }
         git::Input::Ok(acc) => acc,
     };
@@ -731,7 +752,7 @@ fn git_changed(ui: &AppWindow, st: &Rc<RefCell<State>>, debounce: &slint::Timer)
     if let Some(r) = s.git_cache.get(&acc).cloned() {
         return git_show_result(ui, &mut s, &acc, r);
     }
-    git_status(ui, "Checking…", false, false, true);
+    git_status(ui, &format!("Looking up {} on {}…", acc.user, git::source_name(&acc.host)), "", false, false, true);
     let tx = s.tx.clone();
     debounce.start(slint::TimerMode::SingleShot, GIT_DEBOUNCE, move || {
         let (tx, acc) = (tx.clone(), acc.clone());
@@ -742,78 +763,63 @@ fn git_changed(ui: &AppWindow, st: &Rc<RefCell<State>>, debounce: &slint::Timer)
     });
 }
 
-/// Forget the account that filled the fields. A username from it follows the name again.
+/// Forget the account that filled the fields. The fields it filled are cleared again.
 fn git_drop(ui: &AppWindow, s: &mut State) {
-    git_status(ui, "", false, false, false);
+    git_status(ui, "", "", false, false, false);
     if s.git_result.take().is_none() {
         return;
     }
     ui.set_git_name("".into());
     ui.set_git_username("".into());
-    if s.username_git {
-        s.username_git = false;
-        if s.username_auto {
-            ui.set_username(suggest_username(&ui.get_realname()).into());
-        }
+    ui.set_git_keys(0);
+    ui.set_git_keys_url("".into());
+    ui.set_git_dotfiles_url("".into());
+    if s.name_auto {
+        ui.set_realname("".into());
+    }
+    if s.username_auto {
+        let account = ui.get_account();
+        let plain = !account.trim_start().starts_with('@');
+        ui.set_username(if plain { account.trim().into() } else { "".into() });
     }
 }
 
-/// Show the result. A found account fills the name, the username that the user did not
-/// edit, the SSH keys and the dotfiles. The password is next.
+/// Show the result. A found account fills the full name and the username that the
+/// user did not edit, and offers its SSH keys and dotfiles. The password is next.
 fn git_show_result(ui: &AppWindow, s: &mut State, acc: &git::Account, r: git::Lookup) {
     let found = matches!(r, git::Lookup::Found(_));
-    git_status(ui, &git::status(acc, &r), found, !found, false);
+    git_status(ui, &git::title(acc, &r), &git::detail(acc, &r), found, !found, false);
     let git::Lookup::Found(f) = r else {
+        update_ready(ui, s);
         return;
     };
     s.git_current = None;
     ui.set_git_source(git::source_name(&acc.host).into());
     let name = f.name.clone().unwrap_or_else(|| acc.user.clone());
-    ui.set_realname(name.as_str().into());
+    if s.name_auto {
+        ui.set_realname(name.as_str().into());
+    }
     ui.set_git_name(name.into());
-    // The git login is the username too, when it is a valid Linux username that is free.
+    // The git login is the username too, when it is a valid Linux username.
     if s.username_auto {
         let user = git::linux_username(&acc.user);
-        match username_error(&user) {
-            None => {
-                ui.set_username(user.as_str().into());
-                ui.set_git_username(user.into());
-                s.username_git = true;
-                if s.git_error {
-                    ui.set_error("".into());
-                    s.git_error = false;
-                }
-            }
-            Some(e) => {
-                ui.set_error(e.into());
-                s.git_error = true;
-            }
-        }
+        ui.set_username(user.as_str().into());
+        ui.set_git_username(user.into());
     }
+    ui.set_git_keys(f.keys as i32);
+    ui.set_git_keys_url(if f.keys > 0 { acc.keys_url().trim_start_matches("https://").into() } else { "".into() });
+    ui.set_git_dotfiles_url(if f.dotfiles { acc.dotfiles_url().trim_start_matches("https://").trim_end_matches(".git").into() } else { "".into() });
+    ui.set_import_keys(true);
+    ui.set_import_dotfiles(true);
     s.git_result = Some((acc.clone(), f));
     ui.set_git_filled(ui.get_git_filled() + 1);
-}
-
-/// Make the background for the size of the window and the accent. `last` holds the values
-/// of the image that shows now: the work is done only after a change.
-fn update_backdrop(ui: &AppWindow, last: &mut (u32, u32, slint::Color)) {
-    let size = ui.window().size();
-    let accent = ui.global::<Theme>().get_accent();
-    let now = (size.width, size.height, accent);
-    if ui.get_has_background() || size.width == 0 || size.height == 0 || *last == now {
-        return;
+    update_ready(ui, s);
+    // A login that is not a valid or free Linux username: the error shows under the field.
+    if let Some(e) = username_error(&ui.get_username()) {
+        ui.set_account_error(e.into());
     }
-    *last = now;
-    // Very large screens: half the size, and Slint makes the image larger.
-    let k = if size.width > 2048 { 2 } else { 1 };
-    let (w, h) = (size.width / k, size.height / k);
-    let rgb = backdrop::render(w, h, [accent.red(), accent.green(), accent.blue()]);
-    let buffer = slint::SharedPixelBuffer::<slint::Rgb8Pixel>::clone_from_slice(&rgb, w, h);
-    ui.set_backdrop(slint::Image::from_rgb8(buffer));
 }
 
-/// Name (eDP-1) and modes of the first connected display, in the order of the kernel.
-/// The first mode is the preferred one.
 fn screen_modes() -> (String, Vec<(u32, u32)>) {
     let Ok(dir) = fs::read_dir("/sys/class/drm") else { return Default::default() };
     let mut dirs: Vec<_> = dir.flatten().map(|e| e.path()).collect();
@@ -962,11 +968,9 @@ fn main() {
         locale: List::new(data::locales(), start("PRESET_LOCALE", "LOCALE", locale)),
         kb: List::new(data::keyboards(), kb_preset.clone().or_else(|| resume.get("KB").cloned()).unwrap_or(kb)),
         touched: [has("PRESET_TIMEZONE") || resumed, has("PRESET_LOCALE") || resumed, kb_preset.is_some() || resumed],
-        // After a restart: the username was edited when it is not the one from the name.
-        username_auto: resume.get("USER").is_none_or(|u| {
-            u.is_empty() || *u == suggest_username(resume.get("NAME").map_or("", |n| n.as_str())) || Some(u) == resume.get("GIT_USERNAME")
-        }),
-        username_git: resume.get("USER").is_some_and(|u| !u.is_empty() && Some(u) == resume.get("GIT_USERNAME")),
+        // After a restart: the user edited a field when its flag is 0.
+        username_auto: resume.get("USER_AUTO").is_none_or(|v| v != "0"),
+        name_auto: resume.get("NAME_AUTO").is_none_or(|v| v != "0"),
         git_current: None,
         git_result: resume.get("GIT").map(|g| git::parse(g)).and_then(|i| match i {
             git::Input::Ok(acc) => Some((
@@ -981,7 +985,6 @@ fn main() {
         }),
         git_cache: HashMap::new(),
         git_keep: GIT_VARS.iter().filter_map(|&k| preset.get(k).filter(|v| !v.is_empty()).map(|v| (k, v.clone()))).collect(),
-        git_error: false,
         active_kb,
         kms,
         wifi_iface: wifi::interface(),
@@ -1049,37 +1052,37 @@ fn main() {
     wire_list!(on_search_locale, on_pick_locale, locale, 1);
     wire_list!(on_search_kb, on_pick_kb, kb, 2);
 
-    // Git account: "@user" in the name field.
+    // The first field: a local username, or "@user" for a git account.
     let git_debounce = Rc::new(slint::Timer::default());
     let on_git: Rc<dyn Fn()> = {
         let (weak, st2, debounce) = (ui.as_weak(), st.clone(), git_debounce.clone());
-        Rc::new(move || git_changed(&weak.unwrap(), &st2, &debounce))
+        Rc::new(move || {
+            let ui = weak.unwrap();
+            git_changed(&ui, &st2, &debounce);
+            update_ready(&ui, &st2.borrow());
+        })
     };
     {
         let on_git = on_git.clone();
         ui.on_git_changed(move || on_git());
+        let (weak, st2, debounce) = (ui.as_weak(), st.clone(), git_debounce.clone());
+        ui.on_account_edited(move |_| account_changed(&weak.unwrap(), &st2, &debounce));
     }
 
-    // The username follows the name until the user edits it, or until it comes from the git account.
+    // Customize: an edit of the full name or the username keeps it.
     {
-        let (weak, st2, on_git) = (ui.as_weak(), st.clone(), on_git.clone());
-        ui.on_realname_edited(move |name| {
-            {
-                let s = st2.borrow();
-                if s.username_auto && !s.username_git && !name.trim_start().starts_with('@') {
-                    weak.unwrap().set_username(suggest_username(&name).into());
-                }
-            }
-            on_git();
-        });
+        let st2 = st.clone();
+        ui.on_realname_edited(move |_| st2.borrow_mut().name_auto = false);
         let (weak, st2) = (ui.as_weak(), st.clone());
         ui.on_username_edited(move |_| {
+            let ui = weak.unwrap();
             let mut s = st2.borrow_mut();
             s.username_auto = false;
-            s.username_git = false;
-            if s.git_error {
-                weak.unwrap().set_error("".into());
-                s.git_error = false;
+            ui.set_error("".into());
+            update_ready(&ui, &s);
+            // The username of the field is now its own: show its error there too.
+            if let Some(e) = username_error(&ui.get_username()) {
+                ui.set_account_error(e.into());
             }
         });
     }
@@ -1127,6 +1130,17 @@ fn main() {
             ui.set_error("".into());
             ui.set_page(PAGE_REGION);
         });
+        // From the Wi-Fi page: the keyboard list only.
+        let (weak, st2) = (ui.as_weak(), st.clone());
+        ui.on_change_keyboard(move || {
+            let ui = weak.unwrap();
+            let mut s = st2.borrow_mut();
+            s.saved = Some(([s.tz.value.clone(), s.locale.value.clone(), s.kb.value.clone()], s.touched));
+            ui.set_error("".into());
+            ui.set_keyboard_only(true);
+            ui.set_region_tab(2);
+            ui.set_page(PAGE_REGION);
+        });
         let (weak, st2, r2) = (ui.as_weak(), st.clone(), refresh.clone());
         ui.on_region_done(move || {
             {
@@ -1170,7 +1184,13 @@ fn main() {
                 s.kb.filter("");
             }
             r2(true);
-            weak.unwrap().set_page(PAGE_ACCOUNT);
+            let ui = weak.unwrap();
+            if ui.get_keyboard_only() {
+                ui.set_keyboard_only(false);
+                ui.set_page(PAGE_WIFI);
+                return;
+            }
+            ui.set_page(PAGE_ACCOUNT);
         });
     }
 
@@ -1184,8 +1204,8 @@ fn main() {
         ui.on_apply(move || {
             let ui = weak.unwrap();
             // "@user" that did not fill the fields yet.
-            if ui.get_realname().trim_start().starts_with('@') {
-                let e = if ui.get_git_warn() { ui.get_git_status() } else { "Wait for the git account, or type your name.".into() };
+            if ui.get_account().trim_start().starts_with('@') && st2.borrow().git_result.is_none() {
+                let e = if ui.get_git_warn() { ui.get_git_title() } else { "Wait for the git account, or remove the @ for a local account.".into() };
                 ui.set_error(e);
                 return;
             }
@@ -1290,12 +1310,20 @@ fn main() {
             ui.set_shell(sh.into());
         }
         let get = |k: &str| SharedString::from(resume.get(k).map_or("", |v| v.as_str()));
+        ui.set_account(get("ACCOUNT"));
         ui.set_git_name(get("GIT_NAME"));
         ui.set_git_username(get("GIT_USERNAME"));
         ui.set_git_source(get("GIT_SOURCE"));
+        ui.set_import_keys(resume.get("IMPORT_KEYS").is_none_or(|v| v != "0"));
+        ui.set_import_dotfiles(resume.get("IMPORT_DOTFILES").is_none_or(|v| v != "0"));
         if let Some((acc, f)) = st.borrow().git_result.clone() {
-            git_status(&ui, &git::status(&acc, &git::Lookup::Found(f)), true, false, false);
+            let r = git::Lookup::Found(f.clone());
+            git_status(&ui, &git::title(&acc, &r), &git::detail(&acc, &r), true, false, false);
+            ui.set_git_keys(f.keys as i32);
+            ui.set_git_keys_url(if f.keys > 0 { acc.keys_url().trim_start_matches("https://").into() } else { "".into() });
+            ui.set_git_dotfiles_url(if f.dotfiles { acc.dotfiles_url().trim_start_matches("https://").trim_end_matches(".git").into() } else { "".into() });
         }
+        update_ready(&ui, &st.borrow());
         if resume.get("NEXT").and_then(|n| n.parse().ok()) == Some(PAGE_WIFI) {
             ui.set_page(PAGE_WIFI);
             start_scan(&ui, &st.borrow());
@@ -1314,11 +1342,8 @@ fn main() {
         let on_git = on_git.clone();
         let (weak, st2, r2) = (ui.as_weak(), st.clone(), refresh.clone());
         let mut ticks = 0u32;
-        let mut backdrop = (0, 0, slint::Color::default());
         timer.start(slint::TimerMode::Repeated, std::time::Duration::from_millis(200), move || {
             let ui = weak.unwrap();
-            // The window has its size only after the start. A new size makes a new image.
-            update_backdrop(&ui, &mut backdrop);
             while let Ok(msg) = rx.try_recv() {
                 handle(&ui, &st2, msg, &*r2);
             }
@@ -1328,7 +1353,7 @@ fn main() {
                 let online_changed = ip.is_empty() != ui.get_ip_address().is_empty();
                 ui.set_ip_address(ip.into());
                 // A "@user" lookup needs the network.
-                if online_changed && ui.get_realname().trim_start().starts_with('@') {
+                if online_changed && ui.get_account().trim_start().starts_with('@') {
                     on_git();
                 }
             }
@@ -1351,10 +1376,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn username_from_name() {
-        assert_eq!(suggest_username("Igor Pečovnik"), "igor");
-        assert_eq!(suggest_username("  Ana-Marija X"), "anamarija");
-        assert_eq!(suggest_username("42 Bob"), "");
+    fn realname_default() {
+        assert_eq!(realname_or_username("  Igor Pečovnik ", "igor"), "Igor Pečovnik");
+        assert_eq!(realname_or_username("", "igor"), "Igor");
+        assert_eq!(realname_or_username(" ", ""), "");
     }
 
     #[test]
