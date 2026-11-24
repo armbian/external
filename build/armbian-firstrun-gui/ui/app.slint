@@ -2100,6 +2100,13 @@ export component AppWindow inherits Window {
                     HorizontalLayout {
                         spacing: 12 * root.px;
                         alignment: end;
+                        // For example: the answers cannot be saved before a restart.
+                        if root.error != "": Note {
+                            px: root.px;
+                            horizontal-stretch: 1;
+                            error: true;
+                            text: root.error;
+                        }
                         PillButton {
                             reveal(y, h) => {
                                 root.reveal(y, h);

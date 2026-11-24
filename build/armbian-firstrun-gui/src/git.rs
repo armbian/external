@@ -224,24 +224,36 @@ fn get(url: &str) -> (u16, String) {
     (code.trim().parse().unwrap_or(0), body.to_string())
 }
 
-fn profile(acc: &Account) -> (Profile, bool) {
-    let mut reached = false;
-    for (kind, url) in acc.profile_urls() {
-        let (code, body) = get(&url);
-        // No answer: the next API is on the same server.
+/// The profile from the answers of the APIs, in the order of profile_urls(). Code 0: no
+/// answer, and the next API is not asked (same server). Also: whether the server answered.
+/// Other server: missing only when every API says so. A 404 of one API alone can mean
+/// "not this API", and an error of the other tells nothing.
+pub fn profile_from(server: Kind, answers: impl IntoIterator<Item = (Kind, u16, String)>) -> (Profile, bool) {
+    let (mut reached, mut all_missing) = (false, true);
+    for (kind, code, body) in answers {
         if code == 0 {
+            all_missing = false;
             break;
         }
         reached = true;
         match parse_profile(kind, code, &body) {
             Profile::Exists(name, avatar) => return (Profile::Exists(name, avatar), true),
             // A known service: its answer is final. Other server: try the next API.
-            Profile::Missing if acc.kind != Kind::Unknown => return (Profile::Missing, true),
-            _ => {}
+            Profile::Missing if server != Kind::Unknown => return (Profile::Missing, true),
+            Profile::Missing => {}
+            Profile::Unknown => all_missing = false,
         }
     }
-    let missing = reached && acc.kind == Kind::Unknown;
-    (if missing { Profile::Missing } else { Profile::Unknown }, reached)
+    (if reached && all_missing { Profile::Missing } else { Profile::Unknown }, reached)
+}
+
+fn profile(acc: &Account) -> (Profile, bool) {
+    // Lazy: an API is asked only when the one before it answered.
+    let answers = acc.profile_urls().into_iter().map(|(kind, url)| {
+        let (code, body) = get(&url);
+        (kind, code, body)
+    });
+    profile_from(acc.kind, answers)
 }
 
 /// A git server answers the first request of a clone with this line. A sign-in page
@@ -259,23 +271,35 @@ pub fn lookup(acc: &Account) -> Lookup {
         (prof, keys.join().unwrap_or_default(), refs.join().unwrap_or_default())
     });
     let ((prof, reached), (keys_code, keys_text), (refs_code, refs_text)) = (prof, keys, refs);
-    if !reached && keys_code == 0 && refs_code == 0 {
-        return Lookup::Unreachable;
-    }
     let keys = if keys_code == 200 { count_keys(&keys_text) } else { 0 };
     let dotfiles = is_ref_advertisement(refs_code, &refs_text);
+    match decide(&prof, reached, keys_code, dotfiles) {
+        Lookup::Found(_) => {}
+        other => return other,
+    }
     let (name, avatar) = match prof {
         Profile::Exists(name, avatar) => (name, avatar),
-        // The profile tells nothing (for example the GitHub rate limit): the keys
-        // file or the repository shows that the account exists.
-        _ if keys_code == 200 || dotfiles => (None, None),
-        // Absent only when the server says so twice: the profile and the keys file.
-        Profile::Missing if keys_code == 404 => return Lookup::NotFound,
-        // No clear answer: not kept, so that the next try asks again.
-        _ => return Lookup::Unreachable,
+        _ => (None, None),
     };
     let avatar = avatar.and_then(|u| avatar_url(acc, &u)).and_then(|u| get_bytes(&u));
     Lookup::Found(Found { name, keys, dotfiles, avatar })
+}
+
+/// The result from the answers. Found carries no details here: lookup() adds them.
+pub fn decide(prof: &Profile, reached: bool, keys_code: u16, dotfiles: bool) -> Lookup {
+    if !reached && keys_code == 0 && !dotfiles {
+        return Lookup::Unreachable;
+    }
+    match prof {
+        Profile::Exists(..) => Lookup::Found(Found::default()),
+        // The profile tells nothing (for example the GitHub rate limit): the keys
+        // file or the repository shows that the account exists.
+        _ if keys_code == 200 || dotfiles => Lookup::Found(Found::default()),
+        // Absent only when the server says so twice: the profile and the keys file.
+        Profile::Missing if keys_code == 404 => Lookup::NotFound,
+        // No clear answer: not kept, so that the next try asks again.
+        _ => Lookup::Unreachable,
+    }
 }
 
 /// The first line of the result card.
@@ -372,6 +396,28 @@ mod tests {
         assert_eq!(avatar_url(&gt, "https://169.254.169.254/latest"), None);
         assert_eq!(avatar_url(&gt, "https://git.example.org.evil/a"), None);
         assert_eq!(avatar_url(&gt, "https://user@git.example.org/a"), None);
+    }
+
+    #[test]
+    fn unclear_is_not_absent() {
+        let (u, gl, gt) = (Kind::Unknown, Kind::GitLab, Kind::Gitea);
+        // Other server: the GitLab API is not there (404), the Gitea API fails (503).
+        let (p, reached) = profile_from(u, [(gl, 404, String::new()), (gt, 503, String::new())]);
+        assert_eq!(p, Profile::Unknown);
+        assert_eq!(decide(&p, reached, 404, false), Lookup::Unreachable);
+        // Both APIs say missing, and the keys file too: absent.
+        let (p, reached) = profile_from(u, [(gl, 200, "[]".into()), (gt, 404, String::new())]);
+        assert_eq!(p, Profile::Missing);
+        assert_eq!(decide(&p, reached, 404, false), Lookup::NotFound);
+        // The profile is missing, but the keys file answers: the account exists.
+        assert!(matches!(decide(&Profile::Missing, true, 200, false), Lookup::Found(_)));
+        // GitHub says 404: final for a known service.
+        let (p, _) = profile_from(Kind::GitHub, [(Kind::GitHub, 404, String::new())]);
+        assert_eq!(p, Profile::Missing);
+        // No answer at all.
+        assert_eq!(decide(&Profile::Unknown, false, 0, false), Lookup::Unreachable);
+        // A keys file that failed (0) does not confirm the absence.
+        assert_eq!(decide(&Profile::Missing, true, 0, false), Lookup::Unreachable);
     }
 
     #[test]
