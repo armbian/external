@@ -1,0 +1,17 @@
+name: rpi-eeprom-ubuntu
+method: build
+# Raspberry Pi bootloader images for Ubuntu. Ubuntu ships an older
+# rpi-eeprom and splits the images into rpi-eeprom-firmware, so the
+# Raspberry Pi package needs Breaks/Replaces for it. Noble has no raspi-utils.
+packaging:
+  url: http://archive.raspberrypi.com/debian/
+  suite: trixie
+  components: [main]
+  package: rpi-eeprom
+releases:
+- resolute
+architectures:
+- arm64
+target: utils
+install:
+- rpi-eeprom

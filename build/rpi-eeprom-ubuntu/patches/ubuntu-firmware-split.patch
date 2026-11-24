@@ -1,0 +1,16 @@
+Ubuntu splits the bootloader images into rpi-eeprom-firmware.
+This package ships them, so it replaces that package.
+
+--- a/debian/control
++++ b/debian/control
+@@ -15,8 +15,8 @@
+ Architecture: all
+ Depends: ${shlibs:Depends}, ${misc:Depends}, raspi-utils, python3,
+  binutils, pciutils, python3-pycryptodome
+-Breaks: rpi-eeprom-images (<<7.2)
+-Replaces: rpi-eeprom-images (<<7.2)
++Breaks: rpi-eeprom-images (<<7.2), rpi-eeprom-firmware
++Replaces: rpi-eeprom-images (<<7.2), rpi-eeprom-firmware
+ Recommends: flashrom, rpieepromab (>=20260304+1)
+ Provides: rpi-eeprom-images
+ Description: Raspberry Pi 4/5 boot EEPROM updater
