@@ -8,13 +8,14 @@ include /usr/share/dpkg/architecture.mk
 PKG = debian/sunshine
 
 # Sunshine links the patched static FFmpeg of LizardByte/build-deps.
-# Use the release that the third-party/build-deps submodule pins. Update
-# the tag and the SHA256 (GitHub release asset digest) with each upstream tag.
-FFMPEG_TAG = v2026.910.121303
+# Use the release that BUILD_DEPS_TAG in upstream package-lock.cmake pins.
+# Update the tag and the SHA256 (GitHub release asset digest) with each
+# upstream tag. Upstream checks no hash of this download.
+FFMPEG_TAG = v2026.1017.131201
 FFMPEG_ARCH_amd64 = x86_64
 FFMPEG_ARCH_arm64 = aarch64
-FFMPEG_SHA256_amd64 = 496d2bbb674d01e6033e31b9dfc15cbc9dc1494e882a4505f6ab1e03f75b385c
-FFMPEG_SHA256_arm64 = 21f99409e1aba09191f9df28688fb7f9d44f98e65378a651324c632c19823aa0
+FFMPEG_SHA256_amd64 = b2de5119cb0ab89cb6038acb75299b213f97a0c79d34557068add639511f8815
+FFMPEG_SHA256_arm64 = fa6ca8f716922ebd4be222647bf972ec050af145406186787c43bfa0353f0a1d
 FFMPEG_ASSET = Linux-$(FFMPEG_ARCH_$(DEB_HOST_ARCH))-ffmpeg.tar.gz
 FFMPEG_DIR = $(CURDIR)/debian/ffmpeg
 
@@ -32,7 +33,10 @@ override_dh_auto_configure:
 	echo "$(FFMPEG_SHA256_$(DEB_HOST_ARCH))  debian/$(FFMPEG_ASSET)" | sha256sum -c -
 	mkdir -p $(FFMPEG_DIR)
 	tar -xzf debian/$(FFMPEG_ASSET) -C $(FFMPEG_DIR) --no-same-owner
+	# CPM downloads the other dependencies at the versions that upstream
+	# package-lock.cmake pins. dh turns downloads off: turn them on.
 	dh_auto_configure -- -Wno-dev \
+		-DFETCHCONTENT_FULLY_DISCONNECTED=OFF \
 		-DBUILD_DOCS=OFF -DBUILD_TESTS=OFF \
 		-DSUNSHINE_EXECUTABLE_PATH=/usr/bin/sunshine \
 		-DSUNSHINE_ASSETS_DIR=share/sunshine \
