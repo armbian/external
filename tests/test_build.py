@@ -359,6 +359,20 @@ class Matrix(unittest.TestCase):
     def test_both_new(self):
         self.assertEqual(self.matrix([]), (["libdrm"], ["mesa"]))
 
+    def test_only_takes_build_depends(self):
+        """--only mesa (a pull request that changes mesa) also loads libdrm: mesa needs its build."""
+        self.assertEqual(config.with_build_depends(self.tmp, ["mesa"]), ["mesa", "libdrm"])
+        prev = os.path.join(self.tmp, "prev.json")
+        with open(prev, "w") as f:
+            json.dump({"files": [{"config": "libdrm", "release": "resolute", "arch": "amd64", "source": "libdrm",
+                                  "upstream_id": "libdrm-1", "filename": "libdrm.deb", "version": "0"}]}, f)
+        r = subprocess.run(["python3", "-m", "extpkg", "build-matrix", "--configs", self.tmp, "--plan", self.plan,
+                            "--previous", prev, "--only", "mesa"], capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        doc = json.loads(r.stdout)
+        self.assertEqual(([j["config"] for j in doc["deps"]], [j["config"] for j in doc["builds"]]),
+                         (["libdrm"], ["mesa"]))
+
     def test_mesa_changed_builds_libdrm_too(self):
         self.assertEqual(self.matrix(["libdrm"]), (["libdrm"], ["mesa"]))
 

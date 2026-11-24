@@ -298,8 +298,10 @@ Check uses no secrets.
 
 ### Build (`.github/workflows/build.yml`)
 
-Runs daily, by hand, and on pull requests that change `build/`, `extpkg/` or the workflow. Manual inputs: `only` and `dry_run` (default true).
+Runs daily, by hand, and on pull requests that change `build/`, `extpkg/`, `tools/build-in-container.sh` or the workflow. Manual inputs: `only` and `dry_run` (default true).
 Pull requests are always dry runs. Scheduled runs are dry runs until the repository variable `BUILD_LIVE` is `true`.
+Pull requests build only the changed configs (`build/<name>.yaml`, `build/<name>/`) and their `build_depends`. A change of `extpkg/`, `tools/build-in-container.sh` or the workflow builds every config with a new identity.
+`only` also takes the `build_depends` of the named configs.
 
 1. **plan**: resolve the sources. List the builds whose identity is not in the manifest of the last live run. Dry runs and pull requests also use that manifest.
 2. **base**: the `build_depends` of configs that are `build_depends` themselves.
