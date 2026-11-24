@@ -6,6 +6,7 @@ method: build
 upstream:
   url: https://github.com/omacom/omasnap
   ref: v1.25.0
+  bump_group: omarchy
 releases:
 - forky
 - sid

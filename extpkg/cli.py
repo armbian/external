@@ -6,7 +6,7 @@ import os
 import re
 import sys
 
-from . import builder, config, depcheck, net, pipeline, published, site, status, upload
+from . import builder, bump, config, depcheck, net, pipeline, published, site, status, upload
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BETA_URL = "https://fi.mirror.armbian.de/beta"
@@ -304,6 +304,21 @@ def cmd_upload(args):
     return 0
 
 
+def cmd_bump(args):
+    """Without --apply: find newer upstream tags and write the plan. With --apply: edit one group."""
+    if args.apply:
+        g = bump.apply_group(args.plan, args.apply)
+        print(f"{g['key']}: " + ", ".join(f"{b['config']} {b['old']} -> {b['new']}" for b in g["bumps"]))
+        return 0
+    names = [n for n in args.only.split(",") if n]
+    plan = bump.groups(bump.find(_configs(args), names or None))
+    bump.write_plan(args.plan, plan)
+    for g in plan:
+        print(f"{g['branch']}: " + ", ".join(f"{b['config']} {b['old']} -> {b['new']}" for b in g["bumps"]))
+    print(f"bump: {len(plan)} pull requests -> {args.plan}")
+    return 0
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="extpkg", description="Armbian external packages")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -365,6 +380,12 @@ def main(argv=None):
     p.add_argument("--out", default="built")
     p.add_argument("--deps", default=None, help="build outputs of build_depends configs")
     p.set_defaults(fn=cmd_build, default_configs="build")
+
+    p = sub.add_parser("bump", help="find build configs with a newer upstream release tag")
+    _common(p)
+    p.add_argument("--plan", default="bump.json", help="groups to open pull requests for")
+    p.add_argument("--apply", default="", metavar="GROUP", help="edit the configs of this group of --plan")
+    p.set_defaults(fn=cmd_bump, default_configs="build")
 
     p = sub.add_parser("depcheck", help="check dependencies of the new files in an output tree")
     _common(p)

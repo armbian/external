@@ -118,6 +118,11 @@ def _check_build(pkg, path, need):
         need(rb is None or (isinstance(rb, dict) and rb.get("url") and rb.get("ref")),
              "upstream.rebase needs url and ref")
         need(isinstance(up.get("submodules", False), bool), "upstream.submodules must be true or false")
+        # YAML reads a bare off as false.
+        need(up.get("bump", "pr") in ("pr", "off", False), "upstream.bump must be pr or off")
+        grp = up.get("bump_group")
+        need(grp is None or (isinstance(grp, str) and re.fullmatch(r"[a-z0-9][a-z0-9.-]*", grp)),
+             "upstream.bump_group must be a lower-case name")
     rev = pkg.get("revision", 1)
     need(isinstance(rev, int) and rev >= 1, "revision must be a number >= 1")
     deps = pkg.get("build_depends", [])
