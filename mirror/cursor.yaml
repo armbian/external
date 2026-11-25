@@ -1,0 +1,19 @@
+name: cursor
+method: apt
+# Cursor editor, offered in the armbian-hyprland-shell Install menu as
+# cursor-bin. keys/anysphere.gpg: 380FF4BCDC34A4BD92A3565342A1772E62E492D6,
+# from Cursor's documented key URL and from the key in the grok-bot .deb.
+# Its postinst also registers the vendor repository.
+source:
+  url: https://downloads.cursor.com/aptrepo
+  suite: stable
+  components:
+  - main
+releases: all
+architectures:
+- amd64
+- arm64
+target: desktop
+install:
+- cursor
+filter: Name (= cursor)
