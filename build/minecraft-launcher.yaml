@@ -1,0 +1,14 @@
+name: minecraft-launcher
+method: build
+# Minecraft launcher (proprietary). Repacks the vendor tarball, after the
+# upstream Arch PKGBUILD (omacom/omarchy-pkgs, pkgbuilds/minecraft-launcher).
+# Mojang's own .deb depends on packages that forky and resolute removed.
+# Offered in the armbian-hyprland-shell Install menu on x86 only.
+# Mojang builds amd64 only. A new launcher needs a new version and SHA256.
+version: 2.1.3
+releases: all
+architectures:
+- amd64
+target: desktop
+install:
+- minecraft-launcher
