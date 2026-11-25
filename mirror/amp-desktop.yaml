@@ -1,0 +1,19 @@
+name: amp-desktop
+method: apt
+# Amp desktop app, offered in the armbian-hyprland-shell Install menu as
+# amp-desktop-bin. keys/amp.gpg: 26B08A8375D99B8A42DF4A1C4D51480EEEEC728B
+# (Amp Linux Packages), from the vendor sources file
+# https://static.ampcode.com/linux/amp.sources linked on ampcode.com/download.
+source:
+  url: https://static.ampcode.com/linux
+  suite: stable
+  components:
+  - main
+releases: all
+architectures:
+- amd64
+- arm64
+target: desktop
+install:
+- amp-desktop
+filter: Name (= amp-desktop)
