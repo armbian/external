@@ -80,3 +80,4 @@ Install > Gaming > Steam, Lutris (lib32 drivers) | done | Arch multilib becomes 
 Setup > Security > FIDO2 | done | pamu2fcfg is a separate Debian package that libpam-u2f only recommends; the setup installs it (transform 84-fido2-pamu2fcfg).
 wine-mono, wine-gecko | done | WineHQ does not package them: Wine downloads them when a prefix needs them. Both map to winehq-staging (deps.map).
 Install, Remove, Setup > Default > Browser: Zen | done | Removed: Zen has no Debian package or apt repository, only tarballs (maintainer decision, transform 83-no-zen-browser).
+Install menu apps from vendors | done | Cursor, Amp, Slack and Bitwarden come from the Armbian repository (mirror configs). deps.map maps cursor-bin and amp-desktop-bin.

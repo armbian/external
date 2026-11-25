@@ -287,3 +287,5 @@ wine-mono winehq-staging
 wine-gecko winehq-staging
 emacs-wayland emacs-pgtk
 once-bin once
+cursor-bin cursor
+amp-desktop-bin amp-desktop
