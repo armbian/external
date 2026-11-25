@@ -839,7 +839,7 @@ fn git_show_result(ui: &AppWindow, s: &mut State, acc: &git::Account, r: git::Lo
     }
     ui.set_git_keys(f.keys as i32);
     ui.set_git_keys_url(if f.keys > 0 { acc.keys_url().trim_start_matches("https://").into() } else { "".into() });
-    ui.set_git_dotfiles_url(if f.dotfiles { acc.dotfiles_url().trim_start_matches("https://").trim_end_matches(".git").into() } else { "".into() });
+    ui.set_git_dotfiles_url(if f.dotfiles { acc.dotfiles_page().into() } else { "".into() });
     match f.avatar.as_deref().and_then(round_avatar) {
         Some(img) => {
             ui.set_git_avatar(img);
@@ -1387,7 +1387,7 @@ fn main() {
             git_status(&ui, &git::title(&acc, &r), &git::detail(&acc, &r), true, false, false);
             ui.set_git_keys(f.keys as i32);
             ui.set_git_keys_url(if f.keys > 0 { acc.keys_url().trim_start_matches("https://").into() } else { "".into() });
-            ui.set_git_dotfiles_url(if f.dotfiles { acc.dotfiles_url().trim_start_matches("https://").trim_end_matches(".git").into() } else { "".into() });
+            ui.set_git_dotfiles_url(if f.dotfiles { acc.dotfiles_page().into() } else { "".into() });
         }
         // A finished lookup keeps its import choices. A lookup that ran during the
         // restart starts again.
