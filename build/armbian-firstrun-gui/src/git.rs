@@ -129,6 +129,10 @@ impl Account {
     pub fn dotfiles_url(&self) -> String {
         format!("https://{}/{}/{REPO}.git", self.host, self.user)
     }
+    /// Web address of the dotfiles repository.
+    pub fn dotfiles_page(&self) -> String {
+        format!("https://{}/{}/{REPO}", self.host, self.user)
+    }
     /// The URL that a git clone asks first. HTTP 200: a public repository.
     fn refs_url(&self) -> String {
         format!("{}/info/refs?service=git-upload-pack", self.dotfiles_url())
@@ -323,7 +327,7 @@ pub fn detail(acc: &Account, r: &Lookup) -> String {
                 1 => "1 SSH key".to_string(),
                 n => format!("{n} SSH keys"),
             };
-            let repo = if f.dotfiles { REPO.to_string() } else { format!("no {REPO}") };
+            let repo = if f.dotfiles { acc.dotfiles_page() } else { format!("no {}", acc.dotfiles_page()) };
             format!("{name} · {keys} · {repo}")
         }
         Lookup::NotFound => "Check the username, or remove the @ for a local account.".to_string(),
@@ -477,9 +481,9 @@ mod tests {
         let a = Account { kind: Kind::GitHub, host: "github.com".into(), user: "u".into() };
         let f = Lookup::Found(Found { name: Some("Ana".into()), keys: 3, dotfiles: true, avatar: None });
         assert_eq!(title(&a, &f), "GitHub profile found");
-        assert_eq!(detail(&a, &f), "Ana · 3 SSH keys · armbian-dotfiles");
+        assert_eq!(detail(&a, &f), "Ana · 3 SSH keys · https://github.com/u/armbian-dotfiles");
         let f = Lookup::Found(Found { name: None, keys: 0, dotfiles: false, avatar: None });
-        assert_eq!(detail(&a, &f), "u · no SSH keys · no armbian-dotfiles");
+        assert_eq!(detail(&a, &f), "u · no SSH keys · no https://github.com/u/armbian-dotfiles");
         assert_eq!(title(&a, &Lookup::NotFound), "No account u on GitHub");
         assert_eq!(title(&a, &Lookup::Unreachable), "Could not reach github.com");
     }
