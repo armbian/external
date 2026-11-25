@@ -33,6 +33,7 @@ omarchy-version | done | Version of the armbian-hyprland-shell package (overlay)
 omarchy-update-available | done | Reports a new armbian-hyprland-shell in the apt lists (overlay).
 omarchy-update-system-pkgs | done | apt-get update and upgrade, changed conffiles kept (overlay).
 omarchy-update-keyring, omarchy-update-aur-pkgs | done | No-op: apt keys come from keyring packages; no AUR (overlay).
+omarchy-update-time | done | Armbian uses chrony, not systemd-timesyncd. Restart chrony, else timesyncd (overlay).
 omarchy-update-pkg-prune, omarchy-update-orphan-pkgs | done | apt-get autoclean and autoremove, same prompts (overlay).
 omarchy-update-restart | done | dpkg -S finds the package of a kernel (transform 60-kernel-owner-dpkg).
 omarchy-menu-keybindings (lua) | done | Debian keeps lua at 5.1, which has no -E. The key sheet calls lua5.5 (transform 85-keybindings-lua55, deps.map lua).
