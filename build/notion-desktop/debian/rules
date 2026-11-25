@@ -1,0 +1,61 @@
+#!/usr/bin/make -f
+# Repack the vendor Flatpak. Steps follow the upstream Arch PKGBUILD
+# (omacom/omarchy-pkgs, pkgbuilds/notion-desktop). An OSTree commit id is
+# the SHA256 of the commit object, and ostree checks the signed tree under
+# it with debian/notion.gpg. Update the version and the commits together.
+include /usr/share/dpkg/pkg-info.mk
+include /usr/share/dpkg/architecture.mk
+
+PKG = debian/notion-desktop
+REMOTE = https://app.linux-packages.notion.com
+APPID = com.notion.app.desktop.notion
+# Commits of version 7.45.2, the version in build/notion-desktop.yaml.
+COMMIT_amd64 = 1aefc7307141be5e5374ea3ef7fe11d9aa55db9906fd81926a59cc503c05f15d
+COMMIT_arm64 = 89383923ecd41182a55609cd46fa82a8b908cd2d2044e36271524fcb76b39b54
+COMMIT = $(COMMIT_$(DEB_HOST_ARCH))
+APP = $(PKG)/opt/notion-desktop
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	test -n "$(COMMIT)" || { echo "No commit for $(DEB_HOST_ARCH)"; exit 1; }
+	ostree init --repo=debian/repo --mode=bare-user-only
+	ostree --repo=debian/repo remote add --gpg-import=debian/notion.gpg notion $(REMOTE)
+	ostree --repo=debian/repo pull notion $(COMMIT)
+	ostree --repo=debian/repo checkout --user-mode $(COMMIT) debian/flatpak
+
+# The Electron app is self-contained under files/lib/<app id>. The rest of
+# the Flatpak is the sandbox helper and copies of system libraries.
+override_dh_auto_install:
+	install -d $(APP)
+	cp -a debian/flatpak/files/lib/$(APPID)/. $(APP)/
+	# The PipeWire binding has a RUNPATH into its build host. Use the system.
+	patchelf --remove-rpath \
+		$(APP)/resources/app.asar.unpacked/node_modules/node-pipewire/dist/binding/napi-v6/index.node
+	install -D -m755 debian/notion-desktop.sh $(PKG)/usr/bin/notion-desktop
+	install -D -m644 debian/flatpak/export/share/applications/$(APPID).desktop \
+		$(PKG)/usr/share/applications/$(APPID).desktop
+	# Outside a Flatpak the window app id is "notion".
+	sed -i -e 's|^Exec=.*|Exec=notion-desktop %U|' \
+		-e '/^\[Desktop Entry\]/a StartupWMClass=notion' \
+		$(PKG)/usr/share/applications/$(APPID).desktop
+	for icon in debian/flatpak/export/share/icons/hicolor/*/apps/$(APPID).png; do \
+		size=$${icon#debian/flatpak/export/share/icons/hicolor/}; size=$${size%%/*}; \
+		install -D -m644 $$icon $(PKG)/usr/share/icons/hicolor/$$size/apps/$(APPID).png || exit 1; \
+	done
+
+# Electron needs a setuid sandbox helper on kernels without unprivileged
+# user namespaces. dh_fixperms removes the setuid bit.
+override_dh_fixperms:
+	dh_fixperms
+	chmod 4755 $(APP)/chrome-sandbox
+
+override_dh_auto_configure override_dh_auto_test:
+
+# Vendor binaries: keep them as released. Depends lists the libraries by
+# hand, after the upstream Arch package.
+override_dh_strip override_dh_dwz override_dh_shlibdeps:
+
+override_dh_auto_clean:
+	rm -rf debian/repo debian/flatpak
