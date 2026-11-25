@@ -8,7 +8,7 @@ Homepage: https://netbird.io
 
 Package: armbian-netbird
 Architecture: amd64 arm64 riscv64
-Depends: ${misc:Depends}
+Depends: ${misc:Depends}, ca-certificates
 Provides: netbird (= ${source:Upstream-Version})
 Conflicts: netbird
 Replaces: netbird
