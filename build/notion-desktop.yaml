@@ -1,12 +1,12 @@
 name: notion-desktop
 method: build
 # Notion desktop app (proprietary). Notion ships Linux only as a Flatpak from
-# its own OSTree repository. The build pulls the pinned commit, checks its
+# its own OSTree repository. The build pulls the stable ref, checks its
 # signature with debian/notion.gpg (7B67273DAE0520508D6B8B0E1BF8637650053829,
 # from the vendor notion.flatpakrepo and the upstream Arch package) and repacks
 # the Electron app. After the upstream Arch PKGBUILD (omacom/omarchy-pkgs,
 # pkgbuilds/notion-desktop). Offered in the armbian-hyprland-shell Install
-# menu. A new release needs a new version and commits in debian/rules.
+# menu. A new Notion version needs a new version here.
 version: 7.45.2
 releases: all
 architectures:

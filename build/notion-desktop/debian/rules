@@ -1,29 +1,34 @@
 #!/usr/bin/make -f
 # Repack the vendor Flatpak. Steps follow the upstream Arch PKGBUILD
-# (omacom/omarchy-pkgs, pkgbuilds/notion-desktop). An OSTree commit id is
-# the SHA256 of the commit object, and ostree checks the signed tree under
-# it with debian/notion.gpg. Update the version and the commits together.
+# (omacom/omarchy-pkgs, pkgbuilds/notion-desktop). The build pulls the
+# stable ref: Notion keeps only its newest commit, and it re-exports the
+# same version under new commits. ostree checks the commit signature with
+# debian/notion.gpg. The commit must be the version in the config: a new
+# Notion version fails the build until build/notion-desktop.yaml has it.
 include /usr/share/dpkg/pkg-info.mk
 include /usr/share/dpkg/architecture.mk
 
 PKG = debian/notion-desktop
 REMOTE = https://app.linux-packages.notion.com
 APPID = com.notion.app.desktop.notion
-# Commits of version 7.45.2, the version in build/notion-desktop.yaml.
-COMMIT_amd64 = 1aefc7307141be5e5374ea3ef7fe11d9aa55db9906fd81926a59cc503c05f15d
-COMMIT_arm64 = 89383923ecd41182a55609cd46fa82a8b908cd2d2044e36271524fcb76b39b54
-COMMIT = $(COMMIT_$(DEB_HOST_ARCH))
+OSTREE_ARCH_amd64 = x86_64
+OSTREE_ARCH_arm64 = aarch64
+REF = app/$(APPID)/$(OSTREE_ARCH_$(DEB_HOST_ARCH))/stable
+# 7.45.2+armbian1~forky -> 7.45.2
+VERSION = $(firstword $(subst +, ,$(DEB_VERSION_UPSTREAM)))
 APP = $(PKG)/opt/notion-desktop
 
 %:
 	dh $@
 
 override_dh_auto_build:
-	test -n "$(COMMIT)" || { echo "No commit for $(DEB_HOST_ARCH)"; exit 1; }
 	ostree init --repo=debian/repo --mode=bare-user-only
 	ostree --repo=debian/repo remote add --gpg-import=debian/notion.gpg notion $(REMOTE)
-	ostree --repo=debian/repo pull notion $(COMMIT)
-	ostree --repo=debian/repo checkout --user-mode $(COMMIT) debian/flatpak
+	ostree --repo=debian/repo pull notion $(REF)
+	# The commit body names the Flatpak, for example Notion-arm64-7.45.2.flatpak.
+	ostree --repo=debian/repo show notion:$(REF) | grep -qE 'Notion(-arm64)?-$(VERSION)\.flatpak' || \
+		{ ostree --repo=debian/repo show notion:$(REF); echo "Notion is not $(VERSION): update the version"; exit 1; }
+	ostree --repo=debian/repo checkout --user-mode notion:$(REF) debian/flatpak
 
 # The Electron app is self-contained under files/lib/<app id>. The rest of
 # the Flatpak is the sandbox helper and copies of system libraries.
