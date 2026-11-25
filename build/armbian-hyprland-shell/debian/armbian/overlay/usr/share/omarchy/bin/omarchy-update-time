@@ -1,0 +1,18 @@
+#!/bin/bash
+
+# omarchy:summary=Restart system time synchronization
+# omarchy:requires-sudo=true
+
+# Armbian: images use chrony, not systemd-timesyncd. Restart the time
+# service that is installed. chrony steps the clock after the restart
+# (makestep in /etc/chrony/chrony.conf).
+
+echo "Updating time..."
+if systemctl cat chrony.service >/dev/null 2>&1; then
+  sudo systemctl restart chrony
+elif systemctl cat systemd-timesyncd.service >/dev/null 2>&1; then
+  sudo systemctl restart systemd-timesyncd
+else
+  echo "No time synchronization service is installed." >&2
+  exit 1
+fi
