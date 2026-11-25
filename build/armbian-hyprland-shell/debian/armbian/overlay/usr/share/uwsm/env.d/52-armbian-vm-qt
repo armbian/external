@@ -1,0 +1,13 @@
+# Armbian: on a virtio GPU with 3D (QEMU/KVM virgl), Qt Quick OpenGL surfaces
+# lose their alpha channel. The full-screen bar and notification layers of the
+# shell then hide the wallpaper and all windows. Qt software rendering keeps
+# alpha. Real GPUs keep OpenGL. A value that the user sets stays.
+if [ -z "${QT_QUICK_BACKEND:-}" ]; then
+  # PCI: driver of the virtio child device. MMIO: driver of the device.
+  for d in /sys/class/drm/card[0-9]*/device/driver \
+           /sys/class/drm/card[0-9]*/device/virtio*/driver; do
+    case "$(readlink -f "$d" 2>/dev/null)" in
+      */virtio_gpu|*/virtio-gpu) export QT_QUICK_BACKEND=software; break ;;
+    esac
+  done
+fi
