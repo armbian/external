@@ -1,0 +1,40 @@
+#!/usr/bin/make -f
+# Repack the vendor tarball. Install steps follow the upstream Arch PKGBUILD
+# (omacom/omarchy-pkgs, pkgbuilds/minecraft-launcher). The vendor URLs do not
+# name the version: a new launcher changes the SHA256 values, and the build
+# fails until the config gets the new version and values.
+include /usr/share/dpkg/pkg-info.mk
+
+PKG = debian/minecraft-launcher
+URL = https://launcher.mojang.com/download
+SHA256_TAR = 695269281547bbbcf47fe74633027a0e4ddc13a61060c686a7217e85d314e45e
+SHA256_SVG = 35c2bcaeb09fa4b8864e9422fd66bf60847706f8b4400ec4a66ba6436b101f71
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	curl -fsSL --retry 3 -o debian/Minecraft.tar.gz $(URL)/Minecraft.tar.gz
+	curl -fsSL --retry 3 -o debian/minecraft-launcher.svg $(URL)/minecraft-launcher.svg
+	echo "$(SHA256_TAR)  debian/Minecraft.tar.gz" | sha256sum -c -
+	echo "$(SHA256_SVG)  debian/minecraft-launcher.svg" | sha256sum -c -
+	mkdir -p debian/release
+	tar -xzf debian/Minecraft.tar.gz -C debian/release --no-same-owner
+
+override_dh_auto_install:
+	install -D -m755 debian/release/minecraft-launcher/minecraft-launcher \
+		$(PKG)/usr/lib/minecraft-launcher/minecraft-launcher
+	install -D -m755 debian/minecraft-launcher.sh $(PKG)/usr/bin/minecraft-launcher
+	install -D -m644 debian/minecraft-launcher.desktop \
+		$(PKG)/usr/share/applications/minecraft-launcher.desktop
+	install -D -m644 debian/minecraft-launcher.svg \
+		$(PKG)/usr/share/icons/hicolor/scalable/apps/minecraft-launcher.svg
+
+override_dh_auto_configure override_dh_auto_test:
+
+# Vendor binary: keep it as released. It loads its browser runtime at run
+# time, so Depends lists the libraries by hand.
+override_dh_strip override_dh_dwz override_dh_shlibdeps:
+
+override_dh_auto_clean:
+	rm -rf debian/release debian/Minecraft.tar.gz debian/minecraft-launcher.svg
