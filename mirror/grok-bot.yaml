@@ -1,0 +1,19 @@
+name: grok-bot
+method: apt
+# xAI Grok Bot desktop agent, offered in the armbian-hyprland-shell Install
+# menu as grok-bot. keys/anysphere.gpg: 380FF4BCDC34A4BD92A3565342A1772E62E492D6,
+# from the key in the vendor .deb postinst and from Cursor's documented key URL.
+# Its postinst also registers the vendor repository.
+source:
+  url: https://downloads.cursor.com/aptrepo
+  suite: grok-bot
+  components:
+  - main
+releases: all
+architectures:
+- amd64
+- arm64
+target: desktop
+install:
+- grok-bot
+filter: Name (= grok-bot)
