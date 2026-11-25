@@ -37,6 +37,7 @@ omarchy-update-pkg-prune, omarchy-update-orphan-pkgs | done | apt-get autoclean 
 omarchy-update-restart | done | dpkg -S finds the package of a kernel (transform 60-kernel-owner-dpkg).
 omarchy-menu-keybindings (lua) | done | Debian keeps lua at 5.1, which has no -E. The key sheet calls lua5.5 (transform 85-keybindings-lua55, deps.map lua).
 sbin commands (rfkill, iw, modprobe) | done | Arch merges /usr/sbin into /usr/bin. uwsm adds the sbin folders to the session PATH (overlay usr/share/uwsm/env.d/50-armbian-sbin).
+Shell in a VM (virtio GPU) | done | Qt Quick OpenGL loses alpha on virgl: bar and notification layers turn opaque black. uwsm sets QT_QUICK_BACKEND=software on a virtio GPU (overlay usr/share/uwsm/env.d/52-armbian-vm-qt).
 pactl, rfkill, cryptsetup | done | Arch base packages provide them. deps.map maps libpulse, util-linux and cryptsetup to the Debian packages.
 superwhisper-bin (dictation) | done | Proprietary: only the vendor channel may distribute it. Install, first run and removal use the official vendor installer in ~/.local (transform 90-superwhisper-vendor-installer). deps.map recommends its dependencies.
 default/bashrc | done | bash owns /etc/skel/.bashrc, and dpkg cannot divert a conffile. User setup and omarchy-reinstall-configs copy it over an unchanged Debian ~/.bashrc (overlay install/user/bashrc.sh, transform 45-bashrc-user-step).
