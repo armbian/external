@@ -1,0 +1,20 @@
+Source: armbian-netbird
+Section: net
+Priority: optional
+Maintainer: Armbian <info@armbian.com>
+Build-Depends: debhelper-compat (= 13), curl, ca-certificates, golang-go [riscv64]
+Standards-Version: 4.7.0
+Homepage: https://netbird.io
+
+Package: armbian-netbird
+Architecture: amd64 arm64 riscv64
+Depends: ${misc:Depends}
+Provides: netbird
+Conflicts: netbird
+Replaces: netbird
+Description: NetBird mesh VPN client, systemd service
+ NetBird connects devices into a private WireGuard network.
+ Repack of the upstream release binary. riscv64 builds it from the
+ release tag. The package ships a systemd unit and does not start a
+ daemon in an image build chroot.
+ Join a network: netbird up --setup-key <key>

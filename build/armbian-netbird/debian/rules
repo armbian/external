@@ -1,0 +1,58 @@
+#!/usr/bin/make -f
+# amd64, arm64: repack the upstream release that matches the tag. Its SHA256
+# must match the checksums file of the same release.
+# riscv64: upstream publishes no binary. Build the client from the tag, with
+# the flags of upstream's .goreleaser.yaml.
+include /usr/share/dpkg/pkg-info.mk
+include /usr/share/dpkg/architecture.mk
+
+PKG = debian/armbian-netbird
+OUT = debian/package
+ASSET = netbird_$(DEB_VERSION_UPSTREAM)_linux_$(DEB_HOST_ARCH).tar.gz
+RELEASE = https://github.com/netbirdio/netbird/releases/download/v$(DEB_VERSION_UPSTREAM)
+
+ifeq ($(DEB_HOST_ARCH),riscv64)
+# go.mod sets the Go version. GOTOOLCHAIN downloads it when the release has an
+# older Go. sum.golang.org checks the toolchain and the modules.
+export GOTOOLCHAIN = auto
+export GOPROXY = https://proxy.golang.org
+export GOSUMDB = sum.golang.org
+export GOFLAGS = -mod=readonly -trimpath -modcacherw
+export CGO_ENABLED = 0
+export GOPATH = $(CURDIR)/debian/go
+export GOCACHE = $(CURDIR)/debian/go-cache
+endif
+
+%:
+	dh $@
+
+override_dh_auto_build:
+ifeq ($(DEB_HOST_ARCH),riscv64)
+	mkdir -p $(OUT)/LICENSES
+	go build -ldflags "-s -w -X github.com/netbirdio/netbird/version.version=$(DEB_VERSION_UPSTREAM)" \
+		-o $(OUT)/netbird ./client
+	cp LICENSE $(OUT)/LICENSE
+	cp LICENSES/BSD-3-Clause.txt $(OUT)/LICENSES/
+else
+	curl -fsSL --retry 3 -o debian/$(ASSET) $(RELEASE)/$(ASSET)
+	curl -fsSL --retry 3 -o debian/checksums.txt $(RELEASE)/netbird_$(DEB_VERSION_UPSTREAM)_checksums.txt
+	cd debian && grep "  $(ASSET)$$" checksums.txt | sha256sum -c -
+	mkdir -p $(OUT)
+	tar -xzf debian/$(ASSET) -C $(OUT) --no-same-owner
+endif
+
+override_dh_auto_install:
+	install -D -m755 $(OUT)/netbird $(PKG)/usr/bin/netbird
+	install -D -m644 $(OUT)/LICENSE $(PKG)/usr/share/doc/armbian-netbird/LICENSE
+	install -D -m644 $(OUT)/LICENSES/BSD-3-Clause.txt $(PKG)/usr/share/doc/armbian-netbird/BSD-3-Clause.txt
+
+override_dh_installsystemd:
+	dh_installsystemd --name=netbird
+
+override_dh_auto_configure override_dh_auto_test:
+
+# Upstream binary, or a static Go binary built with -s -w: keep it as built.
+override_dh_strip override_dh_dwz:
+
+override_dh_auto_clean:
+	rm -rf $(OUT) debian/*.tar.gz debian/checksums.txt debian/go debian/go-cache

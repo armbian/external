@@ -1,0 +1,17 @@
+name: armbian-netbird
+method: build
+# NetBird mesh VPN client (BSD-3-Clause), with a systemd unit. amd64 and
+# arm64 repack the upstream release binary. riscv64 has no upstream binary:
+# it builds the client from the tag. The upstream package installs its
+# service from postinst: in an image build chroot it writes a SysV script and
+# starts the daemon. Local packaging in build/armbian-netbird/debian/.
+upstream:
+  url: https://github.com/netbirdio/netbird
+releases: all
+architectures:
+- amd64
+- arm64
+- riscv64
+target: utils
+install:
+- armbian-netbird
