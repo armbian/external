@@ -1,0 +1,13 @@
+name: bitwarden
+method: url
+# Bitwarden desktop app, offered in the armbian-hyprland-shell Install menu.
+# The vendor download URL redirects to the newest desktop .deb on GitHub
+# (bitwarden/clients). Bitwarden builds no arm64 .deb.
+source:
+  url: https://vault.bitwarden.com/download/?app=desktop&platform=linux&variant=deb
+releases: all
+architectures:
+- amd64
+target: desktop
+install:
+- bitwarden
