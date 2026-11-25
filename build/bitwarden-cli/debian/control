@@ -1,0 +1,15 @@
+Source: bitwarden-cli
+Section: utils
+Priority: optional
+Maintainer: Armbian <info@armbian.com>
+Build-Depends: debhelper-compat (= 13), curl, ca-certificates, unzip, python3
+Standards-Version: 4.7.0
+Homepage: https://bitwarden.com/help/cli/
+
+Package: bitwarden-cli
+Architecture: amd64 arm64
+Depends: ${misc:Depends}, libc6, libstdc++6, libgcc-s1
+Description: Bitwarden command-line client
+ bw reads and changes the items of a Bitwarden vault from the terminal.
+ .
+ Repack of the upstream release zip from GitHub. The command is bw.

@@ -1,0 +1,36 @@
+#!/usr/bin/make -f
+# Repack the upstream release zip of the cli-v tag. The SHA256 comes from
+# the GitHub release asset digest, so a bump of the tag needs no change here.
+include /usr/share/dpkg/pkg-info.mk
+include /usr/share/dpkg/architecture.mk
+
+PKG = debian/bitwarden-cli
+SUFFIX_amd64 =
+SUFFIX_arm64 = -arm64
+TAG = cli-v$(DEB_VERSION_UPSTREAM)
+ASSET = bw-oss-linux$(SUFFIX_$(DEB_HOST_ARCH))-$(DEB_VERSION_UPSTREAM).zip
+API = https://api.github.com/repos/bitwarden/clients/releases/tags/$(TAG)
+URL = https://github.com/bitwarden/clients/releases/download/$(TAG)/$(ASSET)
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	curl -fsSL --retry 3 -o debian/release.json $(API)
+	sha=$$(python3 -c 'import json, sys; a = [x for x in json.load(open("debian/release.json"))["assets"] if x["name"] == sys.argv[1]]; print(a[0]["digest"].removeprefix("sha256:") if a and a[0].get("digest") else "")' $(ASSET)); \
+		test -n "$$sha" || { echo "No digest for $(ASSET)"; exit 1; }; \
+		curl -fsSL --retry 3 -o debian/$(ASSET) $(URL) && \
+		echo "$$sha  debian/$(ASSET)" | sha256sum -c -
+	mkdir -p debian/release
+	unzip -q -o debian/$(ASSET) -d debian/release
+
+override_dh_auto_install:
+	install -D -m755 debian/release/bw $(PKG)/usr/bin/bw
+
+override_dh_auto_configure override_dh_auto_test:
+
+# Upstream binary: a Node.js single executable. Stripping breaks it.
+override_dh_strip override_dh_dwz override_dh_shlibdeps:
+
+override_dh_auto_clean:
+	rm -rf debian/release debian/release.json debian/*.zip
