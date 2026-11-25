@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 // Adapted from https://github.com/slint-ui/slint/tree/v1.13.1/examples/virtual_keyboard.
 
-struct KeyModel {
+export struct KeyModel {
     normal: string,
     shifted: string,
 }
@@ -43,31 +43,14 @@ export component VirtualKeyboard inherits Rectangle {
     property <bool> shift;
     property <bool> symbols;
     property <length> gap: 5 * root.px;
-    property <length> key-width: (rows.width - 9 * self.gap) / 10;
+    property <length> key-width: (rows.width - (root.columns - 1) * self.gap) / root.columns;
     background: #121214;
 
-    property <[[KeyModel]]> letters: [
-        [
-            { normal: "q", shifted: "Q" }, { normal: "w", shifted: "W" },
-            { normal: "e", shifted: "E" }, { normal: "r", shifted: "R" },
-            { normal: "t", shifted: "T" }, { normal: "y", shifted: "Y" },
-            { normal: "u", shifted: "U" }, { normal: "i", shifted: "I" },
-            { normal: "o", shifted: "O" }, { normal: "p", shifted: "P" }
-        ],
-        [
-            { normal: "a", shifted: "A" }, { normal: "s", shifted: "S" },
-            { normal: "d", shifted: "D" }, { normal: "f", shifted: "F" },
-            { normal: "g", shifted: "G" }, { normal: "h", shifted: "H" },
-            { normal: "j", shifted: "J" }, { normal: "k", shifted: "K" },
-            { normal: "l", shifted: "L" }
-        ],
-        [
-            { normal: "z", shifted: "Z" }, { normal: "x", shifted: "X" },
-            { normal: "c", shifted: "C" }, { normal: "v", shifted: "V" },
-            { normal: "b", shifted: "B" }, { normal: "n", shifted: "N" },
-            { normal: "m", shifted: "M" }
-        ]
-    ];
+    // Letter rows of the active layout (from Rust). latin: US letters for a non-Latin layout.
+    in property <[[KeyModel]]> letters;
+    in property <[[KeyModel]]> latin;
+    in property <string> label;
+    property <bool> use-latin;
     property <[[KeyModel]]> punctuation: [
         [
             { normal: "1", shifted: "!" }, { normal: "2", shifted: "@" },
@@ -90,7 +73,9 @@ export component VirtualKeyboard inherits Rectangle {
             { normal: "=", shifted: "+" }
         ]
     ];
-    property <[[KeyModel]]> keys: root.symbols ? root.punctuation : root.letters;
+    property <[[KeyModel]]> keys: root.symbols ? root.punctuation : root.use-latin ? root.latin : root.letters;
+    // The widest row sets the key width. The third row also holds Shift and Backspace.
+    property <int> columns: max(10, root.keys[0].length, root.keys[1].length, root.keys[2].length + 3);
     function type-key(key: KeyModel) {
         root.key-pressed(root.shift ? key.shifted : key.normal);
         root.shift = false;
@@ -147,6 +132,13 @@ export component VirtualKeyboard inherits Rectangle {
                 accent: root.accent;
                 label: root.symbols ? "ABC" : "123";
                 clicked => { root.symbols = !root.symbols; root.shift = false; }
+            }
+            if root.latin.length > 0: KeyboardKey {
+                width: root.key-width;
+                px: root.px;
+                accent: root.accent;
+                label: root.use-latin ? root.label : "US";
+                clicked => { root.use-latin = !root.use-latin; root.symbols = false; root.shift = false; }
             }
             KeyboardKey {
                 width: root.key-width;

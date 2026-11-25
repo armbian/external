@@ -1,6 +1,6 @@
 [package]
 name = "armbian-firstrun-gui"
-version = "0.1.8"
+version = "0.1.9"
 edition = "2021"
 rust-version = "1.85"
 # Pick crate versions that build with rust-version (trixie: 1.85).
@@ -13,6 +13,8 @@ slint = { version = "~1.13", default-features = false, features = ["std", "compa
 roxmltree = "0.20"
 serde_json = "1"
 udev = "0.9"
+# Keymap of the on-screen keyboard. The Slint LinuxKMS backend uses the same version.
+xkbcommon = { version = "0.8", default-features = false }
 nix = { version = "0.30", features = ["poll"] }
 # Profile pictures. Slint uses the same version for its images.
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }

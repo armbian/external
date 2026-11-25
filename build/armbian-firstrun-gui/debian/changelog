@@ -1,3 +1,11 @@
+armbian-firstrun-gui (0.1.9) unstable; urgency=medium
+
+  * The on-screen keyboard follows the keyboard layout. A non-Latin layout
+    gets a key that switches to US letters.
+  * The git account card shows the full dotfiles repository URL.
+
+ -- Armbian <info@armbian.com>  Wed, 25 Nov 2026 14:00:00 +0100
+
 armbian-firstrun-gui (0.1.8) unstable; urgency=medium
 
   * Zsh is the default shell when it is installed.
