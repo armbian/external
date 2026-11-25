@@ -1,0 +1,12 @@
+name: slack-desktop
+method: url
+# Slack desktop app, offered in the armbian-hyprland-shell Install menu.
+# The vendor API redirects to the newest .deb. Slack builds no arm64 .deb.
+source:
+  url: https://slack.com/api/desktop.latestRelease?arch=x64&variant=deb&redirect=true
+releases: all
+architectures:
+- amd64
+target: desktop
+install:
+- slack-desktop
