@@ -5,7 +5,7 @@
 #   arch-only         Arch tooling, replaced by an entry in adapt.list
 #   armbian-build     build in armbian/external: todo. Built ones map to their package name.
 #   vendor            vendor repository, release or Flathub: todo
-# Extra lines (lua, cryptsetup, util-linux, alsa-lib, a second libpulse) map Arch base
+# Extra lines (lua, cryptsetup, util-linux, alsa-lib, polkit, a second libpulse) map Arch base
 # packages that provide commands Omarchy calls. Upstream lists do not name them.
 # superwhisper-bin lines after the first: the vendor installer's apt
 # dependencies, so it runs without sudo (transform 90-superwhisper-vendor-installer).
@@ -168,6 +168,7 @@ pipewire-libcamera pipewire-libcamera
 pipewire-pulse pipewire-pulse
 plocate plocate
 plymouth plymouth
+polkit pkexec
 postgresql-libs libpq5
 python-gobject python3-gi
 python-poetry-core python3-poetry-core
