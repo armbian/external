@@ -15,6 +15,7 @@ Use the `add-external-package` skill. It follows [CONTRIBUTING.md](CONTRIBUTING.
 - Work on a branch. Open a pull request. Do not push to `main`.
 - Run `python3 -m unittest discover -s tests -t .` and `python3 -m extpkg validate` before each commit.
 - End commit messages with `Signed-off-by:`.
+- Local source in `build/<name>/` with a `version:` key: each change that adds a `debian/changelog` entry also sets `version:` in `build/<name>.yaml` to the same version. Also update other version fields in the source, such as `Cargo.toml`. Stable takes a package only when its version is newer.
 
 ## Style
 
