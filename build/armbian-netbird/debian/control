@@ -9,7 +9,7 @@ Homepage: https://netbird.io
 Package: armbian-netbird
 Architecture: amd64 arm64
 Depends: ${misc:Depends}
-Provides: netbird
+Provides: netbird (= ${source:Upstream-Version})
 Conflicts: netbird
 Replaces: netbird
 Description: NetBird mesh VPN client, systemd service
