@@ -1,0 +1,19 @@
+name: perplexity
+method: apt
+# Perplexity desktop app, offered in the armbian-hyprland-shell Install menu.
+# keys/perplexity.gpg: 5CE6FE16BD533152E64EFD93C751F9CAC952A583 (Perplexity AI),
+# from https://packages.perplexity.ai/perplexity.gpg, the key URL in the
+# vendor install steps (perplexity.ai/hub/products/portable-computer).
+source:
+  url: https://packages.perplexity.ai/deb
+  suite: stable
+  components:
+  - main
+releases: all
+architectures:
+- amd64
+- arm64
+target: desktop
+install:
+- perplexity
+filter: Name (= perplexity)
