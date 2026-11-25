@@ -941,7 +941,12 @@ fn main() {
 
     let ui = AppWindow::new().expect("cannot create the window");
     ui.set_dry_run(a.dry_run);
-    ui.set_has_zsh(has_zsh());
+    // Zsh is the default shell when it is installed.
+    let zsh = has_zsh();
+    ui.set_has_zsh(zsh);
+    if zsh {
+        ui.set_shell("zsh".into());
+    }
     let weak = ui.as_weak();
     std::thread::spawn(move || {
         if let Err(e) = monitor_touchscreens(&weak) {

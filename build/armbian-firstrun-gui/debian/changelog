@@ -1,3 +1,9 @@
+armbian-firstrun-gui (0.1.8) unstable; urgency=medium
+
+  * Zsh is the default shell when it is installed.
+
+ -- Armbian <info@armbian.com>  Wed, 25 Nov 2026 12:00:00 +0100
+
 armbian-firstrun-gui (0.1.7) unstable; urgency=medium
 
   * Quick setup: one screen asks for the username and the password. Time
