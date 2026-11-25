@@ -14,6 +14,7 @@ import re
 import subprocess
 import tempfile
 import threading
+import urllib.parse
 
 from . import config, debver, net, query
 
@@ -247,7 +248,8 @@ class Repo:
         raise last
 
     def pool_url(self, filename):
-        return f"{self.url}/{filename}"
+        # Quote as apt does: S3 servers read a raw "+" as a space.
+        return f"{self.url}/{urllib.parse.quote(filename, safe='/')}"
 
 
 def source_files(stanza):

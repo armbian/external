@@ -48,6 +48,8 @@ class Flat(unittest.TestCase):
         self.assertTrue(r.flat)
         self.assertEqual(r._base(), "https://download.sublimetext.com/apt/stable")
         self.assertEqual(r.pool_url("files/a.deb"), "https://download.sublimetext.com/files/a.deb")
+        self.assertEqual(r.pool_url("pool/p/a_1.0+b2_amd64.deb"),
+                         "https://download.sublimetext.com/pool/p/a_1.0%2Bb2_amd64.deb")
 
 
 def _gpg(home, *args, data=None):
