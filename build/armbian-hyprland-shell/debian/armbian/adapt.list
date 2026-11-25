@@ -19,6 +19,7 @@ install/config/firewall.sh | done | Runs once at boot (overlay usr/lib/armbian-h
 install/user/first-run/wifi.sh (update notice) | done | Waits for the Armbian first-boot LUKS re-key and root resize: omarchy-update needs 10 GiB free (transform 79-first-run-update-waits-for-disk).
 install/config/enable-services.sh (docker) | done | Docker starts on first use: docker.socket enabled, docker.service and containerd.service disabled once (system-setup). docker.service wants containerd, so it starts with Docker.
 localsend command | done | The LocalSend .deb installs localsend_app; Arch installs localsend. Menu, share helper and Nautilus extension call localsend_app (transform 92-localsend-command).
+/etc/vconsole.conf (keyboard layout) | done | Debian keeps the layout in /etc/default/keyboard, with the same XKBLAYOUT and XKBVARIANT keys. Hyprland, the SDDM greeter and the input method setup read it; armbian-firstlogin writes it (transform 53-keyboard-debian).
 default/wayland-sessions/omarchy.desktop | done | Session name "Armbian (Hyprland uwsm)" (transform 40-session-name).
 default/plymouth | done | Not installed: Armbian ships its own Plymouth theme (armbian-plymouth-theme).
 install/user/theme.sh | done | New users start with the armbian theme (transform 50-default-theme).
