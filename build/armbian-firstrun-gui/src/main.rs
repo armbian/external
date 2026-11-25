@@ -6,6 +6,7 @@
 
 mod data;
 mod git;
+mod osk;
 mod wifi;
 
 use data::{Item, Location};
@@ -1000,6 +1001,23 @@ fn main() {
         (Ok(l), _) => l,
         _ => kb.clone(),
     };
+    // The on-screen keyboard follows the layout of the physical keyboard.
+    {
+        let rows = |rows: Vec<Vec<osk::Key>>| -> ModelRc<ModelRc<KeyModel>> {
+            let rows: Vec<ModelRc<KeyModel>> = rows
+                .into_iter()
+                .map(|r| {
+                    let keys: Vec<KeyModel> = r.into_iter().map(|(n, s)| KeyModel { normal: n.into(), shifted: s.into() }).collect();
+                    ModelRc::new(VecModel::from(keys))
+                })
+                .collect();
+            ModelRc::new(VecModel::from(rows))
+        };
+        let screen = osk::layout(&active_kb);
+        ui.set_screen_letters(rows(screen.letters));
+        ui.set_screen_latin(rows(screen.latin.unwrap_or_default()));
+        ui.set_screen_layout(screen.label.into());
+    }
     let (tx, rx): (Sender<Msg>, Receiver<Msg>) = channel();
     let st = Rc::new(RefCell::new(State {
         tz: {

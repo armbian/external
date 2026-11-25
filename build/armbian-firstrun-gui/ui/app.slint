@@ -2,7 +2,8 @@
 // Widgets are drawn here: the look does not come from a Slint style.
 // Sizes use "px", one unit that grows on large screens.
 import { ListView } from "std-widgets.slint";
-import { VirtualKeyboard } from "virtual-keyboard.slint";
+import { VirtualKeyboard, KeyModel } from "virtual-keyboard.slint";
+export { KeyModel }
 
 // Colors of the armbian.com dark theme. All tints come from the accent,
 // so that ACCENT in the configuration changes them together.
@@ -1194,6 +1195,9 @@ export component AppWindow inherits Window {
     callback key-down(string);
     callback key-up(string);
     callback screen-key(string);
+    in property <[[KeyModel]]> screen-letters;
+    in property <[[KeyModel]]> screen-latin;
+    in property <string> screen-layout;
     in-out property <bool> screen-key-active;
     property <bool> screen-keyboard-visible: InputCapabilities.has-touchscreen && TextInputInterface.text-input-focused && root.page >= 1 && root.page <= 3 && !root.wifi-busy;
     property <length> screen-keyboard-height: min(280 * root.px, root.height * 0.4);
@@ -2222,6 +2226,9 @@ export component AppWindow inherits Window {
         height: root.screen-keyboard-height;
         px: root.px;
         accent: Theme.accent;
+        letters: root.screen-letters;
+        latin: root.screen-latin;
+        label: root.screen-layout;
         key-pressed(key) => { root.screen-key(key); }
         dismissed => { TextInputInterface.text-input-focused = false; }
     }
