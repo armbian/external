@@ -1,0 +1,17 @@
+name: bitwarden-cli
+method: build
+# Bitwarden command-line client bw (GPL-3.0-only). Repacks the vendor
+# release zip of the cli-v tag. The Install > Bitwarden menu entry of
+# armbian-hyprland-shell installs it with the bitwarden desktop app.
+# Local packaging in build/bitwarden-cli/debian/.
+upstream:
+  url: https://github.com/bitwarden/clients
+  ref: cli-v2026.11.1
+  tags: cli-v*
+releases: all
+architectures:
+- amd64
+- arm64
+target: utils
+install:
+- bitwarden-cli
