@@ -7,7 +7,7 @@ method: build
 # binaries libzed-ocaml*). Local packaging in build/zed-editor/debian/.
 upstream:
   url: https://github.com/zed-industries/zed
-  ref: v1.29.3
+  ref: v1.30.2
 releases: all
 architectures:
 - amd64
