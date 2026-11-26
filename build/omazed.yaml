@@ -5,7 +5,7 @@ method: build
 # (omacom/omarchy-pkgs, pkgbuilds/omazed).
 upstream:
   url: https://github.com/aps6/omazed
-  ref: v2.2.1
+  ref: v2.3.0
 releases:
 - forky
 - sid
