@@ -8,8 +8,8 @@ include /usr/share/dpkg/architecture.mk
 PKG = debian/zed
 ARCH_amd64 = x86_64
 ARCH_arm64 = aarch64
-SHA256_1.29.3_amd64 = 44b0f350aa7bf4551d1b0aaa2d3b673a6de2c03bc5e979b3592fd2180b4f77c1
-SHA256_1.29.3_arm64 = 5f1de233ac02d8c9eff68e9ab4207274df3ddbd2cf9fa6f8a80ef5487f03e8ee
+SHA256_1.30.2_amd64 = 210e6a08dc5343123254dfa9b9dd7a6e828e6ac2b10f98cd4ed1bd7d68cca2df
+SHA256_1.30.2_arm64 = 497e1732287e974fce9268f828e1053ae384fdec193cbd81f8b0c294ae0efe6f
 ASSET = zed-linux-$(ARCH_$(DEB_HOST_ARCH)).tar.gz
 SHA256 = $(SHA256_$(DEB_VERSION_UPSTREAM)_$(DEB_HOST_ARCH))
 URL = https://github.com/zed-industries/zed/releases/download/v$(DEB_VERSION_UPSTREAM)/$(ASSET)
