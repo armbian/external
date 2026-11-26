@@ -88,6 +88,14 @@ jobs:
             git checkout -q -B "$branch" "$base"
             python3 -m extpkg bump --plan "$plan" --apply "$key"
 
+            # Hooks: build/<config>/bump-update <old> <new> updates files that follow
+            # the tag, for example checksums. A failure is a warning: the build shows it.
+            while read -r config old new; do
+              hook=build/$config/bump-update
+              [ -x "$hook" ] || continue
+              "$hook" "$old" "$new" || echo "::warning::$config: bump-update $old $new failed"
+            done < <(jq -r '.bumps[] | "\(.config) \(.old) \(.new)"' <<< "$g")
+
             # Hooks: build/<config>/bump-check <old> <new> lists the manual work.
             body=$(jq -r .body <<< "$g")
             draft=()

@@ -1,0 +1,22 @@
+#!/bin/bash
+# Bump hook: set the SHA256 of the release assets of the new tag in debian/rules.
+# The values are the GitHub release asset digests. Needs gh with a token.
+# Usage: bump-update <old-tag> <new-tag>
+set -euo pipefail
+tag=$2
+version=${tag#v}
+rules="$(dirname "$0")/debian/rules"
+
+digests=$(gh api "repos/zed-industries/zed/releases/tags/$tag" --jq '.assets[] | "\(.name) \(.digest)"')
+lines=""
+for pair in amd64:x86_64 arm64:aarch64; do
+	asset="zed-linux-${pair#*:}.tar.gz"
+	sha=$(awk -v n="$asset" '$1 == n { sub(/^sha256:/, "", $2); print $2 }' <<< "$digests")
+	[[ "$sha" =~ ^[0-9a-f]{64}$ ]] || { echo "No SHA256 digest for $asset in $tag" >&2; exit 1; }
+	lines+="SHA256_${version}_${pair%%:*} = $sha"$'\n'
+done
+
+# Replace all SHA256_<version>_<arch> lines with the lines of the new tag.
+new=$(awk -v lines="$lines" '/^SHA256_[0-9]/ { if (!done) { printf "%s", lines; done = 1 } next } { print }' "$rules")
+grep -qF "SHA256_${version}_amd64" <<< "$new" || { echo "No SHA256 lines in $rules" >&2; exit 1; }
+printf '%s\n' "$new" > "$rules"
