@@ -8,6 +8,7 @@ source:
 releases:
 - noble
 architectures:
+- armhf
 - arm64
 - amd64
 target: desktop
