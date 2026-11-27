@@ -5,7 +5,7 @@ method: build
 # upstream Arch PKGBUILD (omacom/omarchy-pkgs, pkgbuilds/owe).
 upstream:
   url: https://github.com/omacom/owe
-  ref: v0.2.18
+  ref: v0.2.19
   bump_group: omarchy
 releases:
 - forky
