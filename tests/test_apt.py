@@ -120,6 +120,41 @@ class SelectVersionMatch(unittest.TestCase):
         self.assertIn("chromium-shell", self.picked(self.stanzas() + [st]))
 
 
+class SelectReconcile(unittest.TestCase):
+    """Cases from the review of armbian/external#143."""
+
+    @staticmethod
+    def st(name, version, depends=""):
+        return {"Package": name, "Version": version, "Architecture": "amd64", "Depends": depends}
+
+    def picked(self, stanzas, filter_text="Name (% a) | Name (% b) | Name (% c)", with_deps=False):
+        return {s["Package"]: s["Version"] for s in apt.select(stanzas, filter_text, "amd64", with_deps)}
+
+    def test_cycle_ends_with_a_consistent_set(self):
+        st = self.st
+        got = self.picked([st("a", "2", "b (= 1)"), st("a", "1", "b (= 2)"),
+                           st("b", "2", "a (= 2)"), st("b", "1", "a (= 1)")])
+        self.assertEqual(got, {"b": "2"})
+
+    def test_newer_version_that_fits_later_is_taken(self):
+        st = self.st
+        got = self.picked([st("a", "2", "b (= 1)"), st("a", "1", "b (>= 1)"),
+                           st("b", "2", "c (>= 2)"), st("b", "1", "c (>= 1)"), st("c", "1")])
+        self.assertEqual(got, {"a": "2", "b": "1", "c": "1"})
+
+    def test_left_out_name_comes_back_when_it_fits(self):
+        st = self.st
+        got = self.picked([st("a", "2", "b (= 1)"),
+                           st("b", "2", "c (>= 2)"), st("b", "1", "c (>= 1)"), st("c", "1")])
+        self.assertEqual(got, {"a": "2", "b": "1", "c": "1"})
+
+    def test_with_deps_follows_the_replacement_version(self):
+        st = self.st
+        got = self.picked([st("a", "2", "b (>= 2)"), st("a", "1", "b (>= 1), c (>= 1)"),
+                           st("b", "1"), st("c", "1")], "Name (= a)", with_deps=True)
+        self.assertEqual(got, {"a": "1", "b": "1", "c": "1"})
+
+
 @unittest.skipUnless(shutil.which("gpg") and shutil.which("gpgv"), "needs gpg and gpgv")
 class Signature(unittest.TestCase):
     def test_more_than_40_key_files(self):
