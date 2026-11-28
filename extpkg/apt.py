@@ -313,7 +313,55 @@ def select(stanzas, filter_text, arch, with_deps=False, exclude=()):
                     chosen.add(dep)
                     todo.append(dep)
 
-    return [pick(name) for name in sorted(chosen)]
+    picked = {name: pick(name) for name in chosen}
+
+    # A package can be newer than the package it needs. Example: the PPA
+    # publishes chromium-l10n (Architecture: all) before the chromium build of
+    # each architecture. Take the newest version whose versioned dependencies
+    # on the other picked packages hold. Leave out a name that has none.
+    changed = True
+    while changed:
+        changed = False
+        for name in sorted(picked):
+            if _deps_hold(picked[name], picked):
+                continue
+            sts = [s for s in by_name[name] if pred(s)] or by_name[name]
+            sts = sorted(sts, key=lambda s: debver.Version(s["Version"]), reverse=True)
+            fit = next((s for s in sts if _deps_hold(s, picked)), None)
+            if fit is None:
+                del picked[name]
+            else:
+                picked[name] = fit
+            changed = True
+
+    return [picked[name] for name in sorted(picked)]
+
+
+_RELATIONS = {
+    ">=": lambda c: c >= 0, ">": lambda c: c >= 0, ">>": lambda c: c > 0,
+    "<=": lambda c: c <= 0, "<": lambda c: c <= 0, "<<": lambda c: c < 0,
+    "=": lambda c: c == 0,
+}
+
+
+def _deps_hold(st, picked):
+    """True when the versioned dependencies of st on picked packages hold.
+
+    Only clauses without alternatives count. A dependency on a package that is
+    not picked does not count: the release or another repository gives it.
+    """
+    for clause in (st.get("Depends", "") + "," + st.get("Pre-Depends", "")).split(","):
+        clause = clause.strip()
+        if not clause or "|" in clause:
+            continue
+        m = re.match(r"([^\s(:]+)(?::\S+)?\s*\(\s*(>=|<=|>>|<<|=|>|<)\s*([^)\s]+)\s*\)", clause)
+        if not m:
+            continue
+        name, op, version = m.groups()
+        dep = picked.get(name)
+        if dep is not None and not _RELATIONS[op](debver.compare(dep["Version"], version)):
+            return False
+    return True
 
 
 _repos = {}
