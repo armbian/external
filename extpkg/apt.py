@@ -296,45 +296,88 @@ def select(stanzas, filter_text, arch, with_deps=False, exclude=()):
         by_name.setdefault(st["Package"], []).append(st)
 
     chosen = {name for name, sts in by_name.items() if not excluded(name) and any(pred(s) for s in sts)}
-    def pick(name):
-        # A matched name takes its newest matching version (the filter may cap
-        # the version). A name added as a dependency takes its newest version.
+    def candidates(name):
+        # Newest first. A matched name keeps to its matching versions (the
+        # filter may cap the version). A name added as a dependency takes any.
         sts = [s for s in by_name[name] if pred(s)] or by_name[name]
-        return max(sts, key=lambda s: debver.Version(s["Version"]))
+        return sorted(sts, key=lambda s: debver.Version(s["Version"]), reverse=True)
+
+    def deps_of(st):
+        names = _dep_names(st.get("Depends", "") + "," + st.get("Pre-Depends", ""))
+        return [d for d in names if d in by_name and not excluded(d)]
 
     if with_deps:
         # Follow the dependencies of the picked version only. Older versions in
         # the index can name packages that the picked one does not need.
         todo = list(chosen)
         while todo:
-            st = pick(todo.pop())
-            for dep in _dep_names(st.get("Depends", "") + "," + st.get("Pre-Depends", "")):
-                if dep in by_name and dep not in chosen and not excluded(dep):
+            for dep in deps_of(candidates(todo.pop())[0]):
+                if dep not in chosen:
                     chosen.add(dep)
                     todo.append(dep)
 
-    picked = {name: pick(name) for name in chosen}
+    picked = {name: candidates(name)[0] for name in chosen}
+    dropped = set()
+    while True:
+        _reconcile(picked, dropped, candidates)
+        if not with_deps:
+            break
+        # Reconciliation can take an older version with other dependencies.
+        new = {d for st in picked.values() for d in deps_of(st)} - chosen
+        if not new:
+            break
+        chosen |= new
+        for name in new:
+            picked[name] = candidates(name)[0]
 
-    # A package can be newer than the package it needs. Example: the PPA
-    # publishes chromium-l10n (Architecture: all) before the chromium build of
-    # each architecture. Take the newest version whose versioned dependencies
-    # on the other picked packages hold. Leave out a name that has none.
+    return [picked[name] for name in sorted(picked)]
+
+
+def _reconcile(picked, dropped, candidates):
+    """Make the versioned dependencies between picked packages hold.
+
+    A package can be newer than the package it needs. Example: the PPA
+    publishes chromium-l10n (Architecture: all) before the chromium build of
+    each architecture.
+
+    Phase 1 only lowers a version or leaves a name out, until all versioned
+    dependencies hold. Phase 2 only raises a version or takes a left-out name
+    back, while all versioned dependencies still hold. Each step moves one
+    name in one direction, so both phases end. The result is consistent, but
+    not always the newest consistent set: that needs a full solver.
+    """
+    newer = lambda a, b: debver.Version(b["Version"]) < debver.Version(a["Version"])
+
     changed = True
     while changed:
         changed = False
         for name in sorted(picked):
-            if _deps_hold(picked[name], picked):
+            cur = picked[name]
+            if _deps_hold(cur, picked):
                 continue
-            sts = [s for s in by_name[name] if pred(s)] or by_name[name]
-            sts = sorted(sts, key=lambda s: debver.Version(s["Version"]), reverse=True)
-            fit = next((s for s in sts if _deps_hold(s, picked)), None)
+            fit = next((s for s in candidates(name) if newer(cur, s) and _deps_hold(s, picked)), None)
             if fit is None:
                 del picked[name]
+                dropped.add(name)
             else:
                 picked[name] = fit
             changed = True
 
-    return [picked[name] for name in sorted(picked)]
+    changed = True
+    while changed:
+        changed = False
+        for name in sorted(set(picked) | dropped):
+            cur = picked.get(name)
+            for st in candidates(name):
+                if cur is not None and not newer(st, cur):
+                    break
+                trial = dict(picked)
+                trial[name] = st
+                if all(_deps_hold(s, trial) for s in trial.values()):
+                    picked[name] = st
+                    dropped.discard(name)
+                    changed = True
+                    break
 
 
 _RELATIONS = {
