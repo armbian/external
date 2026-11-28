@@ -5,7 +5,7 @@ method: build
 # source. Local packaging in build/disktree/debian/.
 upstream:
   url: https://github.com/tobi/disktree
-  ref: v1.0.0
+  ref: v1.5.0
 releases:
 - forky
 - sid
