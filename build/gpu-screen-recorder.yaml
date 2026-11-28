@@ -5,7 +5,7 @@ method: build
 # packaging in build/gpu-screen-recorder/debian/.
 upstream:
   url: https://repo.dec05eba.com/gpu-screen-recorder
-  ref: 6.1.7
+  ref: 6.2.0
 releases:
 - forky
 - sid
