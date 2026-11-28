@@ -84,6 +84,42 @@ class Select(unittest.TestCase):
         self.assertEqual(self.names(exclude=["nvidia-kernel-*"]), ["nvidia-open"])
 
 
+class SelectVersionMatch(unittest.TestCase):
+    """An Architecture: all package must not be newer than the package it needs."""
+
+    FILTER = "Name (% chromium) | Name (% chromium-*)"
+
+    def stanzas(self, *l10n):
+        out = [{"Package": "chromium", "Version": "150.0-1", "Architecture": "armhf"},
+               {"Package": "chromium-driver", "Version": "150.0-1", "Architecture": "armhf",
+                "Depends": "chromium (= 150.0-1), libc6 (>= 2.38)"}]
+        for v in l10n:
+            out.append({"Package": "chromium-l10n", "Version": v, "Architecture": "all",
+                        "Depends": f"chromium (>= {v})"})
+        return out
+
+    def picked(self, stanzas):
+        return {st["Package"]: st["Version"] for st in apt.select(stanzas, self.FILTER, "armhf")}
+
+    def test_newer_l10n_falls_back_to_the_matching_version(self):
+        got = self.picked(self.stanzas("150.0-1", "156.0-1"))
+        self.assertEqual(got["chromium-l10n"], "150.0-1")
+
+    def test_l10n_without_a_matching_version_is_left_out(self):
+        got = self.picked(self.stanzas("156.0-1"))
+        self.assertNotIn("chromium-l10n", got)
+        self.assertEqual(got["chromium"], "150.0-1")
+
+    def test_matching_versions_do_not_change(self):
+        got = self.picked(self.stanzas("150.0-1"))
+        self.assertEqual(got, {"chromium": "150.0-1", "chromium-driver": "150.0-1", "chromium-l10n": "150.0-1"})
+
+    def test_alternatives_and_packages_not_picked_are_ignored(self):
+        st = {"Package": "chromium-shell", "Version": "150.0-1", "Architecture": "armhf",
+              "Depends": "libfoo (>= 9) | chromium (>= 999), libbar (>= 9)"}
+        self.assertIn("chromium-shell", self.picked(self.stanzas() + [st]))
+
+
 @unittest.skipUnless(shutil.which("gpg") and shutil.which("gpgv"), "needs gpg and gpgv")
 class Signature(unittest.TestCase):
     def test_more_than_40_key_files(self):
